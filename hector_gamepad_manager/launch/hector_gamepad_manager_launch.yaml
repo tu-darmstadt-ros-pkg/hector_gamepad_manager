@@ -1,0 +1,13 @@
+launch:
+  - arg:
+      name: "config_filename"
+      default: "gamepad_mappings.yaml"
+
+  - node:
+      pkg: "hector_gamepad_manager"
+      exec: "hector_gamepad_manager_node"
+      name: "hector_gamepad_manager_node"
+      output: "screen"
+      param:
+        - name: "config_filename"
+          value: "$(var config_filename)"
