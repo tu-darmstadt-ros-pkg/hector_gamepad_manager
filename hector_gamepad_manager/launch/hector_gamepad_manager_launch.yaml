@@ -1,13 +1,41 @@
 launch:
-  - arg:
-      name: "config_filename"
-      default: "gamepad_mappings.yaml"
+- arg:
+    name: "config_filename"
+    default: "gamepad_mappings.yaml"
+- arg:
+    name: "ns"
+    default: ""
+- arg:
+    name: "stamped"
+    default: "true"
 
-  - node:
-      pkg: "hector_gamepad_manager"
-      exec: "hector_gamepad_manager_node"
-      name: "hector_gamepad_manager_node"
-      output: "screen"
-      param:
-        - name: "config_filename"
-          value: "$(var config_filename)"
+- let:
+    name: "cmd_vel_topic"
+    value: "cmd_vel"
+    if: $(var stamped)
+- let:
+    name: "cmd_vel_topic"
+    value: "cmd_vel_stamped"
+    unless: $(var stamped)
+
+- push-ros-namespace:
+    namespace: "$(var ns)"
+
+- node:
+    pkg: "hector_gamepad_manager"
+    exec: "hector_gamepad_manager_node"
+    name: "hector_gamepad_manager_node"
+    output: "screen"
+    param:
+      - name: "config_filename"
+        value: "$(var config_filename)"
+    remap:
+    - from: "cmd_vel"
+      to: $(var cmd_vel_topic)
+
+- node:
+    pkg: "topic_tools"
+    exec: "relay_field"
+    name: "convert_cmd_vel"
+    args: "/$(var ns)/cmd_vel_stamped /$(var ns)/cmd_vel geometry_msgs/msg/Twist \"{linear: m.twist.linear, angular: m.twist.angular}\" --wait-for-start"
+    output: "screen"
