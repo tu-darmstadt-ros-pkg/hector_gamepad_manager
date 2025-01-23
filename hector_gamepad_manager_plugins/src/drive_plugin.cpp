@@ -8,26 +8,26 @@ void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node, const bool ac
   node_ = node;
   active_ = active;
 
-  node_->declare_parameter<std::string>( "drive_command_topic", "/cmd_vel" );
-  drive_command_topic_ = node_->get_parameter( "drive_command_topic" ).as_string();
+  plugin_namespace_ = "drive_plugin";
 
-  node_->declare_parameter<double>( "max_linear_speed", 1.0 );
-  max_linear_speed_ = node_->get_parameter( "max_linear_speed" ).as_double();
+  node_->declare_parameters<double>( plugin_namespace_, { { "max_linear_speed", 1.0 },
+                                                          { "max_angular_speed", 1.0 },
+                                                          { "slow_factor", 0.5 },
+                                                          { "normal_factor", 0.75 },
+                                                          { "fast_factor", 1.0 } } );
 
-  node_->declare_parameter<double>( "max_angular_speed", 1.0 );
-  max_angular_speed_ = node_->get_parameter( "max_angular_speed" ).as_double();
+  max_linear_speed_ = node_->get_parameter( plugin_namespace_ + ".max_linear_speed" ).as_double();
 
-  node_->declare_parameter<double>( "slow_factor", 0.5 );
-  slow_factor_ = node_->get_parameter( "slow_factor" ).as_double();
+  max_angular_speed_ = node_->get_parameter( plugin_namespace_ + ".max_angular_speed" ).as_double();
 
-  node_->declare_parameter<double>( "normal_factor", 0.75 );
-  normal_factor_ = node_->get_parameter( "normal_factor" ).as_double();
+  slow_factor_ = node_->get_parameter( plugin_namespace_ + ".slow_factor" ).as_double();
 
-  node_->declare_parameter<double>( "fast_factor", 1.0 );
-  fast_factor_ = node_->get_parameter( "fast_factor" ).as_double();
+  normal_factor_ = node_->get_parameter( plugin_namespace_ + ".normal_factor" ).as_double();
+
+  fast_factor_ = node_->get_parameter( plugin_namespace_ + ".fast_factor" ).as_double();
 
   drive_command_publisher_ =
-      node_->create_publisher<geometry_msgs::msg::TwistStamped>( drive_command_topic_, 10 );
+      node_->create_publisher<geometry_msgs::msg::TwistStamped>( "cmd_vel", 10 );
 }
 
 void DrivePlugin::handleButton( const std::string &function, const bool pressed )

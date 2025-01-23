@@ -39,3 +39,4 @@ launch:
     name: "convert_cmd_vel"
     args: "/$(var ns)/cmd_vel_stamped /$(var ns)/cmd_vel geometry_msgs/msg/Twist \"{linear: m.twist.linear, angular: m.twist.angular}\" --wait-for-start"
     output: "screen"
+    unless: $(var stamped)

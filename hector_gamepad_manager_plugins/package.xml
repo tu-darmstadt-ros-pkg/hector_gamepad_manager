@@ -3,7 +3,7 @@
 <package format="3">
   <name>hector_gamepad_manager_plugins</name>
   <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <description>Package with plugins for the hector_gamepad_manager package</description>
   <maintainer email="simon.giegerich@stud.tu-darmstadt.de">Simon Giegerich</maintainer>
   <license>TODO: License declaration</license>
 

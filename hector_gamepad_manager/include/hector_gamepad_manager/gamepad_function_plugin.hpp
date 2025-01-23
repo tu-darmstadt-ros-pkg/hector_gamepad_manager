@@ -51,8 +51,11 @@ public:
   virtual void deactivate() = 0;
 
 protected:
+  // The namespace of the plugin.
+  std::string plugin_namespace_;
+
   // Specifies if the plugin is active.
-  bool active_;
+  bool active_ = false;
 };
 } // namespace hector_gamepad_manager
 
