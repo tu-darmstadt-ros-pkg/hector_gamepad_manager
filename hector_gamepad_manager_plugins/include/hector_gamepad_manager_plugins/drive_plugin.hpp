@@ -40,7 +40,6 @@ private:
   bool fast_button_pressed_;
   bool slow_button_pressed_;
 
-  std::string drive_command_topic_;
   geometry_msgs::msg::TwistStamped drive_command_;
 };
 } // namespace hector_gamepad_manager_plugins

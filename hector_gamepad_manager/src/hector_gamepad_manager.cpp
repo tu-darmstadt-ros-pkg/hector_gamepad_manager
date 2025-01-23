@@ -12,22 +12,22 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
   node_->declare_parameter<std::string>( "config_filename", "gamepad_mappings.yaml" );
   const std::string config_filename = node_->get_parameter( "config_filename" ).as_string();
 
-  if ( !load_config( package_path + "/config/" + config_filename ) ) {
+  if ( !loadConfig( package_path + "/config/" + config_filename ) ) {
     RCLCPP_ERROR( node_->get_logger(), "Failed to load config file %s", config_filename.c_str() );
     return;
   }
 
   joy_subscription_ = node_->create_subscription<sensor_msgs::msg::Joy>(
-      "/joy", 10, std::bind( &HectorGamepadManager::joy_callback, this, std::placeholders::_1 ) );
+      "/joy", 10, std::bind( &HectorGamepadManager::joyCallback, this, std::placeholders::_1 ) );
 }
 
-bool HectorGamepadManager::load_config( const std::string &file_path )
+bool HectorGamepadManager::loadConfig( const std::string &file_path )
 {
   try {
     YAML::Node config = YAML::LoadFile( file_path );
 
-    init_mappings( config, "axes", axis_mappings_ );
-    init_mappings( config, "buttons", button_mappings_ );
+    initMappings( config, "axes", axis_mappings_ );
+    initMappings( config, "buttons", button_mappings_ );
 
     return true;
   } catch ( const std::exception &e ) {
@@ -36,8 +36,8 @@ bool HectorGamepadManager::load_config( const std::string &file_path )
   }
 }
 
-void HectorGamepadManager::init_mappings( const YAML::Node &config, const std::string &type,
-                                          std::unordered_map<int, ActionMapping> &mappings )
+void HectorGamepadManager::initMappings( const YAML::Node &config, const std::string &type,
+                                         std::unordered_map<int, ActionMapping> &mappings )
 {
   if ( config[type] ) {
     for ( const auto &entry : config[type] ) {
@@ -53,13 +53,14 @@ void HectorGamepadManager::init_mappings( const YAML::Node &config, const std::s
   }
 
   // Load plugins
-  for ( const auto &mapping : mappings ) { load_plugin( mapping.second.plugin_name ); }
+  for ( const auto &mapping : mappings ) { loadPlugin( mapping.second.plugin_name ); }
 }
 
-void HectorGamepadManager::load_plugin( const std::string &plugin_name )
+void HectorGamepadManager::loadPlugin( const std::string &plugin_name )
 {
   if ( plugins_.count( plugin_name ) == 0 ) {
     try {
+      RCLCPP_INFO( node_->get_logger(), "Trying to load plugin: %s", plugin_name.c_str() );
       std::shared_ptr<GamepadFunctionPlugin> plugin =
           plugin_loader_.createSharedInstance( plugin_name );
       plugin->initialize( node_, true );
@@ -72,7 +73,7 @@ void HectorGamepadManager::load_plugin( const std::string &plugin_name )
   }
 }
 
-void HectorGamepadManager::joy_callback( const sensor_msgs::msg::Joy::SharedPtr msg )
+void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr msg )
 {
   // Handle buttons
   for ( const auto &button_mapping : button_mappings_ ) {

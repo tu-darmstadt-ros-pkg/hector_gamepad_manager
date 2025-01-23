@@ -28,14 +28,14 @@ private:
   std::unordered_map<int, ActionMapping> axis_mappings_;
   std::unordered_map<std::string, std::shared_ptr<GamepadFunctionPlugin>> plugins_;
 
-  bool load_config( const std::string &file_path );
+  bool loadConfig( const std::string &file_path );
 
-  void init_mappings( const YAML::Node &config, const std::string &type,
-                      std::unordered_map<int, ActionMapping> &mappings );
+  void initMappings( const YAML::Node &config, const std::string &type,
+                     std::unordered_map<int, ActionMapping> &mappings );
 
-  void load_plugin( const std::string &plugin_name );
+  void loadPlugin( const std::string &plugin_name );
 
-  void joy_callback( const sensor_msgs::msg::Joy::SharedPtr msg );
+  void joyCallback( const sensor_msgs::msg::Joy::SharedPtr msg );
 };
 } // namespace hector_gamepad_manager
 
