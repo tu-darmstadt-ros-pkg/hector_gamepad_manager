@@ -10,11 +10,13 @@ namespace hector_gamepad_manager_plugins
 class DrivePlugin : public hector_gamepad_manager::GamepadFunctionPlugin
 {
 public:
-  void initialize( const rclcpp::Node::SharedPtr &node, const bool active ) override;
+  void initialize( const rclcpp::Node::SharedPtr &node, bool active ) override;
 
-  void handleButton( const std::string &function, const bool pressed ) override;
+  void handleAxis( const std::string &function, double value ) override;
 
-  void handleAxis( const std::string &function, const double value ) override;
+  void handleHold( const std::string &function ) override;
+
+  void handleRelease( const std::string &function ) override;
 
   void update() override;
 
@@ -23,23 +25,37 @@ public:
   void deactivate() override;
 
 private:
-  rclcpp::Node::SharedPtr node_;
-
+  // Publisher for drive commands
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr drive_command_publisher_;
 
+  // Maximum linear speed
   double max_linear_speed_;
+
+  // Maximum angular speed
   double max_angular_speed_;
 
+  // Current drive value
   double drive_value_;
+
+  // Current steer value
   double steer_value_;
 
+  // Speed factor for slow driving
   double slow_factor_;
+
+  // Speed factor for normal driving
   double normal_factor_;
+
+  // Speed factor for fast driving
   double fast_factor_;
 
-  bool fast_button_pressed_;
-  bool slow_button_pressed_;
+  // True if fast mode is active, false otherwise
+  bool fast_mode_active_;
 
+  // True if slow mode is active, false otherwise
+  bool slow_mode_active_;
+
+  // Current drive command
   geometry_msgs::msg::TwistStamped drive_command_;
 };
 } // namespace hector_gamepad_manager_plugins

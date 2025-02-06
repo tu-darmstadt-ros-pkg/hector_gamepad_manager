@@ -26,33 +26,37 @@ void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node, const bool ac
 
   fast_factor_ = node_->get_parameter( plugin_namespace_ + ".fast_factor" ).as_double();
 
+  fast_mode_active_ = false;
+  slow_mode_active_ = false;
+
   drive_command_publisher_ =
-      node_->create_publisher<geometry_msgs::msg::TwistStamped>( "cmd_vel", 10 );
-}
-
-void DrivePlugin::handleButton( const std::string &function, const bool pressed )
-{
-  if ( !active_ ) {
-    return;
-  }
-
-  if ( function == "fast" ) {
-    fast_button_pressed_ = pressed;
-  } else if ( function == "slow" ) {
-    slow_button_pressed_ = pressed;
-  }
+      node_->create_publisher<geometry_msgs::msg::TwistStamped>( "cmd_vel", 1 );
 }
 
 void DrivePlugin::handleAxis( const std::string &function, const double value )
 {
-  if ( !active_ ) {
-    return;
-  }
-
   if ( function == "drive" ) {
     drive_value_ = value;
   } else if ( function == "steer" ) {
     steer_value_ = value;
+  }
+}
+
+void DrivePlugin::handleHold( const std::string &function )
+{
+  if ( function == "fast" ) {
+    fast_mode_active_ = true;
+  } else if ( function == "slow" ) {
+    slow_mode_active_ = true;
+  }
+}
+
+void DrivePlugin::handleRelease( const std::string &function )
+{
+  if ( function == "fast" ) {
+    fast_mode_active_ = false;
+  } else if ( function == "slow" ) {
+    slow_mode_active_ = false;
   }
 }
 
@@ -63,10 +67,10 @@ void DrivePlugin::update()
   }
 
   double speed_factor = normal_factor_;
-  if ( fast_button_pressed_ ) {
-    speed_factor = fast_factor_;
-  } else if ( slow_button_pressed_ ) {
+  if ( slow_mode_active_ ) {
     speed_factor = slow_factor_;
+  } else if ( fast_mode_active_ ) {
+    speed_factor = fast_factor_;
   }
 
   drive_command_.twist.linear.x = drive_value_ * max_linear_speed_ * speed_factor;
@@ -82,8 +86,11 @@ void DrivePlugin::deactivate()
 {
   active_ = false;
 
+  // Bring the robot to a stop
   drive_command_.twist.linear.x = 0.0;
   drive_command_.twist.angular.z = 0.0;
+
+  drive_command_.header.stamp = node_->now();
   drive_command_publisher_->publish( drive_command_ );
 }
 } // namespace hector_gamepad_manager_plugins
