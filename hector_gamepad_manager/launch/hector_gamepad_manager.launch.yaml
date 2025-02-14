@@ -1,8 +1,8 @@
 launch:
 - arg:
-    name: "config_filenames"
-    # List all the gamepad mappings files here, the first will be initialized as active.
-    default: "[\"gamepad_mappings.yaml\"]"
+    name: "config_switches_filename"
+    # Meta Config File that determines which buttons activate which config
+    default: "config_switches"
 - arg:
     name: "ns"
     default: ""
@@ -28,8 +28,8 @@ launch:
     name: "hector_gamepad_manager_node"
     output: "screen"
     param:
-      - name: "config_filenames"
-        value: "$(var config_filenames)"
+      - name: "config_switches_filename"
+        value: "$(var config_switches_filename)"
     remap:
     - from: "cmd_vel"
       to: $(var cmd_vel_topic)

@@ -3,11 +3,9 @@
 namespace hector_gamepad_manager_plugins
 {
 
-void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node, const bool active )
+void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node )
 {
   node_ = node;
-  active_ = active;
-
   plugin_namespace_ = "drive_plugin";
 
   node_->declare_parameters<double>( plugin_namespace_, { { "max_linear_speed", 1.0 },

@@ -4,61 +4,92 @@ namespace hector_gamepad_manager
 {
 HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node )
     : node_( node ),
-      plugin_loader_( "hector_gamepad_manager", "hector_gamepad_manager::GamepadFunctionPlugin" ),
-      first_config_( true )
+      plugin_loader_( "hector_gamepad_manager", "hector_gamepad_manager::GamepadFunctionPlugin" )
 {
-  const std::string package_path =
-      ament_index_cpp::get_package_share_directory( "hector_gamepad_manager" );
 
-  node_->declare_parameter<std::vector<std::string>>( "config_filenames",
-                                                      { "gamepad_mappings.yaml" } );
-  const std::vector<std::string> config_filenames =
-      node_->get_parameter( "config_filenames" ).as_string_array();
-
-  for ( const auto &config_filename : config_filenames ) {
-    if ( !loadConfig( package_path + "/config/" + config_filename ) ) {
-      RCLCPP_ERROR( node_->get_logger(), "Failed to load config file %s", config_filename.c_str() );
-      return;
-    }
-  }
-
+  node_->declare_parameter<std::string>( "config_switches_filename", "config_switches.yaml" );
+  const std::string config_switches_filename =
+      node_->get_parameter( "config_switches_filename" ).as_string();
   inputs_ = GamepadInputs();
+  rclcpp::QoS qos_profile(1);  // Keep only the last message
+  qos_profile.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
+  qos_profile.durability(RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL);
+  active_config_publisher_ = node_->create_publisher<std_msgs::msg::String>( "active_config", qos_profile );
 
-  joy_subscription_ = node_->create_subscription<sensor_msgs::msg::Joy>(
-      "/joy", 1, std::bind( &HectorGamepadManager::joyCallback, this, std::placeholders::_1 ) );
+  if ( loadConfigSwitchesConfig( config_switches_filename ) ) {
+    switchConfig( default_config_ );
+    joy_subscription_ = node_->create_subscription<sensor_msgs::msg::Joy>(
+        "/joy", 1, std::bind( &HectorGamepadManager::joyCallback, this, std::placeholders::_1 ) );
+  }
 }
 
-bool HectorGamepadManager::loadConfig( const std::string &file_path )
+bool HectorGamepadManager::loadConfigSwitchesConfig( const std::string &file_name )
+{
+
+  try {
+    const YAML::Node config = YAML::LoadFile( getPath( file_name ) );
+    for ( const auto &entry : config["buttons"] ) {
+      int id = entry.first.as<int>();
+      YAML::Node mapping = entry.second;
+      auto config_name = mapping["config"].as<std::string>();
+
+      if ( config_name.empty() )
+        continue; // skip empty mappings
+
+      RCLCPP_INFO( node_->get_logger(), "Loading config file %s", config_name.c_str() );
+      if ( !loadConfig( config_name ) ) {
+        RCLCPP_ERROR( node_->get_logger(), "Failed to load config file %s", config_name.c_str() );
+        return false;
+      }
+      config_switch_button_mapping_[id] = config_name;
+    }
+    default_config_ = config["default_config"].as<std::string>();
+  } catch ( const std::exception &e ) {
+    RCLCPP_ERROR( node_->get_logger(), "Error loading Config Switch YAML file: %s", e.what() );
+    return false;
+  }
+  return true;
+}
+
+bool HectorGamepadManager::loadConfig( const std::string &file_name )
 {
   try {
-    const YAML::Node config = YAML::LoadFile( file_path );
-
-    // Get the name of the file without the path and extension
-    const std::string filename =
-        file_path.substr( file_path.find_last_of( '/' ) + 1 ).substr( 0, file_path.find_last_of( '.' ) );
+    const YAML::Node config = YAML::LoadFile( getPath( file_name ) );
 
     // Add empty mappings for the filename
-    button_mappings_[filename] = {};
-    axis_mappings_[filename] = {};
+    button_mappings_[file_name] = {};
+    axis_mappings_[file_name] = {};
 
-    if ( first_config_ ) {
-      active_config_ = filename;
-      active_button_mappings_ = &button_mappings_[filename];
-      active_axis_mappings_ = &axis_mappings_[filename];
-    }
-
-    if ( !initMappings( config, "buttons", button_mappings_[filename] ) ||
-         !initMappings( config, "axes", axis_mappings_[filename] ) ) {
+    if ( !initMappings( config, "buttons", button_mappings_[file_name] ) ||
+         !initMappings( config, "axes", axis_mappings_[file_name] ) ) {
       return false;
     }
-
-    first_config_ = false;
 
     return true;
   } catch ( const std::exception &e ) {
     RCLCPP_ERROR( node_->get_logger(), "Error loading YAML file: %s", e.what() );
     return false;
   }
+}
+
+bool HectorGamepadManager::switchConfig( const std::string &config_name )
+{
+  if ( button_mappings_.count( config_name ) == 0 || axis_mappings_.count( config_name ) == 0 ) {
+    RCLCPP_ERROR( node_->get_logger(), "Config %s not found. Cannot switch the gamepad config",
+                  config_name.c_str() );
+    return false;
+  }
+  if ( config_name == active_config_ )
+    return true;
+  RCLCPP_INFO( node_->get_logger(), "Switching from config %s to config: %s",
+               active_config_.c_str(), config_name.c_str() );
+  deactivatePlugins();
+  active_config_publisher_->publish( std_msgs::msg::String().set__data( config_name ) );
+  active_config_ = config_name;
+  active_button_mappings_ = &button_mappings_[config_name];
+  active_axis_mappings_ = &axis_mappings_[config_name];
+  activatePlugins( config_name );
+  return true;
 }
 
 bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::string &type,
@@ -87,7 +118,7 @@ bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::st
       try {
         std::shared_ptr<GamepadFunctionPlugin> plugin =
             plugin_loader_.createSharedInstance( plugin_name );
-        plugin->initialize( node_, first_config_ );
+        plugin->initialize( node_ );
         plugins_[plugin_name] = plugin;
         RCLCPP_INFO( node_->get_logger(), "Loaded plugin: %s", plugin_name.c_str() );
       } catch ( const std::exception &e ) {
@@ -101,9 +132,33 @@ bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::st
   return true;
 }
 
+bool HectorGamepadManager::handleConfigurationSwitches()
+{
+
+  if ( inputs_.buttons[CONFIG_SWITCH_BUTTON] ) {
+    // test if and only if one additional button is pressed
+    int count = 0;
+    std::string new_config;
+    for ( size_t i = 0; i < inputs_.buttons.size(); i++ ) {
+      if ( inputs_.buttons[i] && i != CONFIG_SWITCH_BUTTON ) {
+        count++;
+        new_config = config_switch_button_mapping_[i];
+      }
+    }
+    if ( count == 1 ) {
+      switchConfig( new_config );
+    }
+    return true;
+  }
+  return false;
+}
+
 void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr msg )
 {
   convert_joy_to_gamepad_inputs( msg );
+  // ignore normal button / axis behavior if configuration switching is in progress
+  if ( handleConfigurationSwitches() )
+    return;
 
   // Handle buttons
   for ( const auto &button_mapping : *active_button_mappings_ ) {
@@ -127,8 +182,37 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
     }
   }
 
-  // Update all plugins
-  for ( const auto &plugin : plugins_ ) { plugin.second->update(); }
+  // Update all active plugins
+  for ( const auto &plugin : active_plugins_ ) { plugin->update(); }
+}
+
+void HectorGamepadManager::activatePlugins( const std::string &config_name )
+{
+  // activate all  plugins present in the button_mappings_ and axis_mappings_ of the given config
+  if ( button_mappings_.count( config_name ) == 0 || axis_mappings_.count( config_name ) == 0 ) {
+    RCLCPP_ERROR( node_->get_logger(), "Config %s not found. Cannot activate the gamepad config",
+                  config_name.c_str() );
+    return;
+  }
+  for ( const auto &button_mapping : button_mappings_[config_name] ) {
+    const auto &action = button_mapping.second;
+    if ( plugins_.count( action.plugin_name )==1 && !plugins_[action.plugin_name]->isActive() ) {
+      plugins_[action.plugin_name]->activate();
+      RCLCPP_INFO( node_->get_logger(), "Activated plugin: %s", action.plugin_name.c_str() );
+      active_plugins_.push_back(plugins_[action.plugin_name]);
+    }
+  }
+}
+
+void HectorGamepadManager::deactivatePlugins()
+{
+  for ( const auto &plugin : plugins_ ) {
+    if ( plugin.second->isActive() ) {
+      plugin.second->deactivate();
+      RCLCPP_INFO( node_->get_logger(), "Deactivated plugin: %s", plugin.first.c_str() );
+    }
+  }
+  active_plugins_.clear();
 }
 
 void HectorGamepadManager::convert_joy_to_gamepad_inputs( const sensor_msgs::msg::Joy::SharedPtr &msg )
@@ -144,17 +228,17 @@ void HectorGamepadManager::convert_joy_to_gamepad_inputs( const sensor_msgs::msg
   inputs_.axes[7] = msg->axes[7];                    // Cross up/down
 
   // Buttons
-  inputs_.buttons[0] = msg->buttons[0];                   // Button A
-  inputs_.buttons[1] = msg->buttons[1];                   // Button B
-  inputs_.buttons[2] = msg->buttons[2];                   // Button X
-  inputs_.buttons[3] = msg->buttons[3];                   // Button Y
-  inputs_.buttons[4] = msg->buttons[4];                   // Button LB
-  inputs_.buttons[5] = msg->buttons[5];                   // Button RB
-  inputs_.buttons[6] = msg->buttons[6];                   // Button Back
-  inputs_.buttons[7] = msg->buttons[7];                   // Button Start
-  inputs_.buttons[8] = msg->buttons[8];                   // Button Guide
-  inputs_.buttons[9] = msg->buttons[9];                   // Left joystick pressed
-  inputs_.buttons[10] = msg->buttons[10];                 // Right joystick pressed
+  inputs_.buttons[0] = msg->buttons[0];   // Button A
+  inputs_.buttons[1] = msg->buttons[1];   // Button B
+  inputs_.buttons[2] = msg->buttons[2];   // Button X
+  inputs_.buttons[3] = msg->buttons[3];   // Button Y
+  inputs_.buttons[4] = msg->buttons[4];   // Button LB
+  inputs_.buttons[5] = msg->buttons[5];   // Button RB
+  inputs_.buttons[6] = msg->buttons[6];   // Button Back
+  inputs_.buttons[7] = msg->buttons[7];   // Button Start
+  inputs_.buttons[8] = msg->buttons[8];   // Button Guide -> Reserved for config switches
+  inputs_.buttons[9] = msg->buttons[9];   // Left joystick pressed
+  inputs_.buttons[10] = msg->buttons[10]; // Right joystick pressed
   inputs_.buttons[11] = inputs_.axes[0] > AXIS_DEADZONE;  // Left joystick left
   inputs_.buttons[12] = inputs_.axes[0] < -AXIS_DEADZONE; // Left joystick right
   inputs_.buttons[13] = inputs_.axes[1] > AXIS_DEADZONE;  // Left joystick up
@@ -169,5 +253,12 @@ void HectorGamepadManager::convert_joy_to_gamepad_inputs( const sensor_msgs::msg
   inputs_.buttons[22] = inputs_.axes[6] == -1.0f;         // Cross right
   inputs_.buttons[23] = inputs_.axes[7] == 1.0f;          // Cross up
   inputs_.buttons[24] = inputs_.axes[7] == -1.0f;         // Cross down
+}
+
+std::string HectorGamepadManager::getPath( const std::string &file_name )
+{
+  const auto package_path =
+      ament_index_cpp::get_package_share_directory( "hector_gamepad_manager" );
+  return package_path + "/config/" + file_name + ".yaml";
 }
 } // namespace hector_gamepad_manager

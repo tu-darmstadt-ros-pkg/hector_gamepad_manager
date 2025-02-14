@@ -15,9 +15,8 @@ public:
    * @brief Initialize function that is called when the plugin is loaded.
    *
    * @param node The ROS node that the plugin is associated with.
-   * @param active True if the plugin should be active on startup, false otherwise.
    */
-  virtual void initialize( const rclcpp::Node::SharedPtr &node, bool active ) = 0;
+  virtual void initialize( const rclcpp::Node::SharedPtr &node ) = 0;
 
   /**
    * @brief Handle button input events.
@@ -61,28 +60,28 @@ public:
    *
    * @param function The name of the function that is associated with the input event.
    */
-  virtual void handleNone( const std::string &function ) { }
+  virtual void handleNone( const std::string &function ) { (void) function; }
 
   /**
    * @brief Function for handling input events once if the button or axis is pressed.
    *
    * @param function The name of the function that is associated with the input event.
    */
-  virtual void handlePress( const std::string &function ) { }
+  virtual void handlePress( const std::string &function ) { (void) function; }
 
   /**
    * @brief Function for handling input events where the button or axis is held down.
    *
    * @param function The name of the function that is associated with the input event.
    */
-  virtual void handleHold( const std::string &function ) { }
+  virtual void handleHold( const std::string &function ) { (void) function; }
 
   /**
    * @brief Function for handling input events where the button or axis is released.
    *
    * @param function The name of the function that is associated with the input event.
    */
-  virtual void handleRelease( const std::string &function ) { }
+  virtual void handleRelease( const std::string &function ) { (void) function; }
 
   /**
    * @brief Update function that is called periodically to update the plugin state after handling input events.
@@ -98,6 +97,12 @@ public:
    * @brief Deactivate function to lock the plugin and bring it into a safe state.
    */
   virtual void deactivate() = 0;
+
+  /**
+   * @brief Check if the plugin is active.
+   * @return True if the plugin is active, false otherwise.
+   */
+  bool isActive() const { return active_; }
 
 protected:
   // The ROS node
