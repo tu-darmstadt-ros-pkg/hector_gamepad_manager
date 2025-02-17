@@ -19,7 +19,7 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
   if ( loadConfigSwitchesConfig( config_switches_filename ) ) {
     switchConfig( default_config_ );
     joy_subscription_ = node_->create_subscription<sensor_msgs::msg::Joy>(
-        "/joy", 1, std::bind( &HectorGamepadManager::joyCallback, this, std::placeholders::_1 ) );
+        "joy", 1, std::bind( &HectorGamepadManager::joyCallback, this, std::placeholders::_1 ) );
   }
 }
 

@@ -31,13 +31,14 @@ launch:
       - name: "config_switches_filename"
         value: "$(var config_switches_filename)"
     remap:
-    - from: "cmd_vel"
-      to: $(var cmd_vel_topic)
+        - from: "cmd_vel"
+          to: $(var cmd_vel_topic)
+
 
 - node:
     pkg: "topic_tools"
     exec: "relay_field"
     name: "convert_cmd_vel"
-    args: "/$(var ns)/cmd_vel_stamped /$(var ns)/cmd_vel geometry_msgs/msg/Twist \"{linear: m.twist.linear, angular: m.twist.angular}\" --wait-for-start"
+    args: "cmd_vel_stamped cmd_vel geometry_msgs/msg/Twist \"{linear: m.twist.linear, angular: m.twist.angular}\" --wait-for-start"
     output: "screen"
     unless: $(var stamped)
