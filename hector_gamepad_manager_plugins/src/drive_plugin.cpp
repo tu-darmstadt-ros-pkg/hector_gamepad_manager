@@ -40,7 +40,7 @@ void DrivePlugin::handleAxis( const std::string &function, const double value )
   }
 }
 
-void DrivePlugin::handleHold( const std::string &function )
+void DrivePlugin::handlePress( const std::string &function )
 {
   if ( function == "fast" ) {
     fast_mode_active_ = true;

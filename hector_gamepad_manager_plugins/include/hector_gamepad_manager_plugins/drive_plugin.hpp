@@ -14,7 +14,7 @@ public:
 
   void handleAxis( const std::string &function, double value ) override;
 
-  void handleHold( const std::string &function ) override;
+  void handlePress( const std::string &function ) override;
 
   void handleRelease( const std::string &function ) override;
 
@@ -25,38 +25,18 @@ public:
   void deactivate() override;
 
 private:
-  // Publisher for drive commands
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr drive_command_publisher_;
-
-  // Maximum linear speed
-  double max_linear_speed_;
-
-  // Maximum angular speed
-  double max_angular_speed_;
-
-  // Current drive value
-  double drive_value_;
-
-  // Current steer value
-  double steer_value_;
-
-  // Speed factor for slow driving
-  double slow_factor_;
-
-  // Speed factor for normal driving
-  double normal_factor_;
-
-  // Speed factor for fast driving
-  double fast_factor_;
-
-  // True if fast mode is active, false otherwise
-  bool fast_mode_active_;
-
-  // True if slow mode is active, false otherwise
-  bool slow_mode_active_;
-
-  // Current drive command
   geometry_msgs::msg::TwistStamped drive_command_;
+
+  double max_linear_speed_;
+  double max_angular_speed_;
+  double drive_value_;
+  double steer_value_;
+  double slow_factor_;
+  double normal_factor_;
+  double fast_factor_;
+  bool fast_mode_active_;
+  bool slow_mode_active_;
 };
 } // namespace hector_gamepad_manager_plugins
 
