@@ -27,17 +27,17 @@ bool HectorGamepadManager::loadConfigSwitchesConfig( const std::string &file_nam
 {
 
   try {
-    const YAML::Node config = YAML::LoadFile( getPath( file_name ) );
+    const YAML::Node config = YAML::LoadFile( getPath( "hector_gamepad_manager", file_name ) );
     for ( const auto &entry : config["buttons"] ) {
       int id = entry.first.as<int>();
       YAML::Node mapping = entry.second;
       auto config_name = mapping["config"].as<std::string>();
-
+      auto pkg_name = mapping["package"].as<std::string>();
       if ( config_name.empty() )
         continue; // skip empty mappings
 
       RCLCPP_INFO( node_->get_logger(), "Loading config file %s", config_name.c_str() );
-      if ( !loadConfig( config_name ) ) {
+      if ( !loadConfig( pkg_name, config_name ) ) {
         RCLCPP_ERROR( node_->get_logger(), "Failed to load config file %s", config_name.c_str() );
         return false;
       }
@@ -51,10 +51,10 @@ bool HectorGamepadManager::loadConfigSwitchesConfig( const std::string &file_nam
   return true;
 }
 
-bool HectorGamepadManager::loadConfig( const std::string &file_name )
+bool HectorGamepadManager::loadConfig( const std::string &pkg_name, const std::string &file_name )
 {
   try {
-    const YAML::Node config = YAML::LoadFile( getPath( file_name ) );
+    const YAML::Node config = YAML::LoadFile( getPath( pkg_name, file_name ) );
 
     // Add empty mappings for the filename
     button_mappings_[file_name] = {};
@@ -255,10 +255,10 @@ void HectorGamepadManager::convert_joy_to_gamepad_inputs( const sensor_msgs::msg
   inputs_.buttons[24] = inputs_.axes[7] == -1.0f;         // Cross down
 }
 
-std::string HectorGamepadManager::getPath( const std::string &file_name )
+std::string HectorGamepadManager::getPath( const std::string &pkg_name, const std::string &file_name )
 {
   const auto package_path =
-      ament_index_cpp::get_package_share_directory( "hector_gamepad_manager" );
+      ament_index_cpp::get_package_share_directory( pkg_name);
   return package_path + "/config/" + file_name + ".yaml";
 }
 } // namespace hector_gamepad_manager

@@ -97,7 +97,7 @@ private:
    * @param file_name The name of the configuration file.
    * @return True if the configuration file was loaded successfully, false otherwise.
    */
-  bool loadConfig( const std::string &file_name );
+  bool loadConfig( const std::string &pkg_name, const std::string &file_name );
 
   /**
    * @brief Handle the configuration switches.
@@ -150,7 +150,7 @@ private:
    */
   void convert_joy_to_gamepad_inputs( const sensor_msgs::msg::Joy::SharedPtr &msg );
 
-  std::string getPath(const std::string &file_name);
+  std::string getPath(const std::string &pkg_name, const std::string &file_name);
 };
 } // namespace hector_gamepad_manager
 
