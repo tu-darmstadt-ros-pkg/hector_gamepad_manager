@@ -18,7 +18,7 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
   }
 
   joy_subscription_ = node_->create_subscription<sensor_msgs::msg::Joy>(
-      "/joy", 10, std::bind( &HectorGamepadManager::joyCallback, this, std::placeholders::_1 ) );
+      "joy", 10, std::bind( &HectorGamepadManager::joyCallback, this, std::placeholders::_1 ) );
 }
 
 bool HectorGamepadManager::loadConfig( const std::string &file_path )
