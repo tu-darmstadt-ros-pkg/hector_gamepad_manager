@@ -7,14 +7,14 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
       plugin_loader_( "hector_gamepad_manager", "hector_gamepad_manager::GamepadFunctionPlugin" )
 {
 
-  node_->declare_parameter<std::string>( "config_switches_filename", "config_switches.yaml" );
+  node_->declare_parameter<std::string>( "config_switches_filename", "config_switches" );
   const std::string config_switches_filename =
       node_->get_parameter( "config_switches_filename" ).as_string();
-  inputs_ = GamepadInputs();
-  rclcpp::QoS qos_profile(1);  // Keep only the last message
-  qos_profile.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE);
-  qos_profile.durability(RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL);
-  active_config_publisher_ = node_->create_publisher<std_msgs::msg::String>( "active_config", qos_profile );
+  rclcpp::QoS qos_profile( 1 ); // Keep only the last message
+  qos_profile.reliability( RMW_QOS_POLICY_RELIABILITY_RELIABLE );
+  qos_profile.durability( RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL );
+  active_config_publisher_ =
+      node_->create_publisher<std_msgs::msg::String>( "active_config", qos_profile );
 
   if ( loadConfigSwitchesConfig( config_switches_filename ) ) {
     switchConfig( default_config_ );
@@ -86,8 +86,6 @@ bool HectorGamepadManager::switchConfig( const std::string &config_name )
   deactivatePlugins();
   active_config_publisher_->publish( std_msgs::msg::String().set__data( config_name ) );
   active_config_ = config_name;
-  active_button_mappings_ = &button_mappings_[config_name];
-  active_axis_mappings_ = &axis_mappings_[config_name];
   activatePlugins( config_name );
   return true;
 }
@@ -132,20 +130,20 @@ bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::st
   return true;
 }
 
-bool HectorGamepadManager::handleConfigurationSwitches()
+bool HectorGamepadManager::handleConfigurationSwitches( const GamepadInputs &inputs )
 {
 
-  if ( inputs_.buttons[CONFIG_SWITCH_BUTTON] ) {
+  if ( inputs.buttons[CONFIG_SWITCH_BUTTON] ) {
     // test if and only if one additional button is pressed
     int count = 0;
     std::string new_config;
-    for ( size_t i = 0; i < inputs_.buttons.size(); i++ ) {
-      if ( inputs_.buttons[i] && i != CONFIG_SWITCH_BUTTON ) {
+    for ( size_t i = 0; i < inputs.buttons.size(); i++ ) {
+      if ( inputs.buttons[i] && i != CONFIG_SWITCH_BUTTON ) {
         count++;
         new_config = config_switch_button_mapping_[i];
       }
     }
-    if ( count == 1 ) {
+    if ( count == 1 && !new_config.empty() ) {
       switchConfig( new_config );
     }
     return true;
@@ -155,14 +153,14 @@ bool HectorGamepadManager::handleConfigurationSwitches()
 
 void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr msg )
 {
-  convert_joy_to_gamepad_inputs( msg );
+  const auto inputs = convertJoyToGamepadInputs( msg );
   // ignore normal button / axis behavior if configuration switching is in progress
-  if ( handleConfigurationSwitches() )
+  if ( handleConfigurationSwitches( inputs ) )
     return;
 
   // Handle buttons
-  for ( const auto &button_mapping : *active_button_mappings_ ) {
-    const bool pressed = inputs_.buttons[button_mapping.first];
+  for ( const auto &button_mapping : button_mappings_[active_config_] ) {
+    const bool pressed = inputs.buttons[button_mapping.first];
     const auto &action = button_mapping.second;
     if ( plugins_.count( action.plugin_name ) ) {
       plugins_[action.plugin_name]->handleButton( action.function_name, pressed );
@@ -172,8 +170,8 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
   }
 
   // Handle axes
-  for ( const auto &axis_mapping : *active_axis_mappings_ ) {
-    const float value = inputs_.axes[axis_mapping.first];
+  for ( const auto &axis_mapping : axis_mappings_[active_config_] ) {
+    const float value = inputs.axes[axis_mapping.first];
     const auto &action = axis_mapping.second;
     if ( plugins_.count( action.plugin_name ) ) {
       plugins_[action.plugin_name]->handleAxis( action.function_name, value );
@@ -194,12 +192,22 @@ void HectorGamepadManager::activatePlugins( const std::string &config_name )
                   config_name.c_str() );
     return;
   }
+  // activate all plugins present in the button_mappings_
   for ( const auto &button_mapping : button_mappings_[config_name] ) {
     const auto &action = button_mapping.second;
-    if ( plugins_.count( action.plugin_name )==1 && !plugins_[action.plugin_name]->isActive() ) {
+    if ( plugins_.count( action.plugin_name ) == 1 && !plugins_[action.plugin_name]->isActive() ) {
       plugins_[action.plugin_name]->activate();
       RCLCPP_INFO( node_->get_logger(), "Activated plugin: %s", action.plugin_name.c_str() );
-      active_plugins_.push_back(plugins_[action.plugin_name]);
+      active_plugins_.push_back( plugins_[action.plugin_name] );
+    }
+  }
+  // activate all plugins present in the axis_mappings_
+  for ( const auto &axis_mapping : axis_mappings_[config_name] ) {
+    const auto &action = axis_mapping.second;
+    if ( plugins_.count( action.plugin_name ) == 1 && !plugins_[action.plugin_name]->isActive() ) {
+      plugins_[action.plugin_name]->activate();
+      RCLCPP_INFO( node_->get_logger(), "Activated plugin: %s", action.plugin_name.c_str() );
+      active_plugins_.push_back( plugins_[action.plugin_name] );
     }
   }
 }
@@ -215,50 +223,52 @@ void HectorGamepadManager::deactivatePlugins()
   active_plugins_.clear();
 }
 
-void HectorGamepadManager::convert_joy_to_gamepad_inputs( const sensor_msgs::msg::Joy::SharedPtr &msg )
+HectorGamepadManager::GamepadInputs
+HectorGamepadManager::convertJoyToGamepadInputs( const sensor_msgs::msg::Joy::SharedPtr &msg )
 {
+  GamepadInputs inputs;
   // Axes
-  inputs_.axes[0] = msg->axes[0];                    // Left joystick left/right
-  inputs_.axes[1] = msg->axes[1];                    // Left joystick up/down
-  inputs_.axes[2] = -0.5f * ( msg->axes[2] - 1.0f ); // LT: Change range from [1, -1] to [0, 1]
-  inputs_.axes[3] = msg->axes[3];                    // Right joystick left/right
-  inputs_.axes[4] = msg->axes[4];                    // Right joystick up/down
-  inputs_.axes[5] = -0.5f * ( msg->axes[5] - 1.0f ); // RT: Change range from [1, -1] to [0, 1]
-  inputs_.axes[6] = msg->axes[6];                    // Cross left/right
-  inputs_.axes[7] = msg->axes[7];                    // Cross up/down
+  inputs.axes[0] = msg->axes[0];                    // Left joystick left/right
+  inputs.axes[1] = msg->axes[1];                    // Left joystick up/down
+  inputs.axes[2] = -0.5f * ( msg->axes[2] - 1.0f ); // LT: Change range from [1, -1] to [0, 1]
+  inputs.axes[3] = msg->axes[3];                    // Right joystick left/right
+  inputs.axes[4] = msg->axes[4];                    // Right joystick up/down
+  inputs.axes[5] = -0.5f * ( msg->axes[5] - 1.0f ); // RT: Change range from [1, -1] to [0, 1]
+  inputs.axes[6] = msg->axes[6];                    // Cross left/right
+  inputs.axes[7] = msg->axes[7];                    // Cross up/down
 
   // Buttons
-  inputs_.buttons[0] = msg->buttons[0];   // Button A
-  inputs_.buttons[1] = msg->buttons[1];   // Button B
-  inputs_.buttons[2] = msg->buttons[2];   // Button X
-  inputs_.buttons[3] = msg->buttons[3];   // Button Y
-  inputs_.buttons[4] = msg->buttons[4];   // Button LB
-  inputs_.buttons[5] = msg->buttons[5];   // Button RB
-  inputs_.buttons[6] = msg->buttons[6];   // Button Back
-  inputs_.buttons[7] = msg->buttons[7];   // Button Start
-  inputs_.buttons[8] = msg->buttons[8];   // Button Guide -> Reserved for config switches
-  inputs_.buttons[9] = msg->buttons[9];   // Left joystick pressed
-  inputs_.buttons[10] = msg->buttons[10]; // Right joystick pressed
-  inputs_.buttons[11] = inputs_.axes[0] > AXIS_DEADZONE;  // Left joystick left
-  inputs_.buttons[12] = inputs_.axes[0] < -AXIS_DEADZONE; // Left joystick right
-  inputs_.buttons[13] = inputs_.axes[1] > AXIS_DEADZONE;  // Left joystick up
-  inputs_.buttons[14] = inputs_.axes[1] < -AXIS_DEADZONE; // Left joystick down
-  inputs_.buttons[15] = inputs_.axes[2] > AXIS_DEADZONE;  // LT button
-  inputs_.buttons[16] = inputs_.axes[3] > AXIS_DEADZONE;  // Right joystick left
-  inputs_.buttons[17] = inputs_.axes[3] < -AXIS_DEADZONE; // Right joystick right
-  inputs_.buttons[18] = inputs_.axes[4] > AXIS_DEADZONE;  // Right joystick up
-  inputs_.buttons[19] = inputs_.axes[4] < -AXIS_DEADZONE; // Right joystick down
-  inputs_.buttons[20] = inputs_.axes[5] > AXIS_DEADZONE;  // RT button
-  inputs_.buttons[21] = inputs_.axes[6] == 1.0f;          // Cross left
-  inputs_.buttons[22] = inputs_.axes[6] == -1.0f;         // Cross right
-  inputs_.buttons[23] = inputs_.axes[7] == 1.0f;          // Cross up
-  inputs_.buttons[24] = inputs_.axes[7] == -1.0f;         // Cross down
+  inputs.buttons[0] = msg->buttons[0];   // Button A
+  inputs.buttons[1] = msg->buttons[1];   // Button B
+  inputs.buttons[2] = msg->buttons[2];   // Button X
+  inputs.buttons[3] = msg->buttons[3];   // Button Y
+  inputs.buttons[4] = msg->buttons[4];   // Button LB
+  inputs.buttons[5] = msg->buttons[5];   // Button RB
+  inputs.buttons[6] = msg->buttons[6];   // Button Back
+  inputs.buttons[7] = msg->buttons[7];   // Button Start
+  inputs.buttons[8] = msg->buttons[8];   // Button Guide -> Reserved for config switches
+  inputs.buttons[9] = msg->buttons[9];   // Left joystick pressed
+  inputs.buttons[10] = msg->buttons[10]; // Right joystick pressed
+  inputs.buttons[11] = inputs.axes[0] > AXIS_DEADZONE;  // Left joystick left
+  inputs.buttons[12] = inputs.axes[0] < -AXIS_DEADZONE; // Left joystick right
+  inputs.buttons[13] = inputs.axes[1] > AXIS_DEADZONE;  // Left joystick up
+  inputs.buttons[14] = inputs.axes[1] < -AXIS_DEADZONE; // Left joystick down
+  inputs.buttons[15] = inputs.axes[2] > AXIS_DEADZONE;  // LT button
+  inputs.buttons[16] = inputs.axes[3] > AXIS_DEADZONE;  // Right joystick left
+  inputs.buttons[17] = inputs.axes[3] < -AXIS_DEADZONE; // Right joystick right
+  inputs.buttons[18] = inputs.axes[4] > AXIS_DEADZONE;  // Right joystick up
+  inputs.buttons[19] = inputs.axes[4] < -AXIS_DEADZONE; // Right joystick down
+  inputs.buttons[20] = inputs.axes[5] > AXIS_DEADZONE;  // RT button
+  inputs.buttons[21] = inputs.axes[6] == 1.0f;          // Cross left
+  inputs.buttons[22] = inputs.axes[6] == -1.0f;         // Cross right
+  inputs.buttons[23] = inputs.axes[7] == 1.0f;          // Cross up
+  inputs.buttons[24] = inputs.axes[7] == -1.0f;         // Cross down
+  return inputs;
 }
 
 std::string HectorGamepadManager::getPath( const std::string &pkg_name, const std::string &file_name )
 {
-  const auto package_path =
-      ament_index_cpp::get_package_share_directory( pkg_name);
+  const auto package_path = ament_index_cpp::get_package_share_directory( pkg_name );
   return package_path + "/config/" + file_name + ".yaml";
 }
 } // namespace hector_gamepad_manager

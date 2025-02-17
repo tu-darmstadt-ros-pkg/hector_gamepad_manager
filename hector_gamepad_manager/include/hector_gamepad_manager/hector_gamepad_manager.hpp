@@ -30,23 +30,17 @@ private:
   // Struct to store the inputs from the gamepad
   struct GamepadInputs {
     // Vector of axes values
-    std::vector<float> axes = std::vector( 8, 0.0f );
+    std::array<float,8> axes = std::array<float,8>{0.0};
 
-    // Vector of button states
-    std::vector<bool> buttons = std::vector( 25, false );
+    std::array<bool,25> buttons = std::array<bool,25>{false};
   };
 
-  // ROS node
   rclcpp::Node::SharedPtr node_;
 
-  // Subscription to the joy topic
   rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_subscription_;
 
   // Publish active configuration -> visualization in user interface
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr active_config_publisher_;
-
-  // Current gamepad inputs
-  GamepadInputs inputs_;
 
   // Class loader for the gamepad function plugins
   pluginlib::ClassLoader<GamepadFunctionPlugin> plugin_loader_;
@@ -58,19 +52,13 @@ private:
   std::map<std::string, std::unordered_map<int, FunctionMapping>> axis_mappings_;
 
   // Maps buttons to config names
-  std::unordered_map<int, std::string> config_switch_button_mapping_;
+  std::array<std::string, 25> config_switch_button_mapping_;
 
   // Name of the active configuration
   std::string active_config_;
 
   // Name of the config activated at startup
   std::string default_config_;
-
-  // Pointer to the active button mappings
-  std::unordered_map<int, FunctionMapping> *active_button_mappings_;
-
-  // Pointer to the active axis mappings
-  std::unordered_map<int, FunctionMapping> *active_axis_mappings_;
 
   // Map of loaded plugins
   std::unordered_map<std::string, std::shared_ptr<GamepadFunctionPlugin>> plugins_;
@@ -104,7 +92,7 @@ private:
    *
    * @return True if the configuration switching is in progress and normal button / axis behavior should be ignored
    */
-  bool handleConfigurationSwitches();
+  bool handleConfigurationSwitches(const GamepadInputs &inputs);
 
   /**
    * @brief Switch the active configuration.
@@ -147,9 +135,17 @@ private:
    * @brief Convert the joy message to gamepad inputs.
    *
    * @param msg The message containing the gamepad inputs.
+   * @return the transformed gamepad inputs
    */
-  void convert_joy_to_gamepad_inputs( const sensor_msgs::msg::Joy::SharedPtr &msg );
+  GamepadInputs convertJoyToGamepadInputs( const sensor_msgs::msg::Joy::SharedPtr &msg );
 
+  /**
+   * @brief Get the path of a file in a package. Assuming the file is in the config folder.
+   *
+   * @param pkg_name The name of the package.
+   * @param file_name The name of the file.
+   * @return The path of the file.
+   */
   std::string getPath(const std::string &pkg_name, const std::string &file_name);
 };
 } // namespace hector_gamepad_manager

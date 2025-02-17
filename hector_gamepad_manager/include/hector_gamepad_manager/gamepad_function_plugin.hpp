@@ -39,8 +39,6 @@ public:
     } else {
       if ( button_states_[function] ) {
         handleRelease( function );
-      } else {
-        handleNone( function );
       }
     }
 
@@ -53,35 +51,32 @@ public:
    * @param function The function name that is associated with the axis.
    * @param value The value of the axis input event.
    */
-  virtual void handleAxis( const std::string &function, double value ) = 0;
-
-  /**
-   * @brief Function for handling input events where the button or axis is not pressed.
-   *
-   * @param function The name of the function that is associated with the input event.
-   */
-  virtual void handleNone( const std::string &function ) { (void) function; }
+  virtual void handleAxis( const std::string &function, double value )
+  {
+    (void)function;
+    (void)value;
+  }
 
   /**
    * @brief Function for handling input events once if the button or axis is pressed.
    *
    * @param function The name of the function that is associated with the input event.
    */
-  virtual void handlePress( const std::string &function ) { (void) function; }
+  virtual void handlePress( const std::string &function ) { (void)function; }
 
   /**
    * @brief Function for handling input events where the button or axis is held down.
    *
    * @param function The name of the function that is associated with the input event.
    */
-  virtual void handleHold( const std::string &function ) { (void) function; }
+  virtual void handleHold( const std::string &function ) { (void)function; }
 
   /**
    * @brief Function for handling input events where the button or axis is released.
    *
    * @param function The name of the function that is associated with the input event.
    */
-  virtual void handleRelease( const std::string &function ) { (void) function; }
+  virtual void handleRelease( const std::string &function ) { (void)function; }
 
   /**
    * @brief Update function that is called periodically to update the plugin state after handling input events.
