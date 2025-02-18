@@ -29,7 +29,7 @@ bool HectorGamepadManager::loadConfigSwitchesConfig( const std::string &file_nam
   try {
     const YAML::Node config = YAML::LoadFile( getPath( "hector_gamepad_manager", file_name ) );
     for ( const auto &entry : config["buttons"] ) {
-      int id = entry.first.as<int>();
+      const int id = entry.first.as<int>();
       YAML::Node mapping = entry.second;
       auto config_name = mapping["config"].as<std::string>();
       auto pkg_name = mapping["package"].as<std::string>();
@@ -57,11 +57,10 @@ bool HectorGamepadManager::loadConfig( const std::string &pkg_name, const std::s
     const YAML::Node config = YAML::LoadFile( getPath( pkg_name, file_name ) );
 
     // Add empty mappings for the filename
-    button_mappings_[file_name] = {};
-    axis_mappings_[file_name] = {};
+    configs_[file_name] = GamepadConfig();
 
-    if ( !initMappings( config, "buttons", button_mappings_[file_name] ) ||
-         !initMappings( config, "axes", axis_mappings_[file_name] ) ) {
+    if ( !initMappings( config, "buttons", configs_[file_name].button_mappings ) ||
+         !initMappings( config, "axes", configs_[file_name].axis_mappings ) ) {
       return false;
     }
 
@@ -74,7 +73,7 @@ bool HectorGamepadManager::loadConfig( const std::string &pkg_name, const std::s
 
 bool HectorGamepadManager::switchConfig( const std::string &config_name )
 {
-  if ( button_mappings_.count( config_name ) == 0 || axis_mappings_.count( config_name ) == 0 ) {
+  if ( configs_.count( config_name ) == 0 ) {
     RCLCPP_ERROR( node_->get_logger(), "Config %s not found. Cannot switch the gamepad config",
                   config_name.c_str() );
     return false;
@@ -97,36 +96,32 @@ bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::st
     for ( const auto &entry : config[type] ) {
       int id = entry.first.as<int>();
       YAML::Node mapping = entry.second;
-      auto plugin = mapping["plugin"].as<std::string>();
+      auto plugin_name = mapping["plugin"].as<std::string>();
       auto function = mapping["function"].as<std::string>();
 
-      if ( !plugin.empty() && !function.empty() ) {
-        mappings[id] = { plugin, function };
+      if ( !plugin_name.empty() && !function.empty() ) {
+
+        // make sure plugin is loaded
+        if ( plugins_.count( plugin_name ) == 0 ) {
+          try {
+            std::shared_ptr<GamepadFunctionPlugin> plugin =
+                plugin_loader_.createSharedInstance( plugin_name );
+            plugin->initialize( node_ );
+            plugins_[plugin_name] = plugin;
+            RCLCPP_INFO( node_->get_logger(), "Loaded plugin: %s", plugin_name.c_str() );
+          } catch ( const std::exception &e ) {
+            RCLCPP_ERROR( node_->get_logger(), "Failed to load plugin %s: %s", plugin_name.c_str(),
+                          e.what() );
+            return false;
+          }
+        }
+        mappings[id] = { plugins_[plugin_name], function };
       }
     }
   } else {
     RCLCPP_ERROR( node_->get_logger(), "No %s found in config file", type.c_str() );
     return false;
   }
-
-  // Load plugins
-  for ( const auto &mapping : mappings ) {
-    const std::string plugin_name = mapping.second.plugin_name;
-    if ( plugins_.count( plugin_name ) == 0 ) {
-      try {
-        std::shared_ptr<GamepadFunctionPlugin> plugin =
-            plugin_loader_.createSharedInstance( plugin_name );
-        plugin->initialize( node_ );
-        plugins_[plugin_name] = plugin;
-        RCLCPP_INFO( node_->get_logger(), "Loaded plugin: %s", plugin_name.c_str() );
-      } catch ( const std::exception &e ) {
-        RCLCPP_ERROR( node_->get_logger(), "Failed to load plugin %s: %s", plugin_name.c_str(),
-                      e.what() );
-        return false;
-      }
-    }
-  }
-
   return true;
 }
 
@@ -159,25 +154,17 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
     return;
 
   // Handle buttons
-  for ( const auto &button_mapping : button_mappings_[active_config_] ) {
+  for ( const auto &button_mapping : configs_[active_config_].button_mappings ) {
     const bool pressed = inputs.buttons[button_mapping.first];
     const auto &action = button_mapping.second;
-    if ( plugins_.count( action.plugin_name ) ) {
-      plugins_[action.plugin_name]->handleButton( action.function_name, pressed );
-    } else {
-      RCLCPP_ERROR( node_->get_logger(), "Plugin not found: %s", action.plugin_name.c_str() );
-    }
+    button_mapping.second.plugin->handleButton( action.function_name, pressed );
   }
 
   // Handle axes
-  for ( const auto &axis_mapping : axis_mappings_[active_config_] ) {
+  for ( const auto &axis_mapping : configs_[active_config_].axis_mappings ) {
     const float value = inputs.axes[axis_mapping.first];
     const auto &action = axis_mapping.second;
-    if ( plugins_.count( action.plugin_name ) ) {
-      plugins_[action.plugin_name]->handleAxis( action.function_name, value );
-    } else {
-      RCLCPP_ERROR( node_->get_logger(), "Plugin not found: %s", action.plugin_name.c_str() );
-    }
+    axis_mapping.second.plugin->handleAxis( action.function_name, value );
   }
 
   // Update all active plugins
@@ -187,27 +174,23 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
 void HectorGamepadManager::activatePlugins( const std::string &config_name )
 {
   // activate all  plugins present in the button_mappings_ and axis_mappings_ of the given config
-  if ( button_mappings_.count( config_name ) == 0 || axis_mappings_.count( config_name ) == 0 ) {
+  if ( configs_.count( config_name ) == 0 ) {
     RCLCPP_ERROR( node_->get_logger(), "Config %s not found. Cannot activate the gamepad config",
                   config_name.c_str() );
     return;
   }
   // activate all plugins present in the button_mappings_
-  for ( const auto &button_mapping : button_mappings_[config_name] ) {
-    const auto &action = button_mapping.second;
-    if ( plugins_.count( action.plugin_name ) == 1 && !plugins_[action.plugin_name]->isActive() ) {
-      plugins_[action.plugin_name]->activate();
-      RCLCPP_INFO( node_->get_logger(), "Activated plugin: %s", action.plugin_name.c_str() );
-      active_plugins_.push_back( plugins_[action.plugin_name] );
+  for ( const auto &button_mapping : configs_[config_name].button_mappings ) {
+    if ( !button_mapping.second.plugin->isActive() ) {
+      button_mapping.second.plugin->activate();
+      active_plugins_.push_back( button_mapping.second.plugin );
     }
   }
   // activate all plugins present in the axis_mappings_
-  for ( const auto &axis_mapping : axis_mappings_[config_name] ) {
-    const auto &action = axis_mapping.second;
-    if ( plugins_.count( action.plugin_name ) == 1 && !plugins_[action.plugin_name]->isActive() ) {
-      plugins_[action.plugin_name]->activate();
-      RCLCPP_INFO( node_->get_logger(), "Activated plugin: %s", action.plugin_name.c_str() );
-      active_plugins_.push_back( plugins_[action.plugin_name] );
+  for ( const auto &axis_mapping : configs_[config_name].axis_mappings ) {
+    if ( !axis_mapping.second.plugin->isActive() ) {
+      axis_mapping.second.plugin->activate();
+      active_plugins_.push_back( axis_mapping.second.plugin );
     }
   }
 }

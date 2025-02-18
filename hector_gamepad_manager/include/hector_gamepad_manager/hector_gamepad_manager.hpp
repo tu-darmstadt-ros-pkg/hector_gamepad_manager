@@ -21,7 +21,7 @@ private:
   // Struct to store the mapping of a button or axis to a function of a plugin
   struct FunctionMapping {
     // Name of the plugin
-    std::string plugin_name;
+    std::shared_ptr<GamepadFunctionPlugin> plugin;
 
     // Name of the function
     std::string function_name;
@@ -30,9 +30,14 @@ private:
   // Struct to store the inputs from the gamepad
   struct GamepadInputs {
     // Vector of axes values
-    std::array<float,8> axes = std::array<float,8>{0.0};
+    std::array<float, 8> axes = std::array<float, 8>{ 0.0 };
 
-    std::array<bool,25> buttons = std::array<bool,25>{false};
+    std::array<bool, 25> buttons = std::array<bool, 25>{ false };
+  };
+
+  struct GamepadConfig {
+    std::unordered_map<int, FunctionMapping> button_mappings;
+    std::unordered_map<int, FunctionMapping> axis_mappings;
   };
 
   rclcpp::Node::SharedPtr node_;
@@ -45,11 +50,7 @@ private:
   // Class loader for the gamepad function plugins
   pluginlib::ClassLoader<GamepadFunctionPlugin> plugin_loader_;
 
-  // Map of button mappings for each configuration
-  std::map<std::string, std::unordered_map<int, FunctionMapping>> button_mappings_;
-
-  // Map of axis mappings for each configuration
-  std::map<std::string, std::unordered_map<int, FunctionMapping>> axis_mappings_;
+  std::map<std::string, GamepadConfig> configs_;
 
   // Maps buttons to config names
   std::array<std::string, 25> config_switch_button_mapping_;
@@ -77,7 +78,7 @@ private:
    * @param file_name
    * @return
    */
-  bool loadConfigSwitchesConfig(const std::string &file_name);
+  bool loadConfigSwitchesConfig( const std::string &file_name );
 
   /**
    * @brief Load the configuration file.
@@ -92,7 +93,7 @@ private:
    *
    * @return True if the configuration switching is in progress and normal button / axis behavior should be ignored
    */
-  bool handleConfigurationSwitches(const GamepadInputs &inputs);
+  bool handleConfigurationSwitches( const GamepadInputs &inputs );
 
   /**
    * @brief Switch the active configuration.
@@ -117,7 +118,7 @@ private:
    * @brief Activates all plugins present in the given config
    * @param config_name
    */
-  void activatePlugins(const std::string &config_name);
+  void activatePlugins( const std::string &config_name );
 
   /**
    * @brief Deactivates all plugins
@@ -146,7 +147,7 @@ private:
    * @param file_name The name of the file.
    * @return The path of the file.
    */
-  std::string getPath(const std::string &pkg_name, const std::string &file_name);
+  std::string getPath( const std::string &pkg_name, const std::string &file_name );
 };
 } // namespace hector_gamepad_manager
 
