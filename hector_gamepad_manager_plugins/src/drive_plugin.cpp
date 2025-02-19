@@ -3,6 +3,7 @@
 namespace hector_gamepad_manager_plugins
 {
 
+
 void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node )
 {
   node_ = node;
@@ -23,10 +24,6 @@ void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node )
   normal_factor_ = node_->get_parameter( plugin_namespace_ + ".normal_factor" ).as_double();
 
   fast_factor_ = node_->get_parameter( plugin_namespace_ + ".fast_factor" ).as_double();
-
-
-  fast_mode_active_ = false;
-  slow_mode_active_ = false;
 
   drive_command_publisher_ =
       node_->create_publisher<geometry_msgs::msg::TwistStamped>( "cmd_vel", 1 );
@@ -72,25 +69,33 @@ void DrivePlugin::update()
     speed_factor = fast_factor_;
   }
 
-  drive_command_.twist.linear.x = drive_value_ * max_linear_speed_ * speed_factor;
-  drive_command_.twist.angular.z = steer_value_ * max_angular_speed_ * speed_factor;
-
-  drive_command_.header.stamp = node_->now();
-  drive_command_publisher_->publish( drive_command_ );
+  sendDriveCommand( drive_value_ * max_linear_speed_ * speed_factor,
+                    steer_value_ * max_angular_speed_ * speed_factor );
 }
 
-void DrivePlugin::activate() { active_ = true; }
+void DrivePlugin::activate()
+{
+  active_ = true;
+  last_cmd_zero_ = false;
+}
 
 void DrivePlugin::deactivate()
 {
   active_ = false;
+  sendDriveCommand( 0, 0 );
+}
 
-  // Bring the robot to a stop
-  drive_command_.twist.linear.x = 0.0;
-  drive_command_.twist.angular.z = 0.0;
-
+void DrivePlugin::sendDriveCommand( double linear_speed, double angular_speed )
+{
   drive_command_.header.stamp = node_->now();
-  drive_command_publisher_->publish( drive_command_ );
+  drive_command_.twist.linear.x = linear_speed;
+  drive_command_.twist.angular.z = angular_speed;
+  bool current_cmd_zero =
+      drive_command_.twist.linear.x == 0.0 && drive_command_.twist.angular.z == 0.0;
+  if ( !( current_cmd_zero && last_cmd_zero_ ) ) {
+    drive_command_publisher_->publish( drive_command_ );
+  }
+  last_cmd_zero_ = current_cmd_zero;
 }
 } // namespace hector_gamepad_manager_plugins
 
