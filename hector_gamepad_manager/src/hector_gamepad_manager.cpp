@@ -10,6 +10,8 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
   node_->declare_parameter<std::string>( "config_switches_filename", "config_switches" );
   const std::string config_switches_filename =
       node_->get_parameter( "config_switches_filename" ).as_string();
+  node_->declare_parameter<std::string>( "robot_name", "athena" );
+  robot_name_ = node_->get_parameter( "robot_name" ).as_string();
   rclcpp::QoS qos_profile( 1 ); // Keep only the last message
   qos_profile.reliability( RMW_QOS_POLICY_RELIABILITY_RELIABLE );
   qos_profile.durability( RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL );

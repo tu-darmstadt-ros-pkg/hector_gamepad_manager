@@ -39,6 +39,7 @@ private:
   double fast_factor_;
   bool fast_mode_active_;
   bool slow_mode_active_;
+  std::string cmd_vel_topic;
 };
 } // namespace hector_gamepad_manager_plugins
 
