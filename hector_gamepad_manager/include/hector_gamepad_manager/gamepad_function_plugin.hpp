@@ -15,9 +15,8 @@ public:
    * @brief Initialize function that is called when the plugin is loaded.
    *
    * @param node The ROS node that the plugin is associated with.
-   * @param robot_name The name of the robot that the plugin should control.
    */
-  virtual void initialize( const rclcpp::Node::SharedPtr &node, const std::string &robot_name ) = 0;
+  virtual void initialize( const rclcpp::Node::SharedPtr &node ) = 0;
 
   /**
    * @brief Handle button input events.
@@ -78,14 +77,6 @@ public:
    * @param function The name of the function that is associated with the input event.
    */
   virtual void handleRelease( const std::string &function ) { (void)function; }
-
-  /**
-   * @brief Function for resetting plugin state such it can control a different robot.
-   * Subscribers, Publishers, etc. should be reinitialized such that they communicate with the new robot.
-   *
-   * @param robot_name The name of the robot that the plugin should control.
-   */
-  virtual void switchControlledRobot(const std::string &robot_name) = 0;
 
   /**
    * @brief Update function that is called periodically to update the plugin state after handling input events.

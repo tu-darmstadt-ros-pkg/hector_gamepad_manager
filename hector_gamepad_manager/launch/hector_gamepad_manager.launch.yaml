@@ -4,17 +4,14 @@ launch:
     # Meta Config File that determines which buttons activate which config
     default: "config_switches"
 - arg:
-    name: "ns"
-    default: ""
-- arg:
     name: "stamped"
     default: "true"
 - arg:
     name: "robot_name"
     default: "athena"
-
-- push-ros-namespace:
-    namespace: "$(var ns)"
+- arg:
+    name: "ocs_ns"
+    default: "ocs"
 
 - node:
     pkg: "hector_gamepad_manager"
@@ -26,5 +23,5 @@ launch:
         value: "$(var config_switches_filename)"
       - name: "robot_name"
         value: "$(var robot_name)"
-      - name: "drive_plugin.cmd_vel_topic"
-        value: "cmd_vel"
+      - name: "ocs_ns"
+        value: "$(var ocs_ns)"

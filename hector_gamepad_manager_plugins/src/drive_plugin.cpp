@@ -3,7 +3,7 @@
 namespace hector_gamepad_manager_plugins
 {
 
-void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node, const std::string &robot_name )
+void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node )
 {
   node_ = node;
   plugin_namespace_ = "drive_plugin";
@@ -13,7 +13,6 @@ void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node, const std::st
                                                           { "slow_factor", 0.5 },
                                                           { "normal_factor", 0.75 },
                                                           { "fast_factor", 1.0 } } );
-  node_->declare_parameters<std::string>( plugin_namespace_, { { "cmd_vel_topic", "cmd_vel" } } );
 
   max_linear_speed_ = node_->get_parameter( plugin_namespace_ + ".max_linear_speed" ).as_double();
 
@@ -25,13 +24,12 @@ void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node, const std::st
 
   fast_factor_ = node_->get_parameter( plugin_namespace_ + ".fast_factor" ).as_double();
 
-  cmd_vel_topic = node_->get_parameter( plugin_namespace_ + ".cmd_vel_topic" ).as_string();
 
   fast_mode_active_ = false;
   slow_mode_active_ = false;
 
   drive_command_publisher_ =
-      node_->create_publisher<geometry_msgs::msg::TwistStamped>( "/" + robot_name + "/" + cmd_vel_topic, 1 );
+      node_->create_publisher<geometry_msgs::msg::TwistStamped>( "cmd_vel", 1 );
 }
 
 void DrivePlugin::handleAxis( const std::string &function, const double value )
@@ -79,12 +77,6 @@ void DrivePlugin::update()
 
   drive_command_.header.stamp = node_->now();
   drive_command_publisher_->publish( drive_command_ );
-}
-
-void DrivePlugin::switchControlledRobot( const std::string &robot_name )
-{
-  drive_command_publisher_ =
-      node_->create_publisher<geometry_msgs::msg::TwistStamped>( "/" + robot_name + "/" + cmd_vel_topic, 1 );
 }
 
 void DrivePlugin::activate() { active_ = true; }
