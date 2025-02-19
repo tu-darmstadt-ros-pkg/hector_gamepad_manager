@@ -10,13 +10,15 @@ namespace hector_gamepad_manager_plugins
 class DrivePlugin : public hector_gamepad_manager::GamepadFunctionPlugin
 {
 public:
-  void initialize( const rclcpp::Node::SharedPtr &node ) override;
+  void initialize( const rclcpp::Node::SharedPtr &node, const std::string &robot_name ) override;
 
   void handleAxis( const std::string &function, double value ) override;
 
   void handlePress( const std::string &function ) override;
 
   void handleRelease( const std::string &function ) override;
+
+  void switchControlledRobot( const std::string &robot_name ) override;
 
   void update() override;
 

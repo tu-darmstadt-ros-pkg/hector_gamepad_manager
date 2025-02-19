@@ -3,7 +3,7 @@
 namespace hector_gamepad_manager_plugins
 {
 
-void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node )
+void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node, const std::string &robot_name )
 {
   node_ = node;
   plugin_namespace_ = "drive_plugin";
@@ -28,7 +28,7 @@ void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node )
   slow_mode_active_ = false;
 
   drive_command_publisher_ =
-      node_->create_publisher<geometry_msgs::msg::TwistStamped>( "cmd_vel", 1 );
+      node_->create_publisher<geometry_msgs::msg::TwistStamped>( "/" + robot_name + "/" + "cmd_vel", 1 );
 }
 
 void DrivePlugin::handleAxis( const std::string &function, const double value )
@@ -76,6 +76,12 @@ void DrivePlugin::update()
 
   drive_command_.header.stamp = node_->now();
   drive_command_publisher_->publish( drive_command_ );
+}
+
+void DrivePlugin::switchControlledRobot( const std::string &robot_name )
+{
+  drive_command_publisher_ =
+      node_->create_publisher<geometry_msgs::msg::TwistStamped>( "/" + robot_name + "/" + "cmd_vel", 1 );
 }
 
 void DrivePlugin::activate() { active_ = true; }

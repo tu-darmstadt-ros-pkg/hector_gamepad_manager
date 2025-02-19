@@ -9,6 +9,9 @@ launch:
 - arg:
     name: "stamped"
     default: "true"
+- arg:
+    name: "robot_name"
+    default: "athena"
 
 - let:
     name: "cmd_vel_topic"
@@ -30,6 +33,8 @@ launch:
     param:
       - name: "config_switches_filename"
         value: "$(var config_switches_filename)"
+      - name: "robot_name"
+        value: "$(var robot_name)"
     remap:
         - from: "cmd_vel"
           to: $(var cmd_vel_topic)

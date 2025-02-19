@@ -61,6 +61,9 @@ private:
   // Name of the config activated at startup
   std::string default_config_;
 
+  // used for to prefix the configs
+  std::string robot_name_;
+
   // Map of loaded plugins
   std::unordered_map<std::string, std::shared_ptr<GamepadFunctionPlugin>> plugins_;
 
