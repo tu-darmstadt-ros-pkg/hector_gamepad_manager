@@ -8,8 +8,8 @@ axes:
     function: "drive"
 
   2: # LT
-    plugin: ""
-    function: ""
+    plugin: "hector_gamepad_manager_plugins::FlipperPlugin"
+    function: "flipper_back_down"
 
   3: # Right joystick left/right
     plugin: ""
@@ -20,8 +20,8 @@ axes:
     function: ""
 
   5: # RT
-    plugin: ""
-    function: ""
+    plugin: "hector_gamepad_manager_plugins::FlipperPlugin"
+    function: "flipper_front_down"
 
   6: # Cross left/right
     plugin: ""
@@ -49,12 +49,12 @@ buttons:
     function: ""
 
   4: # Button LB
-    plugin: ""
-    function: ""
+    plugin: "hector_gamepad_manager_plugins::FlipperPlugin"
+    function: "flipper_back_up"
 
   5: # Button RB
-    plugin: ""
-    function: ""
+    plugin: "hector_gamepad_manager_plugins::FlipperPlugin"
+    function: "flipper_front_up"
 
   6: # Button Back
     plugin: ""
