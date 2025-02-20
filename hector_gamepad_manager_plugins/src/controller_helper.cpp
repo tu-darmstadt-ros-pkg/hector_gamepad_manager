@@ -5,7 +5,7 @@ namespace hector_gamepad_manager_plugins
 
     ControllerHelper::ControllerHelper(const rclcpp::Node::SharedPtr &node){
 
-        node_ = node
+        node_ = node;
         std::string switch_controllers_srv = node->get_namespace() + "/controller_manager/switch_controllers";
         switch_controller_client_ = node->create_client<controller_manager_msgs::srv::SwitchController>(switch_controllers_srv);
         std::string list_controllers_srv = node->get_namespace() + "/controller_manager/list_controllers";
@@ -19,9 +19,9 @@ namespace hector_gamepad_manager_plugins
             return;
 
 
-        list_controllers_client_->async_send_request(std::make_shared<controller_manager_msgs::srv::ListControllers::Request> ());
+        auto list_result = list_controllers_client_->async_send_request(std::make_shared<controller_manager_msgs::srv::ListControllers::Request> ());
 
-        rclcpp::spin_until_future_complete(node, result)
+        rclcpp::spin_until_future_complete(node_, list_result);
         // get controller list to check if the controllers are already running or stopped
         if (list_controllers_client_.call(list_controllers_srv_) && !list_controllers_srv_.response.controller.empty())
         {
