@@ -63,10 +63,10 @@ private:
   std::string default_config_;
 
   // used for to prefix the configs
-  std::string robot_name_;
+  std::string robot_namespace_;
 
   // namespace for the operator station
-  std::string ocs_ns_;
+  std::string ocs_namespace_;
 
   // Map of loaded plugins
   std::unordered_map<std::string, std::shared_ptr<GamepadFunctionPlugin>> plugins_;

@@ -1,27 +1,21 @@
 launch:
 - arg:
-    name: "config_switches_filename"
     # Meta Config File that determines which buttons activate which config
-    default: "config_switches"
+    name: "file_name"
 - arg:
-    name: "stamped"
-    default: "true"
+    name: "robot_namespace"
 - arg:
-    name: "robot_name"
-    default: "athena"
-- arg:
-    name: "ocs_ns"
-    default: "ocs"
+    name: "ocs_namespace"
 
 - node:
     pkg: "hector_gamepad_manager"
     exec: "hector_gamepad_manager_node"
-    name: "hector_gamepad_manager_node"
+    name: "$(anon hector_gamepad_manager_node)"
     output: "screen"
     param:
-      - name: "config_switches_filename"
-        value: "$(var config_switches_filename)"
-      - name: "robot_name"
-        value: "$(var robot_name)"
-      - name: "ocs_ns"
-        value: "$(var ocs_ns)"
+      - name: "file_name"
+        value: "$(var file_name)"
+      - name: "robot_namespace"
+        value: "$(var robot_namespace)"
+      - name: "ocs_namespace"
+        value: "$(var ocs_namespace)"
