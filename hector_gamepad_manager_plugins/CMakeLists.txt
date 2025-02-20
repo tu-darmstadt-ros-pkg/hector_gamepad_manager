@@ -21,10 +21,15 @@ find_package(hector_gamepad_manager REQUIRED)
 
 set(HEADERS
   include/hector_gamepad_manager_plugins/drive_plugin.hpp
+  include/hector_gamepad_manager_plugins/flipper_plugin.hpp
+  include/hector_gamepad_manager_plugins/controller_helper.hpp
+
 )
 
 set(SOURCES
   src/drive_plugin.cpp
+  src/flipper_plugin.cpp
+  src/controller_helper.cpp
 )
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES} ${HEADERS})
