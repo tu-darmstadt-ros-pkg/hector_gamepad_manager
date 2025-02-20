@@ -1,7 +1,7 @@
 launch:
 - arg:
     # Meta Config File that determines which buttons activate which config
-    name: "file_name"
+    name: "config_name"
 - arg:
     name: "robot_namespace"
 - arg:
@@ -13,8 +13,8 @@ launch:
     name: "$(anon hector_gamepad_manager_node)"
     output: "screen"
     param:
-      - name: "file_name"
-        value: "$(var file_name)"
+      - name: "config_name"
+        value: "$(var config_name)"
       - name: "robot_namespace"
         value: "$(var robot_namespace)"
       - name: "ocs_namespace"

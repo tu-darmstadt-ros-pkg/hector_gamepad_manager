@@ -6,11 +6,11 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
     : plugin_loader_( "hector_gamepad_manager", "hector_gamepad_manager::GamepadFunctionPlugin" )
 {
   // declare & get parameters
-  node->declare_parameter<std::string>( "file_name", "athena" );
+  node->declare_parameter<std::string>( "config_name", "athena" );
   node->declare_parameter<std::string>( "robot_namespace", "athena" );
   node->declare_parameter<std::string>( "ocs_namespace", "ocs" );
   const std::string config_switches_filename =
-      node->get_parameter( "file_name" ).as_string();
+      node->get_parameter( "config_name" ).as_string();
 
   robot_namespace_ = node->get_parameter( "robot_namespace" ).as_string();
   ocs_namespace_ = node->get_parameter( "ocs_namespace" ).as_string();
