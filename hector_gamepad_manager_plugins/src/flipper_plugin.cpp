@@ -3,45 +3,75 @@
 namespace hector_gamepad_manager_plugins
 {
 
-void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node, const bool active )
+void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node)
 {
   node_ = node;
-  active_ = active;
 
   plugin_namespace_ = "flipper_plugin";
 
   node_->declare_parameters<double>( plugin_namespace_, {{ "speed", 1.5 },
                                                          { "flipper_front_factor", 1.0 },
-                                                         { "flipper_back_factor", 1.0 }});
+                                                         { "flipper_back_factor", 1.0 },
+                                                         });
+  node_->declare_parameters<std::string>(plugin_namespace_, {{ "standard_controller", "flipper_controller" },
+                                                         { "teleop_controller", "flipper_controller_teleop" },
+                                                         });
 
   speed_ = node_->get_parameter( plugin_namespace_ + ".speed" ).as_double();
   flipper_front_factor_ = node_->get_parameter( plugin_namespace_ + ".flipper_front_factor" ).as_double();
   flipper_back_factor_ = node_->get_parameter( plugin_namespace_ + ".flipper_back_factor" ).as_double();
+  standard_controller_ = node_->get_parameter( plugin_namespace_ + ".standard_controller" ).as_string();
+  teleop_controller_ = node_->get_parameter( plugin_namespace_ + ".teleop_controller" ).as_string();
 
   // ros controller mapping [fr_l, fr_r, b_l, b_r]
   vel_commands_.insert(vel_commands_.begin(), {0.0, 0.0, 0.0, 0.0});
 
   flipper_command_publisher_ =
-      node_->create_publisher<std_msgs::msg::Float64MultiArray>("/flipper_controller_teleop/commands", 10 );
+      node_->create_publisher<std_msgs::msg::Float64MultiArray>("/" + node_->get_parameter("robot_namespace").as_string() + "/flipper_controller_teleop/commands", 10 );
+  
+  controller_helper_.initialize(node, "flipper_plugin");
+  RCLCPP_INFO( node_->get_logger(), "Attempting controller switch");
+
+  active_=true;
+    
 }
 
-void FlipperPlugin::handleButton( const std::string &function, const bool pressed )
+void FlipperPlugin::handlePress( const std::string &function)
 {
+  RCLCPP_INFO( node_->get_logger(), "Function: %s, Pressed", function.c_str());
+
   if ( !active_ ) 
     return;
 
-  RCLCPP_INFO( node_->get_logger(), "Function: %s, Pressed: %d", function.c_str(), pressed);
 
-  if(function == "flipper_back_up" && pressed) 
+  if(function == "flipper_back_up") 
       set_back_flipper_command(speed_ * flipper_back_factor_);
 
-  if(function == "flipper_front_up" && pressed)
+  if(function == "flipper_front_up")
+      set_front_flipper_command(speed_ * flipper_front_factor_);
+
+}
+
+void FlipperPlugin::handleHold( const std::string &function)
+{
+  RCLCPP_INFO( node_->get_logger(), "Function: %s Hold", function.c_str());
+
+  if ( !active_ ) 
+    return;
+
+
+  if(function == "flipper_back_up") 
+      set_back_flipper_command(speed_ * flipper_back_factor_);
+
+  if(function == "flipper_front_up")
       set_front_flipper_command(speed_ * flipper_front_factor_);
 
 }
 
 void FlipperPlugin::handleAxis( const std::string &function, const double value )
 {
+  RCLCPP_INFO( node_->get_logger(), "Function: %s, Pressed", function.c_str());
+
   if ( !active_ )
     return;
 
@@ -55,22 +85,27 @@ void FlipperPlugin::handleAxis( const std::string &function, const double value 
 
 void FlipperPlugin::update()
 {
-  if ( !active_ ) 
+  if (!active_) 
     return;  
 
   publish_commands();
   reset_commands();
 }
 
-void FlipperPlugin::activate() { active_ = true;  }
+void FlipperPlugin::activate() {
+  //controller_helper_.switchControllers({teleop_controller_}, {standard_controller_}); 
+  active_ = true;
+}
 
 void FlipperPlugin::deactivate()
 {
   active_ = false;
 
-  reset_commands();
   //Publish null velocity command
+  reset_commands();
   publish_commands();
+
+  //controller_helper_.switchControllers({standard_controller_}, {teleop_controller_}); 
 } 
 
 void FlipperPlugin::set_front_flipper_command(double vel){
