@@ -2,6 +2,9 @@
 #define HECTOR_GAMEPAD_MANAGER_PLUGINS_CONTROLLER_HELPER_HPP
 
 #include <rclcpp/rclcpp.hpp>
+#include "controller_manager_msgs/srv/list_controllers.hpp"
+#include "controller_manager_msgs/srv/switch_controller.hpp"
+
 
 namespace hector_gamepad_manager_plugins
 {
@@ -9,23 +12,27 @@ namespace hector_gamepad_manager_plugins
 
         public:
 
-            ControllerHelper(const rclcpp::Node::SharedPtr &node);
+            ControllerHelper()=default;
+            ~ControllerHelper()=default;
 
-            ~ControllerHelper();
 
-            void switchControllers(std::vector<std::string> start_controllers, std::vector<std::string> stop_controllers);
+            void initialize(const rclcpp::Node::SharedPtr &node, std::string plugin_name);
+
+            bool switchControllers(std::vector<std::string> start_controllers, std::vector<std::string> stop_controllers);
 
         private:
 
+            rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedPtr switch_controller_client_;
+            rclcpp::Client<controller_manager_msgs::srv::ListControllers>::SharedPtr list_controllers_client_;
 
-            rclcpp::Client<controller_manager_msgs::srv::SwitchController> switch_controller_client_;
-
-            rclcpp::Client<controller_manager_msgs::srv::ListControllers> list_controllers_client_;
+            rclcpp::Node::SharedPtr node_;
 
             int max_switch_tries_;
+            int max_wait_on_srv_tries_;
+            int switch_sleep_rate_;
 
-            rclcpp::Node::SharedPtr& node_;
-    }
-
-
+            std::string plugin_name_;            
+    };
 }
+
+#endif 
