@@ -38,11 +38,11 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node)
 
 void FlipperPlugin::handlePress( const std::string &function)
 {
-  RCLCPP_INFO( node_->get_logger(), "Function: %s, Pressed", function.c_str());
 
   if ( !active_ ) 
     return;
 
+  RCLCPP_INFO( node_->get_logger(), "Function: %s, Pressed", function.c_str());
 
   if(function == "flipper_back_up") 
       set_back_flipper_command(speed_ * flipper_back_factor_);
@@ -54,11 +54,9 @@ void FlipperPlugin::handlePress( const std::string &function)
 
 void FlipperPlugin::handleHold( const std::string &function)
 {
-  RCLCPP_INFO( node_->get_logger(), "Function: %s Hold", function.c_str());
 
   if ( !active_ ) 
     return;
-
 
   if(function == "flipper_back_up") 
       set_back_flipper_command(speed_ * flipper_back_factor_);
@@ -70,7 +68,6 @@ void FlipperPlugin::handleHold( const std::string &function)
 
 void FlipperPlugin::handleAxis( const std::string &function, const double value )
 {
-  RCLCPP_INFO( node_->get_logger(), "Function: %s, Pressed", function.c_str());
 
   if ( !active_ )
     return;
@@ -93,7 +90,7 @@ void FlipperPlugin::update()
 }
 
 void FlipperPlugin::activate() {
-  //controller_helper_.switchControllers({teleop_controller_}, {standard_controller_}); 
+  controller_helper_.switchControllers({teleop_controller_}, {standard_controller_}); 
   active_ = true;
 }
 
@@ -105,17 +102,21 @@ void FlipperPlugin::deactivate()
   reset_commands();
   publish_commands();
 
-  //controller_helper_.switchControllers({standard_controller_}, {teleop_controller_}); 
+  controller_helper_.switchControllers({standard_controller_}, {teleop_controller_}); 
 } 
 
 void FlipperPlugin::set_front_flipper_command(double vel){
-  vel_commands_[0] = vel;
-  vel_commands_[1] = vel;
+  // To avoid ovveride of trigger cmd from bumber zero_val add vel
+  // Vel commands are reset after every update call
+  vel_commands_[0] += vel;
+  vel_commands_[1] += vel;
 }
 
 void FlipperPlugin::set_back_flipper_command(double vel){
-  vel_commands_[2] = vel;
-  vel_commands_[3] = vel;
+  // To avoid ovveride of trigger cmd from bumber zero_val add vel
+  // Vel commands are reset after every update call
+  vel_commands_[2] += vel;
+  vel_commands_[3] += vel;
 }
 
 void FlipperPlugin::reset_commands(){
