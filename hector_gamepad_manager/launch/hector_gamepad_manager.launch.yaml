@@ -22,3 +22,5 @@ launch:
         value: "$(var robot_namespace)"
       - name: "ocs_namespace"
         value: "$(var ocs_namespace)"
+      - from: $(find-pkg-share hector_gamepad_manager)/config/plugin_parameters_$(var config_name).yaml
+        allow_substs: true
