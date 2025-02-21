@@ -13,6 +13,8 @@ public:
 
   void initialize( const rclcpp::Node::SharedPtr &node ) override;
 
+  std::string getPluginName() override;
+
   void handleAxis( const std::string &function, double value ) override;
 
   void handlePress( const std::string &function ) override;

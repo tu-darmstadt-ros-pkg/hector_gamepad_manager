@@ -7,21 +7,21 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node)
 {
   node_ = node;
 
-  plugin_namespace_ = "flipper_plugin";
+  std::string plugin_namespace = getPluginName();
 
-  node_->declare_parameters<double>( plugin_namespace_, {{ "speed", 1.5 },
+  node_->declare_parameters<double>( plugin_namespace, {{ "speed", 1.5 },
                                                          { "flipper_front_factor", 1.0 },
                                                          { "flipper_back_factor", 1.0 },
                                                          });
-  node_->declare_parameters<std::string>(plugin_namespace_, {{ "standard_controller", "flipper_controller" },
+  node_->declare_parameters<std::string>(plugin_namespace, {{ "standard_controller", "flipper_controller" },
                                                          { "teleop_controller", "flipper_controller_teleop" },
                                                          });
 
-  speed_ = node_->get_parameter( plugin_namespace_ + ".speed" ).as_double();
-  flipper_front_factor_ = node_->get_parameter( plugin_namespace_ + ".flipper_front_factor" ).as_double();
-  flipper_back_factor_ = node_->get_parameter( plugin_namespace_ + ".flipper_back_factor" ).as_double();
-  standard_controller_ = node_->get_parameter( plugin_namespace_ + ".standard_controller" ).as_string();
-  teleop_controller_ = node_->get_parameter( plugin_namespace_ + ".teleop_controller" ).as_string();
+  speed_ = node_->get_parameter( plugin_namespace + ".speed" ).as_double();
+  flipper_front_factor_ = node_->get_parameter( plugin_namespace + ".flipper_front_factor" ).as_double();
+  flipper_back_factor_ = node_->get_parameter( plugin_namespace + ".flipper_back_factor" ).as_double();
+  standard_controller_ = node_->get_parameter( plugin_namespace + ".standard_controller" ).as_string();
+  teleop_controller_ = node_->get_parameter( plugin_namespace + ".teleop_controller" ).as_string();
 
   // ros controller mapping [fr_l, fr_r, b_l, b_r]
   vel_commands_.insert(vel_commands_.begin(), {0.0, 0.0, 0.0, 0.0});
@@ -29,11 +29,15 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node)
   flipper_command_publisher_ =
       node_->create_publisher<std_msgs::msg::Float64MultiArray>("/" + node_->get_parameter("robot_namespace").as_string() + "/flipper_controller_teleop/commands", 10 );
   
-  controller_helper_.initialize(node, "flipper_plugin");
+  controller_helper_.initialize(node, plugin_namespace);
   RCLCPP_INFO( node_->get_logger(), "Attempting controller switch");
 
   active_=true;
     
+}
+
+std::string FlipperPlugin::getPluginName(){
+  return "flipper_plugin";
 }
 
 void FlipperPlugin::handlePress( const std::string &function)

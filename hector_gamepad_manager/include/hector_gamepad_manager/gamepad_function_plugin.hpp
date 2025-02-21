@@ -19,6 +19,12 @@ public:
   virtual void initialize( const rclcpp::Node::SharedPtr &node ) = 0;
 
   /**
+   * @brief Returns name of associated plugin
+   *
+   */
+  virtual std::string getPluginName()=0;
+
+  /**
    * @brief Handle button input events.
    *
    * @param function The function name that is associated with the button.
@@ -102,9 +108,6 @@ public:
 protected:
   // The ROS node
   rclcpp::Node::SharedPtr node_;
-
-  // The namespace of the plugin.
-  std::string plugin_namespace_;
 
   // Specifies if the plugin is active.
   bool active_ = false;

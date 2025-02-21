@@ -7,26 +7,30 @@ namespace hector_gamepad_manager_plugins
 void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node )
 {
   node_ = node;
-  plugin_namespace_ = "drive_plugin";
+  std::string plugin_namespace = getPluginName();
 
-  node_->declare_parameters<double>( plugin_namespace_, { { "max_linear_speed", 1.0 },
+  node_->declare_parameters<double>( plugin_namespace, { { "max_linear_speed", 1.0 },
                                                           { "max_angular_speed", 1.0 },
                                                           { "slow_factor", 0.5 },
                                                           { "normal_factor", 0.75 },
                                                           { "fast_factor", 1.0 } } );
 
-  max_linear_speed_ = node_->get_parameter( plugin_namespace_ + ".max_linear_speed" ).as_double();
+  max_linear_speed_ = node_->get_parameter( plugin_namespace + ".max_linear_speed" ).as_double();
 
-  max_angular_speed_ = node_->get_parameter( plugin_namespace_ + ".max_angular_speed" ).as_double();
+  max_angular_speed_ = node_->get_parameter( plugin_namespace + ".max_angular_speed" ).as_double();
 
-  slow_factor_ = node_->get_parameter( plugin_namespace_ + ".slow_factor" ).as_double();
+  slow_factor_ = node_->get_parameter( plugin_namespace + ".slow_factor" ).as_double();
 
-  normal_factor_ = node_->get_parameter( plugin_namespace_ + ".normal_factor" ).as_double();
+  normal_factor_ = node_->get_parameter( plugin_namespace + ".normal_factor" ).as_double();
 
-  fast_factor_ = node_->get_parameter( plugin_namespace_ + ".fast_factor" ).as_double();
+  fast_factor_ = node_->get_parameter( plugin_namespace + ".fast_factor" ).as_double();
 
   drive_command_publisher_ =
       node_->create_publisher<geometry_msgs::msg::TwistStamped>( "cmd_vel", 1 );
+}
+
+std::string DrivePlugin::getPluginName(){
+  return "drive_plugin";
 }
 
 void DrivePlugin::handleAxis( const std::string &function, const double value )
