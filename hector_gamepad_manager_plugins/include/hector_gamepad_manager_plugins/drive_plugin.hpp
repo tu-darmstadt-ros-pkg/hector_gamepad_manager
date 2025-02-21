@@ -10,6 +10,7 @@ namespace hector_gamepad_manager_plugins
 class DrivePlugin : public hector_gamepad_manager::GamepadFunctionPlugin
 {
 public:
+  DrivePlugin();
   void initialize( const rclcpp::Node::SharedPtr &node, const bool active ) override;
 
   void handleButton( const std::string &function, const bool pressed ) override;
@@ -23,6 +24,7 @@ public:
   void deactivate() override;
 
 private:
+  void sendDriveCommand( double linear_speed, double angular_speed );
   rclcpp::Node::SharedPtr node_;
 
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr drive_command_publisher_;
@@ -41,6 +43,7 @@ private:
   bool slow_button_pressed_;
 
   geometry_msgs::msg::TwistStamped drive_command_;
+  bool last_cmd_zero_;
 };
 } // namespace hector_gamepad_manager_plugins
 
