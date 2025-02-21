@@ -11,12 +11,13 @@
 #include <std_srvs/srv/set_bool.hpp>
 namespace hector_gamepad_manager_plugins
 {
-class ManipulationPlugin : public hector_gamepad_manager::GamepadFunctionPlugin
+class ManipulationPlugin final : public hector_gamepad_manager::GamepadFunctionPlugin
 {
 public:
-  void initialize( const rclcpp::Node::SharedPtr &node, const bool active ) override;
+  void initialize( const rclcpp::Node::SharedPtr &node ) override;
 
-  void handleButton( const std::string &function, const bool pressed ) override;
+  void handlePress(const std::string &function) override;
+  void handleRelease(const std::string &function) override;
 
   void handleAxis( const std::string &function, const double value ) override;
 
@@ -25,6 +26,13 @@ public:
   void activate() override;
 
   void deactivate() override;
+
+  /**
+   * Avoid repeatedly sending zero cmd_vel commands.
+   * @param linear_speed
+   * @param angular_speed
+   */
+  void sendDriveCommand( double linear_speed, double angular_speed );
 
   /**
    * Reset all motion commands to zero.
@@ -47,17 +55,18 @@ private:
 
   bool hold_mode_active_ = false;
   bool hold_mode_change_requested_ = false;
+  bool last_cmd_zero_ = false;
 
   double move_left_right_ = 0.0;
   double move_up_down_ = 0.0;
   double move_forward_ = 0.0;
   double move_backward_ = 0.0;
-  double rotate_pitch = 0.0;
-  double rotate_yaw = 0.0;
-  double rotate_roll_clockwise = 0.0;
-  double rotate_roll_counter_clockwise = 0.0;
-  double open_gripper = 0.0;
-  double close_gripper = 0.0;
+  double rotate_pitch_ = 0.0;
+  double rotate_yaw_ = 0.0;
+  double rotate_roll_clockwise_ = 0.0;
+  double rotate_roll_counter_clockwise_ = 0.0;
+  double open_gripper_ = 0.0;
+  double close_gripper_ = 0.0;
 
   geometry_msgs::msg::TwistStamped eef_cmd_;
   geometry_msgs::msg::TwistStamped drive_cmd_;
