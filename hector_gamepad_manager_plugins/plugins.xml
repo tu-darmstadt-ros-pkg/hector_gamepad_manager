@@ -3,4 +3,7 @@
     <class type="hector_gamepad_manager_plugins::DrivePlugin" base_class_type="hector_gamepad_manager::GamepadFunctionPlugin">
         <description>Drive functionality plugin</description>
     </class>
+    <class type="hector_gamepad_manager_plugins::ManipulationPlugin" base_class_type="hector_gamepad_manager::GamepadFunctionPlugin">
+        <description>Manipulation functionality plugin</description>
+    </class>
 </library>

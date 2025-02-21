@@ -2,10 +2,13 @@ launch:
 - arg:
     # Meta Config File that determines which buttons activate which config
     name: "config_name"
+    default: "athena"
 - arg:
     name: "robot_namespace"
+    default: "athena"
 - arg:
     name: "ocs_namespace"
+    default: "ocs"
 
 - node:
     pkg: "hector_gamepad_manager"
@@ -19,3 +22,5 @@ launch:
         value: "$(var robot_namespace)"
       - name: "ocs_namespace"
         value: "$(var ocs_namespace)"
+      - from: $(find-pkg-share hector_gamepad_manager)/config/plugin_parameters_$(var config_name).yaml
+        allow_substs: true
