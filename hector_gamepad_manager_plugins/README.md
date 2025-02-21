@@ -17,7 +17,7 @@ This plugin is used to drive the robot using a gamepad.
 ## Manipulation Plugin
 
 This plugin can be used to control the robots end-effector and gripper.
-Additionally, in the hold mode the robot can be driven while the end-effector remains at its hold position.
+Additionally, in the hold mode the robot can be driven while the end-effector remains at its current position in the world frame.
 
 ### Functions
 #### Axis
@@ -32,4 +32,4 @@ Additionally, in the hold mode the robot can be driven while the end-effector re
 - `rotate_roll_counterclockwise`: Rotate the end-effector counterclockwise around the roll axis.
 - `open_gripper`: Open the gripper.
 - `close_gripper`: Close the gripper.
-- `hold_mode`: Toggle the hold mode. In hold mode the robot can be driven while the end-effector remains at its hold position.
+- `hold_mode`: Toggle the hold mode. In hold mode the robot can be driven while the end-effector remains at its current position in the world frame.
