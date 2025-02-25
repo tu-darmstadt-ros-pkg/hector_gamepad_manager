@@ -44,6 +44,7 @@ private:
   std_msgs::msg::Float64MultiArray flipper_speed_commands_;
 
   std::vector<double> vel_commands_;
+  bool last_cmd_zero_;
 
   void set_front_flipper_command(double vel);
 
@@ -52,6 +53,8 @@ private:
   void reset_commands();
 
   void publish_commands();
+
+  bool check_current_cmd_is_zero();
 
 };
 } // namespace hector_gamepad_manager_plugins

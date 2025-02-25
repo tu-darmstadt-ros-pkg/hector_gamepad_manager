@@ -29,8 +29,11 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
   // load meta switch config and all referenced config files
   if ( loadConfigSwitchesConfig( config_switches_filename ) ) {
     switchConfig( default_config_ );
+
+    rclcpp::SubscriptionOptions options;
+    options.callback_group = node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
     joy_subscription_ = ocs_ns_node_->create_subscription<sensor_msgs::msg::Joy>(
-        "joy", 1, std::bind( &HectorGamepadManager::joyCallback, this, std::placeholders::_1 ) );
+        "joy", 1, std::bind( &HectorGamepadManager::joyCallback, this, std::placeholders::_1 ), options);
   }
 }
 
@@ -227,10 +230,10 @@ HectorGamepadManager::convertJoyToGamepadInputs( const sensor_msgs::msg::Joy::Sh
   // Axes
   inputs.axes[0] = msg->axes[0];                    // Left joystick left/right
   inputs.axes[1] = msg->axes[1];                    // Left joystick up/down
-  inputs.axes[2] = -0.5f * ( msg->axes[2] - 1.0f ); // LB: Change range from [1, -1] to [0, 1]
+  inputs.axes[2] = -0.5f * ( msg->axes[2] - 1.0f ); // LT: Change range from [1, -1] to [0, 1]
   inputs.axes[3] = msg->axes[3];                    // Right joystick left/right
   inputs.axes[4] = msg->axes[4];                    // Right joystick up/down
-  inputs.axes[5] = -0.5f * ( msg->axes[5] - 1.0f ); // RB: Change range from [1, -1] to [0, 1]
+  inputs.axes[5] = -0.5f * ( msg->axes[5] - 1.0f ); // RT: Change range from [1, -1] to [0, 1]
   inputs.axes[6] = msg->axes[6];                    // Cross left/right
   inputs.axes[7] = msg->axes[7];                    // Cross up/down
 
@@ -239,8 +242,8 @@ HectorGamepadManager::convertJoyToGamepadInputs( const sensor_msgs::msg::Joy::Sh
   inputs.buttons[1] = msg->buttons[1];   // Button B
   inputs.buttons[2] = msg->buttons[2];   // Button X
   inputs.buttons[3] = msg->buttons[3];   // Button Y
-  inputs.buttons[4] = msg->buttons[4];   // Button LT
-  inputs.buttons[5] = msg->buttons[5];   // Button RT
+  inputs.buttons[4] = msg->buttons[4];   // Button LB
+  inputs.buttons[5] = msg->buttons[5];   // Button RB
   inputs.buttons[6] = msg->buttons[6];   // Button Back
   inputs.buttons[7] = msg->buttons[7];   // Button Start
   inputs.buttons[8] = msg->buttons[8];   // Button Guide -> Reserved for config switches
@@ -250,12 +253,12 @@ HectorGamepadManager::convertJoyToGamepadInputs( const sensor_msgs::msg::Joy::Sh
   inputs.buttons[12] = inputs.axes[0] < -AXIS_DEADZONE; // Left joystick right
   inputs.buttons[13] = inputs.axes[1] > AXIS_DEADZONE;  // Left joystick up
   inputs.buttons[14] = inputs.axes[1] < -AXIS_DEADZONE; // Left joystick down
-  inputs.buttons[15] = inputs.axes[2] > AXIS_DEADZONE;  // LB button
+  inputs.buttons[15] = inputs.axes[2] > AXIS_DEADZONE;  // LT button
   inputs.buttons[16] = inputs.axes[3] > AXIS_DEADZONE;  // Right joystick left
   inputs.buttons[17] = inputs.axes[3] < -AXIS_DEADZONE; // Right joystick right
   inputs.buttons[18] = inputs.axes[4] > AXIS_DEADZONE;  // Right joystick up
   inputs.buttons[19] = inputs.axes[4] < -AXIS_DEADZONE; // Right joystick down
-  inputs.buttons[20] = inputs.axes[5] > AXIS_DEADZONE;  // RB button
+  inputs.buttons[20] = inputs.axes[5] > AXIS_DEADZONE;  // RT button
   inputs.buttons[21] = inputs.axes[6] == 1.0f;          // Cross left
   inputs.buttons[22] = inputs.axes[6] == -1.0f;         // Cross right
   inputs.buttons[23] = inputs.axes[7] == 1.0f;          // Cross up

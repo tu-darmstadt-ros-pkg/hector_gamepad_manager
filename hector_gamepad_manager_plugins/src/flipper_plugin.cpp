@@ -46,8 +46,6 @@ void FlipperPlugin::handlePress( const std::string &function)
   if ( !active_ ) 
     return;
 
-  RCLCPP_INFO( node_->get_logger(), "Function: %s, Pressed", function.c_str());
-
   if(function == "flipper_back_up") 
       set_back_flipper_command(speed_ * flipper_back_factor_);
 
@@ -87,15 +85,24 @@ void FlipperPlugin::handleAxis( const std::string &function, const double value 
 void FlipperPlugin::update()
 {
   if (!active_) 
-    return;  
+    return;
 
-  publish_commands();
+  bool current_cmd_zero = check_current_cmd_is_zero();
+
+  if(last_cmd_zero_ && !current_cmd_zero)
+    controller_helper_.switchControllers({teleop_controller_}, {standard_controller_}); 
+    
+
+  if(!(last_cmd_zero_ && current_cmd_zero))
+    publish_commands();
   reset_commands();
+  last_cmd_zero_ = current_cmd_zero;
 }
 
 void FlipperPlugin::activate() {
   controller_helper_.switchControllers({teleop_controller_}, {standard_controller_}); 
   active_ = true;
+  last_cmd_zero_=false;
 }
 
 void FlipperPlugin::deactivate()
@@ -135,6 +142,15 @@ void FlipperPlugin::publish_commands(){
   cmd_msg.data = vel_commands_;
   flipper_command_publisher_->publish(cmd_msg);
 }
+
+bool FlipperPlugin::check_current_cmd_is_zero(){
+ for(double cmd : vel_commands_){
+   if(cmd != 0.0)
+     return false;
+ }
+ return true;
+}
+
 
 }// namespace hector_gamepad_manager_plugins
 

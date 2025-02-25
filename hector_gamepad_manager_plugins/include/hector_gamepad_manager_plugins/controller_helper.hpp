@@ -15,7 +15,6 @@ namespace hector_gamepad_manager_plugins
             ControllerHelper()=default;
             ~ControllerHelper()=default;
 
-
             void initialize(const rclcpp::Node::SharedPtr &node, std::string plugin_name);
 
             bool switchControllers(std::vector<std::string> start_controllers, std::vector<std::string> stop_controllers);
@@ -29,9 +28,13 @@ namespace hector_gamepad_manager_plugins
 
             int max_switch_tries_;
             int max_wait_on_srv_tries_;
-            int switch_sleep_rate_;
 
-            std::string plugin_name_;            
+            int switch_retry_sleep_rate_;   // hz
+            int regular_srv_timeout_;       // nanoseconds
+            int init_srv_timeout_;          // nanoseconds
+
+            std::string plugin_name_;  
+     
     };
 }
 
