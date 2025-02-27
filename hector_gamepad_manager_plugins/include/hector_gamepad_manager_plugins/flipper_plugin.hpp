@@ -3,15 +3,16 @@
 
 #include <hector_gamepad_manager/gamepad_function_plugin.hpp>
 
-#include "std_msgs/msg/float64_multi_array.hpp"
 #include "hector_gamepad_manager_plugins/controller_helper.hpp"
+#include "rcl_interfaces/msg/set_parameters_result.hpp"
+#include "std_msgs/msg/float64_multi_array.hpp"
 
 namespace hector_gamepad_manager_plugins
 {
 class FlipperPlugin : public hector_gamepad_manager::GamepadFunctionPlugin
 {
 public:
-  void initialize( const rclcpp::Node::SharedPtr &node) override;
+  void initialize( const rclcpp::Node::SharedPtr &node ) override;
 
   std::string getPluginName() override;
 
@@ -46,15 +47,19 @@ private:
   std::vector<double> vel_commands_;
   bool last_cmd_zero_;
 
-  void set_front_flipper_command(double vel);
+  rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_cb_handler_;
 
-  void set_back_flipper_command(double vel);
+  void set_front_flipper_command( double vel );
+
+  void set_back_flipper_command( double vel );
 
   void reset_commands();
 
   void publish_commands();
 
   bool check_current_cmd_is_zero();
+
+  rcl_interfaces::msg::SetParametersResult set_params_cb(std::vector<rclcpp::Parameter> parameters);
 
 };
 } // namespace hector_gamepad_manager_plugins
