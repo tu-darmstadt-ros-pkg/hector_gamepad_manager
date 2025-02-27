@@ -100,7 +100,7 @@ void FlipperPlugin::update()
 }
 
 void FlipperPlugin::activate() {
-  controller_helper_.switchControllers({teleop_controller_}, {standard_controller_}); 
+  //controller_helper_.switchControllers({teleop_controller_}, {standard_controller_}); 
   active_ = true;
   last_cmd_zero_=false;
 }
@@ -113,7 +113,7 @@ void FlipperPlugin::deactivate()
   reset_commands();
   publish_commands();
 
-  controller_helper_.switchControllers({standard_controller_}, {teleop_controller_}); 
+  //controller_helper_.switchControllers({standard_controller_}, {teleop_controller_}); 
 } 
 
 void FlipperPlugin::set_front_flipper_command(double vel){
