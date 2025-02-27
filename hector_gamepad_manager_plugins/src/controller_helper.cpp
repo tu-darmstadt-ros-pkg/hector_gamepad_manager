@@ -17,10 +17,7 @@ void ControllerHelper::initialize( const rclcpp::Node::SharedPtr &node, std::str
   list_controllers_client_ =
       node->create_client<controller_manager_msgs::srv::ListControllers>( list_controllers_srv );
 
-  max_switch_tries_ = 2;
-
-  max_wait_on_srv_tries_ = 20;
-  regular_srv_timeout_ = 10000; // 1s
+  regular_srv_timeout_ = 10000;
 
   plugin_name_ = plugin_name;
 }
@@ -33,8 +30,13 @@ void ControllerHelper::switchControllers( std::vector<std::string> start_control
     return;
 
   std::chrono::nanoseconds wait_dur = std::chrono::nanoseconds( regular_srv_timeout_ );
-  switch_controller_client_->wait_for_service( wait_dur );
-  list_controllers_client_->wait_for_service( wait_dur );
+  bool switch_status = switch_controller_client_->wait_for_service( wait_dur );
+  bool list_status = list_controllers_client_->wait_for_service( wait_dur );
+
+  if(!(switch_status && list_status)){
+    RCLCPP_ERROR( node_->get_logger(), "Controller manager services not available." );
+    return;
+  }
 
   list_controllers_client_->async_send_request(
       std::make_shared<controller_manager_msgs::srv::ListControllers::Request>(),
@@ -92,8 +94,8 @@ void ControllerHelper::switch_controller_cb(
     rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedFuture response )
 {
 
-  if ( response.get()->ok ) {
-    RCLCPP_INFO( node_->get_logger(), "Successful controller switch for plugin %s",
+  if ( !(response.get()->ok) ) {
+    RCLCPP_ERROR( node_->get_logger(), "Controller switch for plugin %s failed" ,
                  plugin_name_.c_str() );
   }
 }
