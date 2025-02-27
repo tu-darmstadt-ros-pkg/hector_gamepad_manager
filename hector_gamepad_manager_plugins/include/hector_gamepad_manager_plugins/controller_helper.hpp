@@ -17,12 +17,15 @@ namespace hector_gamepad_manager_plugins
 
             void initialize(const rclcpp::Node::SharedPtr &node, std::string plugin_name);
 
-            bool switchControllers(std::vector<std::string> start_controllers, std::vector<std::string> stop_controllers);
+            void switchControllers(std::vector<std::string> start_controllers, std::vector<std::string> stop_controllers);
 
         private:
 
             rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedPtr switch_controller_client_;
             rclcpp::Client<controller_manager_msgs::srv::ListControllers>::SharedPtr list_controllers_client_;
+
+            void controller_list_cb(rclcpp::Client<controller_manager_msgs::srv::ListControllers>::SharedFuture response, std::vector<std::string> start_controllers, std::vector<std::string> stop_controllers);
+            void switch_controller_cb(rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedFuture response);
 
             rclcpp::Node::SharedPtr node_;
 

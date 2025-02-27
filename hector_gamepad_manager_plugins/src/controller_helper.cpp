@@ -23,10 +23,10 @@ namespace hector_gamepad_manager_plugins
         
     }
 
-    bool ControllerHelper::switchControllers(std::vector<std::string> start_controllers, std::vector<std::string> stop_controllers){
+    void ControllerHelper::switchControllers(std::vector<std::string> start_controllers, std::vector<std::string> stop_controllers){
 
         if (start_controllers.empty() && stop_controllers.empty())
-            return true;
+            return;
 
         RCLCPP_INFO(node_->get_logger(), "Initiating controller switch for %s plugin", plugin_name_.c_str());
 
@@ -36,37 +36,33 @@ namespace hector_gamepad_manager_plugins
 
             if (!rclcpp::ok()){ 
                 RCLCPP_ERROR(node_->get_logger(), "Interrupted while waiting for control manager services. Exiting.");
-                return false;
+                return;
             }
 
             wait_on_srv_tries++;
             if(wait_on_srv_tries > max_wait_on_srv_tries_){
                 RCLCPP_ERROR(node_->get_logger(), "Maximum waiting for service tries exceeded");
-                return false;
+                return;
             }
         }
 
-        auto list_result = list_controllers_client_->async_send_request(std::make_shared<controller_manager_msgs::srv::ListControllers::Request>());
+        list_controllers_client_->async_send_request(
+            std::make_shared<controller_manager_msgs::srv::ListControllers::Request>(),
+            [this, start_controllers, stop_controllers](rclcpp::Client<controller_manager_msgs::srv::ListControllers>::SharedFuture response) {
+                this->controller_list_cb(response, start_controllers, stop_controllers);
+            });
+    }
 
-        // This is ugly but controller switch is also called during initialization
-        // before node is spinned therefore need to spin manually
-        try {
-            auto list_status = rclcpp::spin_until_future_complete(node_, list_result, std::chrono::nanoseconds(init_srv_timeout_));
-            if(!(list_status == rclcpp::FutureReturnCode::SUCCESS)){
-                RCLCPP_ERROR(node_->get_logger(), "Error while calling controller list service during initialising. Status %i", list_status);
-                return false;
-            }
-        } catch (const std::runtime_error &e) {
-            if(!(list_result.wait_for(std::chrono::nanoseconds(regular_srv_timeout_)) == std::future_status::ready)){
-                RCLCPP_ERROR(node_->get_logger(), "Error while calling controller list service");
-                return false;
-            }
-        }
-        
-        auto list_response = list_result.get();
+void ControllerHelper::controller_list_cb(rclcpp::Client<controller_manager_msgs::srv::ListControllers>::SharedFuture response,
+                                        std::vector<std::string> start_controllers, 
+                                        std::vector<std::string> stop_controllers){
 
-        // Get controller list to check if the controllers are already running or stopped
-        if (!list_response->controller.empty())
+    auto list_response = response.get();
+
+    RCLCPP_INFO(node_->get_logger(), "Got list response");
+
+    // Get controller list to check if the controllers are already running or stopped
+    if (!list_response->controller.empty())
         {
 
             for (auto& controller : list_response->controller)
@@ -87,10 +83,10 @@ namespace hector_gamepad_manager_plugins
                 }
             }
         }
-
+    
     // if everything is running/stopped, return
     if (start_controllers.empty() && stop_controllers.empty())
-        return true;
+        return;
 
     // fill service request
     auto switch_request = std::make_shared<controller_manager_msgs::srv::SwitchController::Request>();
@@ -105,8 +101,23 @@ namespace hector_gamepad_manager_plugins
         RCLCPP_INFO(node_->get_logger(), "Activating %s", start_controllers[0].c_str());
     if(!stop_controllers.empty())
         RCLCPP_INFO(node_->get_logger(), "Deactivating %s", stop_controllers[0].c_str());
+    
+    switch_controller_client_->async_send_request(switch_request, std::bind(&ControllerHelper::switch_controller_cb, this, std::placeholders::_1));
 
-    rclcpp::Rate sleep_rate(switch_retry_sleep_rate_);
+}
+
+
+void ControllerHelper::switch_controller_cb(rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedFuture response){
+    RCLCPP_INFO(node_->get_logger(), "Got switch response");
+
+    if (response.get()->ok)
+    {
+        RCLCPP_INFO(node_->get_logger(), "Successful controller switch for plugin %s", plugin_name_.c_str());
+    }
+}
+
+
+    /*rclcpp::Rate sleep_rate(switch_retry_sleep_rate_);
     // try to switch controllers several times
     for (int i = 0; i < max_switch_tries_; i++)
     {
@@ -138,6 +149,6 @@ namespace hector_gamepad_manager_plugins
     RCLCPP_ERROR(node_->get_logger(), "Failed to switch controllers for plugin %s", plugin_name_.c_str());
     return false;
 
-    }
+    }*/
 
 }
