@@ -31,9 +31,6 @@ private:
 
   rclcpp::Node::SharedPtr node_;
 
-  int max_switch_tries_;
-  int max_wait_on_srv_tries_;
-
   int regular_srv_timeout_;     // nanoseconds
 
   std::string plugin_name_;
