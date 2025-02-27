@@ -30,8 +30,6 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node)
       node_->create_publisher<std_msgs::msg::Float64MultiArray>("/" + node_->get_parameter("robot_namespace").as_string() + "/flipper_controller_teleop/commands", 10 );
   
   controller_helper_.initialize(node, plugin_namespace);
-  RCLCPP_INFO( node_->get_logger(), "Attempting controller switch");
-
   active_=true;
     
 }
@@ -100,7 +98,6 @@ void FlipperPlugin::update()
 }
 
 void FlipperPlugin::activate() {
-  //controller_helper_.switchControllers({teleop_controller_}, {standard_controller_}); 
   active_ = true;
   last_cmd_zero_=false;
 }
@@ -113,7 +110,6 @@ void FlipperPlugin::deactivate()
   reset_commands();
   publish_commands();
 
-  //controller_helper_.switchControllers({standard_controller_}, {teleop_controller_}); 
 } 
 
 void FlipperPlugin::set_front_flipper_command(double vel){
