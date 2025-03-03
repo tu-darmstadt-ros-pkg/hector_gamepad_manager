@@ -75,3 +75,60 @@ buttons:
   10: # Right joystick press
     plugin: ""
     function: ""
+
+  # -------------------- All the axes can also be used as buttons if specified here --------------------
+  11: # Left joystick left
+    plugin: ""
+    function: ""
+
+  12: # Left joystick right
+    plugin: ""
+    function: ""
+
+  13: # Left joystick up
+    plugin: ""
+    function: ""
+
+  14: # Left joystick down
+    plugin: ""
+    function: ""
+
+  15: # LT
+    plugin: ""
+    function: ""
+
+  16: # Right joystick left
+    plugin: ""
+    function: ""
+
+  17: # Right joystick right
+    plugin: ""
+    function: ""
+
+  18: # Right joystick up
+    plugin: ""
+    function: ""
+
+  19: # Right joystick down
+    plugin: ""
+    function: ""
+
+  20: # RT
+    plugin: ""
+    function: ""
+
+  21: # Cross left
+    plugin: ""
+    function: ""
+
+  22: # Cross right
+    plugin: ""
+    function: ""
+
+  23: # Cross up
+    plugin: ""
+    function: ""
+
+  24: # Cross down
+    plugin: ""
+    function: ""
