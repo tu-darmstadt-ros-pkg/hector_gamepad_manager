@@ -1,0 +1,15 @@
+/**:
+    ros__parameters:
+        drive_plugin:
+            normal_factor: 0.6
+            slow_factor: 0.3
+            fast_factor: 1.0
+            max_angular_speed: 1.5
+            max_linear_speed: 1.0
+        flipper_plugin:
+            flipper_back_factor: 1.0
+            flipper_front_factor: 1.0
+            speed: 1.5  # max of dynamixel motors
+            standard_controller: "flipper_trajectory_controller"
+            teleop_controller: "flipper_velocity_controller"
+
