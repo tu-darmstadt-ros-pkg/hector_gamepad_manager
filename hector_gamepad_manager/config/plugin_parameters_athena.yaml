@@ -6,8 +6,8 @@
     drive_plugin.normal_factor: 1.0
     drive_plugin.fast_factor: 2.0
 
-    manipulation_plugin.max_eef_linear_speed: 0.1
-    manipulation_plugin.max_eef_angular_speed: 0.1
-    manipulation_plugin.max_gripper_speed: 0.1
+    manipulation_plugin.max_eef_linear_speed: 0.15
+    manipulation_plugin.max_eef_angular_speed: 0.25
+    manipulation_plugin.max_gripper_speed: 0.2
     manipulation_plugin.max_drive_linear_speed: 0.5
     manipulation_plugin.max_drive_angular_speed: 0.5
