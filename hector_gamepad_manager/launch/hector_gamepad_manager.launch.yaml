@@ -19,3 +19,4 @@ launch:
         value: "$(var robot_namespace)"
       - name: "ocs_namespace"
         value: "$(var ocs_namespace)"
+      - from: "$(find-pkg-share hector_gamepad_manager)/config/$(var config_name)_plugin_config.yaml"
