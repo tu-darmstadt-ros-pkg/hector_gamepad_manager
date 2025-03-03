@@ -30,10 +30,8 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
   if ( loadConfigSwitchesConfig( config_switches_filename ) ) {
     switchConfig( default_config_ );
 
-    rclcpp::SubscriptionOptions options;
-    options.callback_group = node->create_callback_group(rclcpp::CallbackGroupType::MutuallyExclusive);
     joy_subscription_ = ocs_ns_node_->create_subscription<sensor_msgs::msg::Joy>(
-        "joy", 1, std::bind( &HectorGamepadManager::joyCallback, this, std::placeholders::_1 ), options);
+        "joy", 1, std::bind( &HectorGamepadManager::joyCallback, this, std::placeholders::_1 ));
   }
 }
 

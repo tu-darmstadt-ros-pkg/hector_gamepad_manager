@@ -18,7 +18,7 @@ public:
 
   void handlePress( const std::string &function ) override;
 
-  void handleHold( const std::string &function ) override;
+  void handleRelease( const std::string &function ) override;
 
   void handleAxis( const std::string &function, const double value ) override;
 
@@ -44,22 +44,23 @@ private:
 
   std_msgs::msg::Float64MultiArray flipper_speed_commands_;
 
+  std::vector<double> button_vel_commands_;
+  std::vector<double> axis_vel_commands_;
   std::vector<double> vel_commands_;
+
   bool last_cmd_zero_;
 
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_cb_handler_;
 
-  void set_front_flipper_command( double vel );
+  void handleUserInput( double base_speed_factor, bool is_button, const std::string &function );
 
-  void set_back_flipper_command( double vel );
+  void resetCommands();
 
-  void reset_commands();
+  void publishCommands();
 
-  void publish_commands();
+  bool checkCurrentCmdIsZero();
 
-  bool check_current_cmd_is_zero();
-
-  rcl_interfaces::msg::SetParametersResult set_params_cb(std::vector<rclcpp::Parameter> parameters);
+  rcl_interfaces::msg::SetParametersResult setParamsCb(std::vector<rclcpp::Parameter> parameters);
 
 };
 } // namespace hector_gamepad_manager_plugins
