@@ -39,13 +39,13 @@ void ManipulationPlugin::handlePress( const std::string &function )
     hold_mode_active_ = true;
   }
   else if ( function == "rotate_roll_clockwise" ) {
-    rotate_roll_clockwise_ = max_eef_angular_speed_;
+    rotate_roll_clockwise_ = 1;
   } else if ( function == "rotate_roll_counter_clockwise" ) {
-    rotate_roll_counter_clockwise_ = -max_eef_angular_speed_;
+    rotate_roll_counter_clockwise_ = -1;
   } else if ( function == "gripper_open" ) {
-    open_gripper_ = max_gripper_speed_;
+    open_gripper_ = 1;
   } else if ( function == "gripper_close" ) {
-    close_gripper_ = -max_gripper_speed_;
+    close_gripper_ = -1;
   }
 }
 
