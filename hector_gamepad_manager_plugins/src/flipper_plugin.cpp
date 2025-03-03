@@ -37,7 +37,7 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
 
   flipper_command_publisher_ = node_->create_publisher<std_msgs::msg::Float64MultiArray>(
       "/" + node_->get_parameter( "robot_namespace" ).as_string() +
-          "/flipper_controller_teleop/commands",
+          "/" + teleop_controller_ + "/commands",
       10 );
 
   controller_helper_.initialize( node, plugin_namespace );

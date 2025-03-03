@@ -64,10 +64,10 @@ void ControllerHelper::controller_list_cb(
       auto stop_iter = std::find( stop_controllers.begin(), stop_controllers.end(), controller.name );
 
       // if the controller was found in one of the lists and has the desired state, do not try to change the state later
-      if ( start_iter != start_controllers.end() && controller.state == "running" ) {
+      if ( start_iter != start_controllers.end() && controller.state == "active" ) {
         start_controllers.erase( start_iter );
       } else if ( stop_iter != stop_controllers.end() &&
-                  ( controller.state == "stopped" || controller.state == "initialized" ) ) {
+                  ( controller.state == "inactive" || controller.state == "initialized" ) ) {
         stop_controllers.erase( stop_iter );
       }
     }
@@ -83,7 +83,7 @@ void ControllerHelper::controller_list_cb(
   switch_request->deactivate_controllers = stop_controllers;
   switch_request->strictness = controller_manager_msgs::srv::SwitchController::Request::STRICT;
   switch_request->activate_asap = false;
-  switch_request->timeout = rclcpp::Duration( 0, 0 );
+  switch_request->timeout = rclcpp::Duration( 1, 0 );
 
   switch_controller_client_->async_send_request(
       switch_request,
