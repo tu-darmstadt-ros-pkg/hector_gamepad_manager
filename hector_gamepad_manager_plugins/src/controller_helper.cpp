@@ -42,11 +42,11 @@ void ControllerHelper::switchControllers( std::vector<std::string> start_control
       std::make_shared<controller_manager_msgs::srv::ListControllers::Request>(),
       [this, start_controllers, stop_controllers](
           rclcpp::Client<controller_manager_msgs::srv::ListControllers>::SharedFuture response ) {
-        this->controller_list_cb( response, start_controllers, stop_controllers );
+        this->controllerListCb( response, start_controllers, stop_controllers );
       } );
 }
 
-void ControllerHelper::controller_list_cb(
+void ControllerHelper::controllerListCb(
     rclcpp::Client<controller_manager_msgs::srv::ListControllers>::SharedFuture response,
     std::vector<std::string> start_controllers, std::vector<std::string> stop_controllers )
 {
@@ -87,10 +87,10 @@ void ControllerHelper::controller_list_cb(
 
   switch_controller_client_->async_send_request(
       switch_request,
-      std::bind( &ControllerHelper::switch_controller_cb, this, std::placeholders::_1 ) );
+      std::bind( &ControllerHelper::switchControllerCb, this, std::placeholders::_1 ) );
 }
 
-void ControllerHelper::switch_controller_cb(
+void ControllerHelper::switchControllerCb(
     rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedFuture response )
 {
 
