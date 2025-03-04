@@ -70,7 +70,7 @@ This plugin is used to steer the robot flippers using a gamepad.
 
 ### Functions
 
-- `front flippers up`: Rotate front flippers upwards (counterclockwise). Default button: (RB)
-- `front flippers down`: Rotate front flippers downwards (clockwise). Default button: (LT)
-- `back flippers up`: Rotate back flippers upwards (clockwise). Default button: (LB)
-- `back flippers down`: Rotate back flippers downwards (counterclockwise). Default button: (LT)
+- `front_flippers_up`: Rotate front flippers upwards (counterclockwise). Default button: (RB)
+- `front_flippers_down`: Rotate front flippers downwards (clockwise). Default button: (LT)
+- `back_flippers_up`: Rotate back flippers upwards (clockwise). Default button: (LB)
+- `back_flippers_down`: Rotate back flippers downwards (counterclockwise). Default button: (LT)
