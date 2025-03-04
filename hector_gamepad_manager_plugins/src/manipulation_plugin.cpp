@@ -7,30 +7,32 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
 {
   node_ = node;
 
-  plugin_namespace_ = "manipulation_plugin";
+  std::string plugin_namespace = getPluginName();
 
-  node_->declare_parameters<double>( plugin_namespace_, { { "max_eef_linear_speed", 1.0 },
+  node_->declare_parameters<double>( plugin_namespace, { { "max_eef_linear_speed", 1.0 },
                                                           { "max_eef_angular_speed", 1.0 },
                                                           { "max_drive_linear_speed", 1.0 },
                                                           { "max_drive_angular_speed", 1.0 },
                                                           { "max_gripper_speed", 1.0 } } );
 
   max_eef_linear_speed_ =
-      node_->get_parameter( plugin_namespace_ + ".max_eef_linear_speed" ).as_double();
+      node_->get_parameter( plugin_namespace + ".max_eef_linear_speed" ).as_double();
 
   max_eef_angular_speed_ =
-      node_->get_parameter( plugin_namespace_ + ".max_eef_angular_speed" ).as_double();
+      node_->get_parameter( plugin_namespace + ".max_eef_angular_speed" ).as_double();
   max_drive_linear_speed_ =
-      node_->get_parameter( plugin_namespace_ + ".max_drive_linear_speed" ).as_double();
+      node_->get_parameter( plugin_namespace + ".max_drive_linear_speed" ).as_double();
   max_drive_angular_speed_ =
-      node_->get_parameter( plugin_namespace_ + ".max_drive_angular_speed" ).as_double();
-  max_gripper_speed_ = node_->get_parameter( plugin_namespace_ + ".max_gripper_speed" ).as_double();
+      node_->get_parameter( plugin_namespace + ".max_drive_angular_speed" ).as_double();
+  max_gripper_speed_ = node_->get_parameter( plugin_namespace + ".max_gripper_speed" ).as_double();
 
   eef_cmd_pub_ = node_->create_publisher<geometry_msgs::msg::TwistStamped>( "teleop/eef_cmd", 10 );
   drive_cmd_pub_ = node_->create_publisher<geometry_msgs::msg::TwistStamped>( "cmd_vel", 10 );
   gripper_cmd_pub_ = node_->create_publisher<std_msgs::msg::Float64>( "teleop/gripper_cmd", 10 );
   hold_mode_client_ = node_->create_client<std_srvs::srv::SetBool>( "teleop/hold_mode" );
 }
+
+std::string ManipulationPlugin::getPluginName() { return "manipulation_plugin"; }
 
 void ManipulationPlugin::handlePress( const std::string &function )
 {
