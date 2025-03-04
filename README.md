@@ -48,5 +48,29 @@ The hector_gamepad_manager can be launched with the following command:
 ros2 launch hector_gampepad_manager hector_gamepad_manager.launch.yaml
 ```
 
-## Plugins
-See the hector_gamepad_manager_plugins pkg for available plugins.
+# Hector Gamepad Manager Plugins
+
+This package contains the following plugins for the hector_gamepad_manager package.
+The functionalities per plugin are described below.
+
+## DrivePlugin
+
+This plugin is used to drive the robot using a gamepad.
+
+### Functions
+
+- `drive`: Forward and backward movement of the robot. Default button: (Left joystick up/down)
+- `steer`: Left and right steering of the robot. Default button: (Left joystick left/right)
+- `fast`: Fast driving mode. Default button: (A)
+- `slow`: Slow driving mode. Default button: (X)           
+
+## FlipperPlugin
+
+This plugin is used to steer the robot flippers using a gamepad.
+
+### Functions
+
+- `front flippers up`: Rotate front flippers upwards (counterclockwise). Default button: (RB)
+- `front flippers down`: Rotate front flippers downwards (clockwise). Default button: (LT)
+- `back flippers up`: Rotate back flippers upwards (clockwise). Default button: (LB)
+- `back flippers down`: Rotate back flippers downwards (counterclockwise). Default button: (LT)
