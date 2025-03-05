@@ -33,22 +33,22 @@ private:
 
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr flipper_command_publisher_;
 
-  double speed_;
-  double flipper_front_factor_;
-  double flipper_back_factor_;
+  double speed_=0.0;
+  double flipper_front_factor_=0.0;
+  double flipper_back_factor_=0.0;
 
   std::string standard_controller_;
   std::string teleop_controller_;
 
-  ControllerHelper controller_helper_;
+  ControllerHelper controller_helper_{};
 
   std_msgs::msg::Float64MultiArray flipper_speed_commands_;
 
-  std::vector<double> button_vel_commands_;
-  std::vector<double> axis_vel_commands_;
-  std::vector<double> vel_commands_;
+  std::array<double, 4> button_vel_commands_ = {};
+  std::array<double, 4> axis_vel_commands_ = {};
+  std::array<double, 4> vel_commands_ = {};
 
-  bool last_cmd_zero_;
+  bool last_cmd_zero_=false;
 
   rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr param_cb_handler_;
 
@@ -56,13 +56,13 @@ private:
 
   void resetCommands();
 
-  void publishCommands();
+  void publishCommands() const;
 
-  bool checkCurrentCmdIsZero();
+  bool checkCurrentCmdIsZero() const;
 
-  rcl_interfaces::msg::SetParametersResult setParamsCb(std::vector<rclcpp::Parameter> parameters);
+  rcl_interfaces::msg::SetParametersResult setParamsCb( const std::vector<rclcpp::Parameter> &parameters );
 
 };
 } // namespace hector_gamepad_manager_plugins
 
-#endif // HECTOR_GAMEPAD_MANAGER_PLUGINS_DRIVE_PLUGIN_HPP
+#endif // HECTOR_GAMEPAD_MANAGER_PLUGINS_FLIPPER_PLUGIN_HPP
