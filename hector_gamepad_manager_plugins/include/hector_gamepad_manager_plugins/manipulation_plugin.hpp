@@ -5,7 +5,7 @@
 #define HECTOR_GAMEPAD_MANAGER_PLUGINS_MANIPULATION_PLUGIN_HPP
 
 #include <hector_gamepad_manager/gamepad_function_plugin.hpp>
-
+#include <hector_gamepad_manager_plugins/controller_helper.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <std_msgs/msg/float64.hpp>
 #include <std_srvs/srv/set_bool.hpp>
@@ -36,6 +36,8 @@ public:
    */
   void sendDriveCommand( double linear_speed, double angular_speed );
 
+  bool isZeroCmd()const;
+
   /**
    * Reset all motion commands to zero.
    */
@@ -57,7 +59,8 @@ private:
 
   bool hold_mode_active_ = false;
   bool hold_mode_change_requested_ = false;
-  bool last_cmd_zero_ = false;
+  bool last_drive_cmd_zero_ = false;
+  bool last_eef_cmd_zero_ = true;
 
   double move_left_right_ = 0.0;
   double move_up_down_ = 0.0;
@@ -69,6 +72,10 @@ private:
   double rotate_roll_counter_clockwise_ = 0.0;
   double open_gripper_ = 0.0;
   double close_gripper_ = 0.0;
+
+  std::string twist_controller_name_;
+  std::vector<std::string> stop_controllers_;
+  ControllerHelper controller_helper_;
 
   geometry_msgs::msg::TwistStamped eef_cmd_;
   geometry_msgs::msg::TwistStamped drive_cmd_;
