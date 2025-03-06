@@ -15,13 +15,13 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   node_->declare_parameter<double>( plugin_namespace + ".max_drive_angular_speed", 1.0 );
   node_->declare_parameter<double>( plugin_namespace + ".max_gripper_speed", 1.0 );
 
-  /*node_->declare_parameter<std::string>( plugin_namespace+ ".twist_controller_name", std::string("moveit_twist_controller") );
+  node_->declare_parameter<std::string>( plugin_namespace+ ".twist_controller_name", "moveit_twist_controller" );
   node_->declare_parameter<std::vector<std::string>>( plugin_namespace + ".stop_controllers",
                                                        {"arm_trajectory_controller",
-                                                         "gripper_trajectory_controller"} );*/
+                                                         "gripper_trajectory_controller"} );
+
   max_eef_linear_speed_ =
       node_->get_parameter( plugin_namespace + ".max_eef_linear_speed" ).as_double();
-
   max_eef_angular_speed_ =
       node_->get_parameter( plugin_namespace + ".max_eef_angular_speed" ).as_double();
   max_drive_linear_speed_ =
@@ -30,16 +30,14 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
       node_->get_parameter( plugin_namespace + ".max_drive_angular_speed" ).as_double();
   max_gripper_speed_ = node_->get_parameter( plugin_namespace + ".max_gripper_speed" ).as_double();
 
-  //twist_controller_name_ = node_->get_parameter( plugin_namespace + ".twist_controller_name" ).as_string();
-  //stop_controllers_ = node_->get_parameter( plugin_namespace + ".stop_controllers" ).as_string_array();
-  twist_controller_name_ = "moveit_twist_controller";
-  stop_controllers_ = {"arm_trajectory_controller", "gripper_trajectory_controller"};
-  std::string twist_controller_ns = "moveit_twist_controller";
+  twist_controller_name_ = node_->get_parameter( plugin_namespace + ".twist_controller_name" ).as_string();
+  stop_controllers_ =
+      node_->get_parameter( plugin_namespace + ".stop_controllers" ).as_string_array();
 
-  eef_cmd_pub_ = node_->create_publisher<geometry_msgs::msg::TwistStamped>( twist_controller_ns + "/eef_cmd", 10 );
+  eef_cmd_pub_ = node_->create_publisher<geometry_msgs::msg::TwistStamped>( twist_controller_name_ + "/eef_cmd", 10 );
   drive_cmd_pub_ = node_->create_publisher<geometry_msgs::msg::TwistStamped>( "cmd_vel", 10 );
-  gripper_cmd_pub_ = node_->create_publisher<std_msgs::msg::Float64>( twist_controller_ns + "/gripper_cmd", 10 );
-  hold_mode_client_ = node_->create_client<std_srvs::srv::SetBool>( twist_controller_ns + "/hold_mode" );
+  gripper_cmd_pub_ = node_->create_publisher<std_msgs::msg::Float64>( twist_controller_name_ + "/gripper_cmd", 10 );
+  hold_mode_client_ = node_->create_client<std_srvs::srv::SetBool>( twist_controller_name_ + "/hold_mode" );
   controller_helper_.initialize( node, plugin_namespace );
 }
 
