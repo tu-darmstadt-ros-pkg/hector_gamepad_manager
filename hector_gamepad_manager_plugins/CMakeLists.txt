@@ -21,6 +21,8 @@ find_package(std_srvs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(hector_gamepad_manager REQUIRED)
 find_package(controller_manager_msgs REQUIRED)
+find_package(moveit_msgs REQUIRED)
+find_package(rclcpp_action REQUIRED)
 
 set(HEADERS
   include/hector_gamepad_manager_plugins/drive_plugin.hpp
@@ -42,7 +44,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
     $<INSTALL_INTERFACE:include>
     )
 
-ament_target_dependencies(${PROJECT_NAME} PUBLIC rclcpp controller_manager_msgs std_srvs sensor_msgs geometry_msgs pluginlib hector_gamepad_manager)
+ament_target_dependencies(${PROJECT_NAME} PUBLIC rclcpp rclcpp_action controller_manager_msgs moveit_msgs std_srvs sensor_msgs geometry_msgs pluginlib hector_gamepad_manager)
 
 install(TARGETS ${PROJECT_NAME} EXPORT ${PROJECT_NAME}-targets LIBRARY DESTINATION lib)
 install(DIRECTORY include/ DESTINATION include)
@@ -75,6 +77,6 @@ endif()
 
 ament_export_targets(${PROJECT_NAME}-targets)
 ament_export_include_directories(include)
-ament_export_dependencies(rclcpp sensor_msgs geometry_msgs pluginlib std_srvs hector_gamepad_manager)
+ament_export_dependencies(rclcpp rclcpp_action sensor_msgs geometry_msgs pluginlib moveit_msgs std_srvs hector_gamepad_manager)
 
 ament_package()

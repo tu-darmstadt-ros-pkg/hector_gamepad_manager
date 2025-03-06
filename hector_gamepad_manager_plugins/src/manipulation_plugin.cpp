@@ -200,8 +200,24 @@ bool ManipulationPlugin::isZeroCmd() const
          rotate_roll_clockwise_ == 0.0 && rotate_roll_counter_clockwise_ == 0.0 &&
          open_gripper_ == 0.0 && close_gripper_ == 0.0;
 }
+void ManipulationPlugin::sendNamedPoseGoal( const std::string &pose_name )
+{
+  if (!action_client_->wait_for_action_server(std::chrono::seconds(5)))
+  {
+    RCLCPP_ERROR(node_->get_logger(), "Action server not available after waiting");
+    return;
+  }
 
+  // Create a goal message
+  moveit_msgs::action::MoveGroup::Goal move_group_goal_;
+  move_group_goal_.request.group_name = "arm";
+  move_group_goal_.request.
 
+  // Send the goal
+  auto send_goal_options = rclcpp_action::Client<MoveGroupAction>::SendGoalOptions();
+  send_goal_options.result_callback = std::bind(&GamepadController::result_callback, this, std::placeholders::_1);
+  this->action_client_->async_send_goal(goal_msg, send_goal_options);
+}
 } // namespace hector_gamepad_manager_plugins
 
 #include <pluginlib/class_list_macros.hpp>
