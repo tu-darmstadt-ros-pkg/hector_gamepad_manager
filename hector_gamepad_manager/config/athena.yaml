@@ -1,15 +1,15 @@
 # This file maps the buttons to config switches
-# if CONFIG_SWITCH_BUTTON=8 is hold and another button is pressed the config will switch to the one specified in the button mapping
-# the config names must match the file names in the config folder (without the .yaml extension)
+# If a button is pressed, the corresponding config will be loaded
+# The buttons used here will block the button mappings for these buttons in ALL other configs
 default_config: "driving" # config used at startup
 buttons:
   0: # Button A
-    package: "hector_gamepad_manager"
-    config: "driving"
+    package: ""
+    config: ""
 
   1: # Button B
-    package: "hector_gamepad_manager"
-    config: "manipulation"
+    package: ""
+    config: ""
 
   2: # Button X
    package: ""
@@ -28,12 +28,12 @@ buttons:
    config: ""
 
   6: # Button Back
-   package: ""
-   config: ""
+   package: "hector_gamepad_manager"
+   config: "driving"
 
   7: # Button Start
-   package: ""
-   config: ""
+   package: "hector_gamepad_manager"
+   config: "manipulation"
 
   8: # Button Guide (Manufacturer Button)
    package: ""

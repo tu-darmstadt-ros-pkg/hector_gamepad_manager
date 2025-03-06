@@ -9,8 +9,7 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
   node->declare_parameter<std::string>( "config_name", "athena" );
   node->declare_parameter<std::string>( "robot_namespace", "athena" );
   node->declare_parameter<std::string>( "ocs_namespace", "ocs" );
-  const std::string config_switches_filename =
-      node->get_parameter( "config_name" ).as_string();
+  const std::string config_switches_filename = node->get_parameter( "config_name" ).as_string();
 
   robot_namespace_ = node->get_parameter( "robot_namespace" ).as_string();
   ocs_namespace_ = node->get_parameter( "ocs_namespace" ).as_string();
@@ -31,7 +30,7 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
     switchConfig( default_config_ );
 
     joy_subscription_ = ocs_ns_node_->create_subscription<sensor_msgs::msg::Joy>(
-        "joy", 1, std::bind( &HectorGamepadManager::joyCallback, this, std::placeholders::_1 ));
+        "joy", 1, std::bind( &HectorGamepadManager::joyCallback, this, std::placeholders::_1 ) );
   }
 }
 
@@ -45,7 +44,7 @@ bool HectorGamepadManager::loadConfigSwitchesConfig( const std::string &file_nam
       YAML::Node mapping = entry.second;
       auto config_name = mapping["config"].as<std::string>();
       auto pkg_name = mapping["package"].as<std::string>();
-      if ( config_name.empty() )
+      if ( config_name.empty() || pkg_name.empty() )
         continue; // skip empty mappings
 
       RCLCPP_INFO( ocs_ns_node_->get_logger(), "Loading config file %s", config_name.c_str() );
@@ -141,20 +140,12 @@ bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::st
 bool HectorGamepadManager::handleConfigurationSwitches( const GamepadInputs &inputs )
 {
 
-  if ( inputs.buttons[CONFIG_SWITCH_BUTTON] ) {
-    // test if and only if one additional button is pressed
-    int count = 0;
-    std::string new_config;
-    for ( size_t i = 0; i < inputs.buttons.size(); i++ ) {
-      if ( inputs.buttons[i] && i != CONFIG_SWITCH_BUTTON ) {
-        count++;
-        new_config = config_switch_button_mapping_[i];
-      }
+  // test if a button is pressed that is mapped to a config switch
+  for ( size_t i = 0; i < config_switch_button_mapping_.size(); i++ ) {
+    if ( inputs.buttons[i] && !config_switch_button_mapping_[i].empty() ) {
+      switchConfig( config_switch_button_mapping_[i] );
+      return true;
     }
-    if ( count == 1 && !new_config.empty() ) {
-      switchConfig( new_config );
-    }
-    return true;
   }
   return false;
 }
@@ -196,7 +187,8 @@ void HectorGamepadManager::activatePlugins( const std::string &config_name )
   for ( const auto &button_mapping : configs_[config_name].button_mappings ) {
     if ( !button_mapping.second.plugin->isActive() ) {
       button_mapping.second.plugin->activate();
-      RCLCPP_INFO(ocs_ns_node_->get_logger(), "Activated plugin: %s", button_mapping.second.plugin->getPluginName().c_str());
+      RCLCPP_INFO( ocs_ns_node_->get_logger(), "Activated plugin: %s",
+                   button_mapping.second.plugin->getPluginName().c_str() );
       active_plugins_.push_back( button_mapping.second.plugin );
     }
   }
@@ -204,7 +196,8 @@ void HectorGamepadManager::activatePlugins( const std::string &config_name )
   for ( const auto &axis_mapping : configs_[config_name].axis_mappings ) {
     if ( !axis_mapping.second.plugin->isActive() ) {
       axis_mapping.second.plugin->activate();
-      RCLCPP_INFO(ocs_ns_node_->get_logger(), "Activated plugin: %s", axis_mapping.second.plugin->getPluginName().c_str());
+      RCLCPP_INFO( ocs_ns_node_->get_logger(), "Activated plugin: %s",
+                   axis_mapping.second.plugin->getPluginName().c_str() );
       active_plugins_.push_back( axis_mapping.second.plugin );
     }
   }
@@ -268,7 +261,7 @@ std::string HectorGamepadManager::getPath( const std::string &pkg_name, const st
 {
   const auto package_path = ament_index_cpp::get_package_share_directory( pkg_name );
   std::string path = package_path + "/config/" + file_name;
-  if (file_name.find(".yaml") == std::string::npos) {
+  if ( file_name.find( ".yaml" ) == std::string::npos ) {
     path += ".yaml";
   }
   return path;

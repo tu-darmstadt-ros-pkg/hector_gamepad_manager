@@ -77,9 +77,6 @@ private:
   // Deadzone to consider an axis as pressed
   static constexpr float AXIS_DEADZONE = 0.5;
 
-  // button id for configuration switching
-  static constexpr int CONFIG_SWITCH_BUTTON = 8;
-
   /**
    * @brief Load the Config Switch File, determines which configs must be loaded
    * @param file_name
