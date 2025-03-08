@@ -170,6 +170,7 @@ void ManipulationPlugin::deactivate()
   active_ = false;
 
   reset();
+  moveit_helper_.cancelGoal();
   eef_cmd_.header.stamp = node_->now();
   eef_cmd_pub_->publish( eef_cmd_ );
   gripper_cmd_pub_->publish( gripper_cmd_ );
