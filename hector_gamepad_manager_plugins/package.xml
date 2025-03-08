@@ -16,6 +16,7 @@
   <depend>controller_manager_msgs</depend>
   <depend>moveit_msgs</depend>
   <depend>rclcpp_action</depend>
+  <depend>srdfdom</depend>
 
   <depend>hector_gamepad_manager</depend>
 
