@@ -23,3 +23,4 @@
             max_drive_angular_speed: 0.5
             twist_controller_name: "moveit_twist_controller"
             stop_controllers: ["arm_trajectory_controller", "gripper_trajectory_controller"]
+            pose_names: ["front", "back", "door", "folded"]
