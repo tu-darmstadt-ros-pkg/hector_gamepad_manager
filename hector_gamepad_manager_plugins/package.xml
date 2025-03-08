@@ -9,16 +9,15 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <depend>rclcpp</depend>
-  <depend>sensor_msgs</depend>
-  <depend>std_srvs</depend>
-  <depend>pluginlib</depend>
   <depend>controller_manager_msgs</depend>
-  <depend>moveit_msgs</depend>
-  <depend>rclcpp_action</depend>
-  <depend>srdfdom</depend>
-
   <depend>hector_gamepad_manager</depend>
+  <depend>moveit_msgs</depend>
+  <depend>pluginlib</depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_action</depend>
+  <depend>sensor_msgs</depend>
+  <depend>srdfdom</depend>
+  <depend>std_srvs</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
