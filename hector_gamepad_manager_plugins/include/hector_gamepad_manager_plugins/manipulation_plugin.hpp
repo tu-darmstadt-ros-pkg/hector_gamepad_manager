@@ -83,7 +83,7 @@ private:
   std::vector<std::string> stop_controllers_;
   ControllerHelper controller_helper_{};
   MoveitHelper moveit_helper_{};
-
+  std::array<std::string, 4> pose_names_;
   geometry_msgs::msg::TwistStamped eef_cmd_;
   geometry_msgs::msg::TwistStamped drive_cmd_;
   std_msgs::msg::Float64 gripper_cmd_;

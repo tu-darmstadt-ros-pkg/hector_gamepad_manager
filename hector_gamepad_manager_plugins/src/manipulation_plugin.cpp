@@ -21,6 +21,8 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   node_->declare_parameter<std::vector<std::string>>(
       plugin_namespace + ".stop_controllers",
       { "arm_trajectory_controller", "gripper_trajectory_controller" } );
+  node_->declare_parameter<std::vector<std::string>>(plugin_namespace + ".pose_names",
+                                                      { "front", "back", "folded", "door" });
 
   max_eef_linear_speed_ =
       node_->get_parameter( plugin_namespace + ".max_eef_linear_speed" ).as_double();
@@ -36,6 +38,8 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
       node_->get_parameter( plugin_namespace + ".twist_controller_name" ).as_string();
   stop_controllers_ =
       node_->get_parameter( plugin_namespace + ".stop_controllers" ).as_string_array();
+  const auto pose_names = node_->get_parameter( plugin_namespace + ".pose_names" ).as_string_array();
+  for (size_t i=0; i<std::min(4uL,pose_names.size());i++) pose_names_[i] = pose_names[i];
 
   eef_cmd_pub_ = node_->create_publisher<geometry_msgs::msg::TwistStamped>(
       twist_controller_name_ + "/eef_cmd", 10 );
@@ -64,9 +68,13 @@ void ManipulationPlugin::handlePress( const std::string &function )
   } else if ( function == "gripper_close" ) {
     close_gripper_ = -1;
   } else if ( function == "go_to_pose_1" ) {
-    goal_pose_name_ = "front";
+    goal_pose_name_ = pose_names_[0];
   } else if ( function == "go_to_pose_2" ) {
-    goal_pose_name_ = "back";
+    goal_pose_name_ = pose_names_[1];
+  } else if ( function == "go_to_pose_3" ) {
+    goal_pose_name_ = pose_names_[2];
+  } else if ( function == "go_to_pose_4" ) {
+    goal_pose_name_ = pose_names_[3];
   }
 }
 

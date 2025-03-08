@@ -78,6 +78,7 @@ void MoveitHelper::sendNamedPoseGoal( const std::string &pose_name )
   move_group_goal_.planning_options.plan_only = false;
   move_group_goal_.request.max_acceleration_scaling_factor = max_acceleration_scaling_factor_;
   move_group_goal_.request.max_velocity_scaling_factor = max_velocity_scaling_factor_;
+  move_group_goal_.request.num_planning_attempts = 3;
 
   // Send the goal
   auto send_goal_options = rclcpp_action::Client<moveit_msgs::action::MoveGroup>::SendGoalOptions();
