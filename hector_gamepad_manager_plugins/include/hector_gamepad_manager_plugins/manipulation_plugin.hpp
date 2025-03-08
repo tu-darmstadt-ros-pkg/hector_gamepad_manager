@@ -9,8 +9,8 @@
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <std_msgs/msg/float64.hpp>
 #include <std_srvs/srv/set_bool.hpp>
-#include <moveit_msgs/action/move_group.hpp>
-#include <rclcpp_action/rclcpp_action.hpp>
+#include <hector_gamepad_manager_plugins/moveit_helper.hpp>
+
 
 namespace hector_gamepad_manager_plugins
 {
@@ -54,7 +54,7 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr drive_cmd_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr gripper_cmd_pub_;
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr hold_mode_client_;
-  rclcpp_action::Client<moveit_msgs::action::MoveGroup>::SharedPtr action_client_;
+
 
   double max_eef_linear_speed_ = 0.0;
   double max_eef_angular_speed_ = 0.0;
@@ -77,10 +77,12 @@ private:
   double rotate_roll_counter_clockwise_ = 0.0;
   double open_gripper_ = 0.0;
   double close_gripper_ = 0.0;
+  std:: string goal_pose_name_;
 
   std::string twist_controller_name_;
   std::vector<std::string> stop_controllers_;
-  ControllerHelper controller_helper_;
+  ControllerHelper controller_helper_{};
+  MoveitHelper moveit_helper_{};
 
   geometry_msgs::msg::TwistStamped eef_cmd_;
   geometry_msgs::msg::TwistStamped drive_cmd_;

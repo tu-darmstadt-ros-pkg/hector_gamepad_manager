@@ -118,12 +118,12 @@ buttons:
     function: ""
 
   21: # Cross left
-    plugin: ""
-    function: ""
+    plugin: "hector_gamepad_manager_plugins::ManipulationPlugin"
+    function: "go_to_pose_1"
 
   22: # Cross right
-    plugin: ""
-    function: ""
+    plugin: "hector_gamepad_manager_plugins::ManipulationPlugin"
+    function: "go_to_pose_2"
 
   23: # Cross up
     plugin: ""
