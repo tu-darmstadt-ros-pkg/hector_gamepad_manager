@@ -38,7 +38,7 @@ private:
   double flipper_back_factor_=0.0;
 
   std::string standard_controller_;
-  std::string teleop_controller_;
+  std::vector<std::string> teleop_controller_;
 
   ControllerHelper controller_helper_{};
 

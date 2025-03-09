@@ -17,8 +17,12 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   node_->declare_parameters<std::string>( plugin_namespace,
                                           {
                                               { "standard_controller", "flipper_controller" },
-                                              { "teleop_controller", "flipper_controller_teleop" },
                                           } );
+  node_->declare_parameters<std::vector<std::string>>(
+      plugin_namespace,
+      {
+          { "teleop_controller", { "passthrough_controller", "flipper_controller_teleop" } },
+      } );
 
   speed_ = node_->get_parameter( plugin_namespace + ".speed" ).as_double();
   flipper_front_factor_ =
@@ -27,14 +31,14 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
       node_->get_parameter( plugin_namespace + ".flipper_back_factor" ).as_double();
   standard_controller_ =
       node_->get_parameter( plugin_namespace + ".standard_controller" ).as_string();
-  teleop_controller_ = node_->get_parameter( plugin_namespace + ".teleop_controller" ).as_string();
+  teleop_controller_ =
+      node_->get_parameter( plugin_namespace + ".teleop_controller" ).as_string_array();
 
   param_cb_handler_ = node->add_on_set_parameters_callback(
       std::bind( &FlipperPlugin::setParamsCb, this, std::placeholders::_1 ) );
 
-
   flipper_command_publisher_ = node_->create_publisher<std_msgs::msg::Float64MultiArray>(
-      "/" + node_->get_parameter( "robot_namespace" ).as_string() + "/" + teleop_controller_ +
+      "/" + node_->get_parameter( "robot_namespace" ).as_string() + "/" + teleop_controller_[1] +
           "/commands",
       10 );
 
@@ -49,9 +53,9 @@ FlipperPlugin::setParamsCb( const std::vector<rclcpp::Parameter> &parameters )
   result.successful = true;
   const auto plugin_namespace = getPluginName();
 
-  for ( const auto& parameter : parameters ) {
+  for ( const auto &parameter : parameters ) {
     if ( parameter.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE &&
-      parameter.get_name().find( plugin_namespace ) != std::string::npos ) {
+         parameter.get_name().find( plugin_namespace ) != std::string::npos ) {
       const double val = parameter.as_double();
       if ( val <= 0 ) {
         result.successful = false;
@@ -103,7 +107,7 @@ void FlipperPlugin::update()
   const bool current_cmd_zero = checkCurrentCmdIsZero();
 
   if ( last_cmd_zero_ && !current_cmd_zero )
-    controller_helper_.switchControllers( { teleop_controller_ }, { standard_controller_ } );
+    controller_helper_.switchControllers( teleop_controller_, { standard_controller_ } );
 
   if ( !( last_cmd_zero_ && current_cmd_zero ) )
     publishCommands();
@@ -126,7 +130,7 @@ void FlipperPlugin::deactivate()
 }
 
 void FlipperPlugin::handleUserInput( const double base_speed_factor, const bool is_button,
-                                  const std::string &function )
+                                     const std::string &function )
 {
   if ( !active_ )
     return;

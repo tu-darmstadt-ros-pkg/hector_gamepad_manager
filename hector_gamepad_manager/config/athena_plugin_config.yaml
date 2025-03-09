@@ -11,7 +11,9 @@
             flipper_front_factor: 1.0
             speed: 1.5  # max of dynamixel motors
             standard_controller: "flipper_trajectory_controller"
-            teleop_controller: "flipper_velocity_controller"
+            teleop_controller:
+                - "passthrough_controller" 
+                - "flipper_velocity_controller"
         manipulation_plugin:
             max_eef_linear_speed: 0.15
             max_eef_angular_speed: 0.25
