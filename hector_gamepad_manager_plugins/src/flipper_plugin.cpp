@@ -21,7 +21,7 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   node_->declare_parameters<std::vector<std::string>>(
       plugin_namespace,
       {
-          { "teleop_controller", { "passthrough_controller", "flipper_controller_teleop" } },
+          { "teleop_controller", { "self_collision_avoidance_controller", "flipper_controller_teleop" } },
       } );
 
   speed_ = node_->get_parameter( plugin_namespace + ".speed" ).as_double();
