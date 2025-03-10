@@ -13,23 +13,24 @@ void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node )
 {
   node_ = node;
   const std::string plugin_name = getPluginName();
-  node_->declare_parameter<std::vector<std::string>>(plugin_name+".start_controllers" );
-  node_->declare_parameter<std::vector<std::string>>(plugin_name+".stop_controllers" );
-  start_controllers_ = node_->get_parameter(plugin_name+".start_controllers").as_string_array();
-  stop_controllers_ = node_->get_parameter(plugin_name+".stop_controllers").as_string_array();
+  node_->declare_parameter<std::vector<std::string>>( plugin_name + ".start_controllers" );
+  node_->declare_parameter<std::vector<std::string>>( plugin_name + ".stop_controllers" );
+  start_controllers_ = node_->get_parameter( plugin_name + ".start_controllers" ).as_string_array();
+  stop_controllers_ = node_->get_parameter( plugin_name + ".stop_controllers" ).as_string_array();
   // setup reconfigurable parameters
   velocity_scaling_factor_subscriber_ = hector::createReconfigurableParameter(
-      node_, plugin_name+".max_velocity_scaling_factor", max_velocity_scaling_factor_,
+      node_, plugin_name + ".max_velocity_scaling_factor", max_velocity_scaling_factor_,
       "Velocity scaling factor for moveit motion planning",
       hector::ReconfigurableParameterOptions<double>().onValidate(
           []( const auto &value ) { return value >= 0.0 && value <= 1.0; } ) );
   acceleration_scaling_factor_subscriber_ = hector::createReconfigurableParameter(
-      node_, plugin_name+".max_acceleration_scaling_factor", max_acceleration_scaling_factor_,
+      node_, plugin_name + ".max_acceleration_scaling_factor", max_acceleration_scaling_factor_,
       "Acceleration scaling factor for moveit motion planning",
       hector::ReconfigurableParameterOptions<double>().onValidate(
           []( const auto &value ) { return value >= 0.0 && value <= 1.0; } ) );
   joint_tolerance_subscriber_ = hector::createReconfigurableParameter(
-      node_, plugin_name+".joint_tolerance", joint_tolerance_, "Joint tolerance for moveit motion planning",
+      node_, plugin_name + ".joint_tolerance", joint_tolerance_,
+      "Joint tolerance for moveit motion planning",
       hector::ReconfigurableParameterOptions<double>().onValidate(
           []( const auto &value ) { return value >= 0.0; } ) );
 
@@ -51,13 +52,17 @@ void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node )
         robot_description_semantic_subscriber_.reset();
       } );
   controller_helper_.initialize( node, plugin_name );
+  joint_state_subscriber_ = node_->create_subscription<sensor_msgs::msg::JointState>(
+      "joint_states", 10,
+      [this]( const sensor_msgs::msg::JointState::SharedPtr msg ) { joint_state_ = *msg; } );
 }
 
 std::string MoveitPlugin::getPluginName() { return "moveit_plugin"; }
 
 void MoveitPlugin::handlePress( const std::string &function )
 {
-  if (!active_) return;
+  if ( !active_ )
+    return;
   if ( !initializedNamedPoses ) {
     initializeNamedPoses();
     initializedNamedPoses = true;
@@ -66,27 +71,25 @@ void MoveitPlugin::handlePress( const std::string &function )
   if ( named_poses_.count( function ) > 0 ) {
     controller_helper_.switchControllers( start_controllers_, stop_controllers_ );
     const auto [group, pose] = fromGroupPoseName( function );
-        sendNamedPoseGoal( group, pose );
-  }else {
-    RCLCPP_WARN(node_->get_logger(), "No pose named %s found", function.c_str() );
+    sendNamedPoseGoal( group, pose );
+  } else {
+    RCLCPP_WARN( node_->get_logger(), "No pose named %s found", function.c_str() );
   }
 }
 
 void MoveitPlugin::handleRelease( const std::string &function )
 {
-  if (!active_) return;
+  if ( !active_ )
+    return;
   // function is <group_name>_<pose_name>
   if ( named_poses_.count( function ) > 0 ) {
     cancelGoal(); // cancels all current goals
   }
 }
 
-void MoveitPlugin::update(){}
+void MoveitPlugin::update() { }
 
-void MoveitPlugin::activate()
-{
-  active_ = true;
-}
+void MoveitPlugin::activate() { active_ = true; }
 
 void MoveitPlugin::deactivate()
 {
@@ -120,6 +123,21 @@ void MoveitPlugin::sendNamedPoseGoal( const std::string &move_group, const std::
   move_group_goal_.request.max_acceleration_scaling_factor = max_acceleration_scaling_factor_;
   move_group_goal_.request.max_velocity_scaling_factor = max_velocity_scaling_factor_;
   move_group_goal_.request.num_planning_attempts = 3;
+
+  // make sure flippers don't flip the robot
+  // side effect - flipper motions not possible if start state in [-3/4 pi, -pi]
+  if ( move_group.find( "flipper" ) != std::string::npos ) {
+    // add path constraints so that flipper joints must be within -3/4 pi and pi
+    moveit_msgs::msg::JointConstraint joint_constraint;
+    for ( const auto &joint : named_poses_[group_pose_name].joint_constraints ) {
+      joint_constraint.joint_name = joint.joint_name;
+      joint_constraint.position = 0;
+      joint_constraint.tolerance_above = M_PI;
+      joint_constraint.tolerance_below = 3.0 * M_PI / 4.0;
+      joint_constraint.weight = 1.0;
+      move_group_goal_.request.path_constraints.joint_constraints.push_back( joint_constraint );
+    }
+  }
 
   // Send the goal
   auto send_goal_options = rclcpp_action::Client<moveit_msgs::action::MoveGroup>::SendGoalOptions();
@@ -190,9 +208,30 @@ void MoveitPlugin::initializeNamedPoses()
     named_poses_[toGroupPoseName( group_state.group_, group_state.name_ )] = constraints;
   }
   // print all poses
-  for (const auto &pose : named_poses_) {
+  for ( const auto &pose : named_poses_ ) {
     RCLCPP_WARN( node_->get_logger(), "Named pose: %s", pose.first.c_str() );
   }
+}
+
+double MoveitPlugin::getJointPosition( const std::string &name ) const
+{
+  // read joint position from joint state
+  for ( size_t i = 0; i < joint_state_.name.size(); i++ ) {
+    if ( joint_state_.name[i] == name ) {
+      return joint_state_.position[i];
+    }
+  }
+  RCLCPP_ERROR( node_->get_logger(), "Joint %s not found in joint state", name.c_str() );
+  return 0.0;
+}
+
+double MoveitPlugin::getNormalizedJointPosition( const std::string &name ) const
+{
+  double position = getJointPosition( name );
+  // make sure in interval [-pi, pi]
+  while ( position > M_PI ) { position -= 2 * M_PI; }
+  while ( position < -M_PI ) { position += 2 * M_PI; }
+  return position;
 }
 
 std::string MoveitPlugin::toGroupPoseName( const std::string &group_name,
