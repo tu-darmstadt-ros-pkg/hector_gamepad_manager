@@ -16,12 +16,14 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
                                                        } );
   node_->declare_parameters<std::string>( plugin_namespace,
                                           {
-                                              { "standard_controller", "flipper_controller" },
+                                              { "standard_controller", "flipper_trajectory_controller" },
+                                              { "command_topic", "flipper_velocity_controller/commands"}
                                           } );
   node_->declare_parameters<std::vector<std::string>>(
       plugin_namespace,
       {
-          { "teleop_controller", { "self_collision_avoidance_controller", "flipper_controller_teleop" } },
+          { "teleop_controller",
+            { "self_collision_avoidance_controller", "flipper_velocity_controller" } },
       } );
 
   speed_ = node_->get_parameter( plugin_namespace + ".speed" ).as_double();
@@ -34,12 +36,14 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   teleop_controller_ =
       node_->get_parameter( plugin_namespace + ".teleop_controller" ).as_string_array();
 
+  std::string command_topic =
+      node_->get_parameter( plugin_namespace + ".command_topic" ).as_string();
+
   param_cb_handler_ = node->add_on_set_parameters_callback(
       std::bind( &FlipperPlugin::setParamsCb, this, std::placeholders::_1 ) );
 
   flipper_command_publisher_ = node_->create_publisher<std_msgs::msg::Float64MultiArray>(
-      "/" + node_->get_parameter( "robot_namespace" ).as_string() + "/" + teleop_controller_[1] +
-          "/commands",
+      "/" + node_->get_parameter( "robot_namespace" ).as_string() + "/" + command_topic,
       10 );
 
   controller_helper_.initialize( node, plugin_namespace );

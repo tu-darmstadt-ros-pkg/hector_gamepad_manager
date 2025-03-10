@@ -14,6 +14,7 @@
             teleop_controller:
                 - "self_collision_avoidance_controller" 
                 - "flipper_velocity_controller"
+            command_topic: "flipper_velocity_controller/commands"
         manipulation_plugin:
             max_eef_linear_speed: 0.15
             max_eef_angular_speed: 0.25
