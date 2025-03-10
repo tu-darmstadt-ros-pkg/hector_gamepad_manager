@@ -2,32 +2,34 @@
 // Created by aljoscha-schmidt on 3/8/25.
 //
 
-#include <hector_gamepad_manager_plugins/moveit_helper.hpp>
+#include <hector_gamepad_manager_plugins/moveit_plugin.hpp>
 #include <srdfdom/model.h>
 #include <std_msgs/msg/string.hpp>
 #include <urdf_parser/urdf_parser.h>
 
 namespace hector_gamepad_manager_plugins
 {
-void MoveitHelper::initialize( const rclcpp::Node::SharedPtr &node )
+void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node )
 {
   node_ = node;
-  node_->declare_parameter<std::string>( "move_group_name", "arm_group" );
-  move_group_name_ = node_->get_parameter( "move_group_name" ).as_string();
-
+  const std::string plugin_name = getPluginName();
+  node_->declare_parameter<std::vector<std::string>>(plugin_name+".start_controllers" );
+  node_->declare_parameter<std::vector<std::string>>(plugin_name+".stop_controllers" );
+  start_controllers_ = node_->get_parameter(plugin_name+".start_controllers").as_string_array();
+  stop_controllers_ = node_->get_parameter(plugin_name+".stop_controllers").as_string_array();
   // setup reconfigurable parameters
   velocity_scaling_factor_subscriber_ = hector::createReconfigurableParameter(
-      node_, "max_velocity_scaling_factor", max_velocity_scaling_factor_,
+      node_, plugin_name+".max_velocity_scaling_factor", max_velocity_scaling_factor_,
       "Velocity scaling factor for moveit motion planning",
       hector::ReconfigurableParameterOptions<double>().onValidate(
           []( const auto &value ) { return value >= 0.0 && value <= 1.0; } ) );
   acceleration_scaling_factor_subscriber_ = hector::createReconfigurableParameter(
-      node_, "max_acceleration_scaling_factor", max_acceleration_scaling_factor_,
+      node_, plugin_name+".max_acceleration_scaling_factor", max_acceleration_scaling_factor_,
       "Acceleration scaling factor for moveit motion planning",
       hector::ReconfigurableParameterOptions<double>().onValidate(
           []( const auto &value ) { return value >= 0.0 && value <= 1.0; } ) );
   joint_tolerance_subscriber_ = hector::createReconfigurableParameter(
-      node_, "joint_tolerance", joint_tolerance_, "Joint tolerance for moveit motion planning",
+      node_, plugin_name+".joint_tolerance", joint_tolerance_, "Joint tolerance for moveit motion planning",
       hector::ReconfigurableParameterOptions<double>().onValidate(
           []( const auto &value ) { return value >= 0.0; } ) );
 
@@ -48,15 +50,54 @@ void MoveitHelper::initialize( const rclcpp::Node::SharedPtr &node )
         robot_description_semantic_ = msg->data;
         robot_description_semantic_subscriber_.reset();
       } );
+  controller_helper_.initialize( node, plugin_name );
 }
 
-void MoveitHelper::sendNamedPoseGoal( const std::string &pose_name )
+std::string MoveitPlugin::getPluginName() { return "moveit_plugin"; }
+
+void MoveitPlugin::handlePress( const std::string &function )
 {
+  if (!active_) return;
   if ( !initializedNamedPoses ) {
     initializeNamedPoses();
     initializedNamedPoses = true;
   }
-  if ( named_poses_.find( pose_name ) == named_poses_.end() ) {
+  // function is <group_name>_<pose_name>
+  if ( named_poses_.count( function ) > 0 ) {
+    controller_helper_.switchControllers( start_controllers_, stop_controllers_ );
+    const auto [group, pose] = fromGroupPoseName( function );
+        sendNamedPoseGoal( group, pose );
+  }else {
+    RCLCPP_WARN(node_->get_logger(), "No pose named %s found", function.c_str() );
+  }
+}
+
+void MoveitPlugin::handleRelease( const std::string &function )
+{
+  if (!active_) return;
+  // function is <group_name>_<pose_name>
+  if ( named_poses_.count( function ) > 0 ) {
+    cancelGoal(); // cancels all current goals
+  }
+}
+
+void MoveitPlugin::update(){}
+
+void MoveitPlugin::activate()
+{
+  active_ = true;
+}
+
+void MoveitPlugin::deactivate()
+{
+  active_ = false;
+  cancelGoal(); // cancels all Goals
+}
+
+void MoveitPlugin::sendNamedPoseGoal( const std::string &move_group, const std::string &pose_name )
+{
+  std::string group_pose_name = toGroupPoseName( move_group, pose_name );
+  if ( named_poses_.find( group_pose_name ) == named_poses_.end() ) {
     RCLCPP_ERROR( node_->get_logger(), "Named pose %s not found.", pose_name.c_str() );
     return;
   }
@@ -66,15 +107,15 @@ void MoveitHelper::sendNamedPoseGoal( const std::string &pose_name )
   }
 
   // update the joint tolerance
-  for ( auto &joint_constraint : named_poses_[pose_name].joint_constraints ) {
+  for ( auto &joint_constraint : named_poses_[group_pose_name].joint_constraints ) {
     joint_constraint.tolerance_above = joint_tolerance_;
     joint_constraint.tolerance_below = joint_tolerance_;
   }
 
   // Create a goal message
   moveit_msgs::action::MoveGroup::Goal move_group_goal_;
-  move_group_goal_.request.group_name = move_group_name_;
-  move_group_goal_.request.goal_constraints.push_back( named_poses_[pose_name] );
+  move_group_goal_.request.group_name = move_group;
+  move_group_goal_.request.goal_constraints.push_back( named_poses_[group_pose_name] );
   move_group_goal_.planning_options.plan_only = false;
   move_group_goal_.request.max_acceleration_scaling_factor = max_acceleration_scaling_factor_;
   move_group_goal_.request.max_velocity_scaling_factor = max_velocity_scaling_factor_;
@@ -83,22 +124,22 @@ void MoveitHelper::sendNamedPoseGoal( const std::string &pose_name )
   // Send the goal
   auto send_goal_options = rclcpp_action::Client<moveit_msgs::action::MoveGroup>::SendGoalOptions();
   send_goal_options.result_callback =
-      std::bind( &MoveitHelper::resultCallback, this, std::placeholders::_1 );
-  send_goal_options.feedback_callback = std::bind( &MoveitHelper::feedbackCallback, this,
+      std::bind( &MoveitPlugin::resultCallback, this, std::placeholders::_1 );
+  send_goal_options.feedback_callback = std::bind( &MoveitPlugin::feedbackCallback, this,
                                                    std::placeholders::_1, std::placeholders::_2 );
   send_goal_options.goal_response_callback =
-      std::bind( &MoveitHelper::goalResponseCallback, this, std::placeholders::_1 );
+      std::bind( &MoveitPlugin::goalResponseCallback, this, std::placeholders::_1 );
   this->action_client_->async_send_goal( move_group_goal_, send_goal_options );
 }
 
-void MoveitHelper::cancelGoal()
+void MoveitPlugin::cancelGoal()
 {
   if ( action_client_->wait_for_action_server( std::chrono::seconds( 5 ) ) ) {
     action_client_->async_cancel_all_goals();
   }
 }
 
-void MoveitHelper::resultCallback(
+void MoveitPlugin::resultCallback(
     const rclcpp_action::ClientGoalHandle<moveit_msgs::action::MoveGroup>::WrappedResult &result )
 {
   if ( result.code != rclcpp_action::ResultCode::SUCCEEDED ) {
@@ -107,14 +148,14 @@ void MoveitHelper::resultCallback(
   }
 }
 
-void MoveitHelper::feedbackCallback(
+void MoveitPlugin::feedbackCallback(
     rclcpp_action::ClientGoalHandle<moveit_msgs::action::MoveGroup>::SharedPtr,
     const std::shared_ptr<const moveit_msgs::action::MoveGroup::Feedback> feedback )
 {
   RCLCPP_INFO( node_->get_logger(), "Moveit action feedback: %s", feedback->state.c_str() );
 }
 
-void MoveitHelper::goalResponseCallback(
+void MoveitPlugin::goalResponseCallback(
     const rclcpp_action::ClientGoalHandle<moveit_msgs::action::MoveGroup>::SharedPtr &goal_handle )
 {
   if ( !goal_handle ) {
@@ -124,7 +165,7 @@ void MoveitHelper::goalResponseCallback(
   }
 }
 
-void MoveitHelper::initializeNamedPoses()
+void MoveitPlugin::initializeNamedPoses()
 {
   if ( robot_description_.empty() || robot_description_semantic_.empty() ) {
     RCLCPP_ERROR( node_->get_logger(), "Failed to get urdf and srdf file." );
@@ -135,21 +176,44 @@ void MoveitHelper::initializeNamedPoses()
   srdf_model.initString( *urdf_model, robot_description_semantic_ );
   const auto group_states = srdf_model.getGroupStates();
   for ( const auto &group_state : group_states ) {
-    if ( group_state.group_ == move_group_name_ ) {
-      moveit_msgs::msg::Constraints constraints;
-      constraints.name = group_state.name_;
-      for ( const auto &joint_state : group_state.joint_values_ ) {
-        moveit_msgs::msg::JointConstraint joint_constraint;
-        joint_constraint.joint_name = joint_state.first;
-        joint_constraint.position = joint_state.second[0]; // assume single DOF joint
-        joint_constraint.tolerance_above = joint_tolerance_;
-        joint_constraint.tolerance_below = joint_tolerance_;
-        joint_constraint.weight = 1.0;
-        constraints.joint_constraints.push_back( joint_constraint );
-      }
-      named_poses_[group_state.name_] = constraints;
+    moveit_msgs::msg::Constraints constraints;
+    constraints.name = group_state.name_;
+    for ( const auto &joint_state : group_state.joint_values_ ) {
+      moveit_msgs::msg::JointConstraint joint_constraint;
+      joint_constraint.joint_name = joint_state.first;
+      joint_constraint.position = joint_state.second[0]; // assume single DOF joint
+      joint_constraint.tolerance_above = joint_tolerance_;
+      joint_constraint.tolerance_below = joint_tolerance_;
+      joint_constraint.weight = 1.0;
+      constraints.joint_constraints.push_back( joint_constraint );
     }
+    named_poses_[toGroupPoseName( group_state.group_, group_state.name_ )] = constraints;
+  }
+  // print all poses
+  for (const auto &pose : named_poses_) {
+    RCLCPP_WARN( node_->get_logger(), "Named pose: %s", pose.first.c_str() );
   }
 }
 
+std::string MoveitPlugin::toGroupPoseName( const std::string &group_name,
+                                           const std::string &pose_name ) const
+{
+  return group_name + "/" + pose_name;
+}
+
+std::pair<std::string, std::string>
+MoveitPlugin::fromGroupPoseName( const std::string &group_pose_name ) const
+{
+  const auto pos = group_pose_name.find_last_of( '/' );
+  if ( pos == std::string::npos ) {
+    return { "", "" };
+  }
+  return { group_pose_name.substr( 0, pos ), group_pose_name.substr( pos + 1 ) };
+}
+
 } // namespace hector_gamepad_manager_plugins
+
+#include <pluginlib/class_list_macros.hpp>
+
+PLUGINLIB_EXPORT_CLASS( hector_gamepad_manager_plugins::MoveitPlugin,
+                        hector_gamepad_manager::GamepadFunctionPlugin )

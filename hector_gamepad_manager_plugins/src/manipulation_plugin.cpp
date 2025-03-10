@@ -21,8 +21,6 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   node_->declare_parameter<std::vector<std::string>>(
       plugin_namespace + ".stop_controllers",
       { "arm_trajectory_controller", "gripper_trajectory_controller" } );
-  node_->declare_parameter<std::vector<std::string>>(plugin_namespace + ".pose_names",
-                                                      { "front", "back", "folded", "door" });
 
   max_eef_linear_speed_ =
       node_->get_parameter( plugin_namespace + ".max_eef_linear_speed" ).as_double();
@@ -38,8 +36,6 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
       node_->get_parameter( plugin_namespace + ".twist_controller_name" ).as_string();
   stop_controllers_ =
       node_->get_parameter( plugin_namespace + ".stop_controllers" ).as_string_array();
-  const auto pose_names = node_->get_parameter( plugin_namespace + ".pose_names" ).as_string_array();
-  for (size_t i=0; i<std::min(4uL,pose_names.size());i++) pose_names_[i] = pose_names[i];
 
   eef_cmd_pub_ = node_->create_publisher<geometry_msgs::msg::TwistStamped>(
       twist_controller_name_ + "/eef_cmd", 10 );
@@ -49,7 +45,6 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   hold_mode_client_ =
       node_->create_client<std_srvs::srv::SetBool>( twist_controller_name_ + "/hold_mode" );
   controller_helper_.initialize( node, plugin_namespace );
-  moveit_helper_.initialize( node_ );
 }
 
 std::string ManipulationPlugin::getPluginName() { return "manipulation_plugin"; }
@@ -67,14 +62,6 @@ void ManipulationPlugin::handlePress( const std::string &function )
     open_gripper_ = 1;
   } else if ( function == "gripper_close" ) {
     close_gripper_ = -1;
-  } else if ( function == "go_to_pose_1" ) {
-    goal_pose_name_ = pose_names_[0];
-  } else if ( function == "go_to_pose_2" ) {
-    goal_pose_name_ = pose_names_[1];
-  } else if ( function == "go_to_pose_3" ) {
-    goal_pose_name_ = pose_names_[2];
-  } else if ( function == "go_to_pose_4" ) {
-    goal_pose_name_ = pose_names_[3];
   }
 }
 
@@ -143,20 +130,12 @@ void ManipulationPlugin::update()
   // make sure controllers are active
   if ( last_eef_cmd_zero_ && !is_zero_cmd ) {
     controller_helper_.switchControllers( { twist_controller_name_ }, stop_controllers_ );
-    moveit_helper_.cancelGoal();
   }
   // avoid repeatedly sending zero commands
   if ( !( last_eef_cmd_zero_ && is_zero_cmd ) ) {
     eef_cmd_.header.stamp = node_->now();
     eef_cmd_pub_->publish( eef_cmd_ );
     gripper_cmd_pub_->publish( gripper_cmd_ );
-  }
-  if ( !hold_mode_active_ && last_eef_cmd_zero_ && is_zero_cmd ) {
-    // check if a goal pose is set
-    if ( !goal_pose_name_.empty() ) {
-      sendNamedPoseGoal( goal_pose_name_ );
-      goal_pose_name_ = "";
-    }
   }
   last_eef_cmd_zero_ = is_zero_cmd;
 
@@ -170,7 +149,6 @@ void ManipulationPlugin::deactivate()
   active_ = false;
 
   reset();
-  moveit_helper_.cancelGoal();
   eef_cmd_.header.stamp = node_->now();
   eef_cmd_pub_->publish( eef_cmd_ );
   gripper_cmd_pub_->publish( gripper_cmd_ );
@@ -200,7 +178,6 @@ void ManipulationPlugin::reset()
   gripper_cmd_.data = 0.0;
   hold_mode_change_requested_ = false;
   last_eef_cmd_zero_ = true;
-  goal_pose_name_ = "";
 }
 
 void ManipulationPlugin::sendDriveCommand( const double linear_speed, const double angular_speed )
@@ -223,12 +200,6 @@ bool ManipulationPlugin::isZeroCmd() const
          open_gripper_ == 0.0 && close_gripper_ == 0.0;
 }
 
-void ManipulationPlugin::sendNamedPoseGoal( const std::string &pose_name )
-{
-  moveit_helper_.cancelGoal();
-  controller_helper_.switchControllers(  stop_controllers_ ,{ twist_controller_name_ });
-  moveit_helper_.sendNamedPoseGoal( pose_name );
-}
 
 } // namespace hector_gamepad_manager_plugins
 

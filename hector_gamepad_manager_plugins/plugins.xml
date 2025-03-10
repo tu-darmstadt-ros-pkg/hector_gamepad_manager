@@ -9,4 +9,7 @@
     <class type="hector_gamepad_manager_plugins::FlipperPlugin" base_class_type="hector_gamepad_manager::GamepadFunctionPlugin">
         <description>Flipper functionality plugin</description>
     </class>
+    <class type="hector_gamepad_manager_plugins::MoveitPlugin" base_class_type="hector_gamepad_manager::GamepadFunctionPlugin">
+        <description>Interface to moveit planners.</description>
+    </class>
 </library>

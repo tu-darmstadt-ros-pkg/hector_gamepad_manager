@@ -38,6 +38,8 @@ set(HEADERS
         include/hector_gamepad_manager_plugins/drive_plugin.hpp
         include/hector_gamepad_manager_plugins/flipper_plugin.hpp
         include/hector_gamepad_manager_plugins/controller_helper.hpp
+        include/hector_gamepad_manager_plugins/manipulation_plugin.hpp
+        include/hector_gamepad_manager_plugins/moveit_plugin.hpp
 )
 
 set(SOURCES
@@ -45,7 +47,7 @@ set(SOURCES
         src/manipulation_plugin.cpp
         src/flipper_plugin.cpp
         src/controller_helper.cpp
-        src/moveit_helper.cpp
+        src/moveit_plugin.cpp
 )
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES} ${HEADERS})
