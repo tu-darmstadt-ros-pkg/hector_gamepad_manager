@@ -45,6 +45,8 @@ private:
   void goalResponseCallback(
       const rclcpp_action::ClientGoalHandle<moveit_msgs::action::MoveGroup>::SharedPtr &goal_handle );
   void initializeNamedPoses();
+  double getJointPosition(const std::string &name ) const;
+  double getNormalizedJointPosition(const std::string &name ) const;
 
   std::string toGroupPoseName(const std::string& group_name, const std::string& pose_name) const;
   std::pair<std::string, std::string> fromGroupPoseName(const std::string& group_pose_name) const;
@@ -60,10 +62,12 @@ private:
   std::vector<std::string> start_controllers_;
   std::vector<std::string> stop_controllers_;
   ControllerHelper controller_helper_{};
+  sensor_msgs::msg::JointState joint_state_;
   rclcpp::Node::SharedPtr node_;
   hector::ReconfigurableParameterSubscription velocity_scaling_factor_subscriber_;
   hector::ReconfigurableParameterSubscription acceleration_scaling_factor_subscriber_;
   hector::ReconfigurableParameterSubscription joint_tolerance_subscriber_;
+  rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_subscriber_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr robot_description_subscriber_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr robot_description_semantic_subscriber_;
   rclcpp_action::Client<moveit_msgs::action::MoveGroup>::SharedPtr action_client_;
