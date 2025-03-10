@@ -118,17 +118,17 @@ buttons:
     function: ""
 
   21: # Cross left
-    plugin: "hector_gamepad_manager_plugins::ManipulationPlugin"
-    function: "go_to_pose_1"
+    plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
+    function: "arm_group/front"
 
   22: # Cross right
-    plugin: "hector_gamepad_manager_plugins::ManipulationPlugin"
-    function: "go_to_pose_2"
+    plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
+    function: "arm_group/back"
 
   23: # Cross up
-    plugin: "hector_gamepad_manager_plugins::ManipulationPlugin"
-    function: "go_to_pose_3"
+    plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
+    function: "arm_group/todo"
 
   24: # Cross down
-    plugin: "hector_gamepad_manager_plugins::ManipulationPlugin"
-    function: "go_to_pose_4"
+    plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
+    function: "arm_group/folded"

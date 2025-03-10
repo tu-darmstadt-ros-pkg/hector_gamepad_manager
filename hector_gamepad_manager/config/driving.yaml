@@ -118,17 +118,17 @@ buttons:
     function: ""
 
   21: # Cross left
-    plugin: ""
-    function: ""
+    plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
+    function: "flipper_group/wanne"
 
   22: # Cross right
-    plugin: ""
-    function: ""
+    plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
+    function: "flipper_group/small"
 
   23: # Cross up
-    plugin: ""
-    function: ""
+    plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
+    function: "flipper_group/up"
 
   24: # Cross down
-    plugin: ""
-    function: ""
+    plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
+    function: "flipper_group/flat"
