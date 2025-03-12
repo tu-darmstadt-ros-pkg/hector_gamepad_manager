@@ -36,7 +36,7 @@ public:
 
 private:
   void sendNamedPoseGoal(  const std::string& move_group, const std::string &pose_name );
-  void cancelGoal();
+  void cancelGoal() const;
   void resultCallback(
     const rclcpp_action::ClientGoalHandle<moveit_msgs::action::MoveGroup>::WrappedResult &result );
   void
@@ -46,12 +46,13 @@ private:
       const rclcpp_action::ClientGoalHandle<moveit_msgs::action::MoveGroup>::SharedPtr &goal_handle );
   void initializeNamedPoses();
   double getJointPosition(const std::string &name ) const;
-  double getNormalizedJointPosition(const std::string &name ) const;
+  double getNormalizedJointPosition( const std::string &name ) const;
 
-  std::string toGroupPoseName(const std::string& group_name, const std::string& pose_name) const;
-  std::pair<std::string, std::string> fromGroupPoseName(const std::string& group_pose_name) const;
+  static std::string toGroupPoseName( const std::string &group_name, const std::string &pose_name );
+  static std::pair<std::string, std::string> fromGroupPoseName(const std::string& group_pose_name );
 
   bool active_ = false;
+  bool request_active_ = false;
   double joint_tolerance_ = 0.05;
   double max_acceleration_scaling_factor_ = 0.3;
   double max_velocity_scaling_factor_ = 0.3;

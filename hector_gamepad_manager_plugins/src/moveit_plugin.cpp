@@ -67,10 +67,16 @@ void MoveitPlugin::handlePress( const std::string &function )
     initializeNamedPoses();
     initializedNamedPoses = true;
   }
+  if (request_active_) {
+    RCLCPP_WARN( node_->get_logger(), "Moveit action still active. Ignoring new request." );
+    return;
+  }
   // function is <group_name>_<pose_name>
   if ( named_poses_.count( function ) > 0 ) {
     controller_helper_.switchControllers( start_controllers_, stop_controllers_ );
     const auto [group, pose] = fromGroupPoseName( function );
+    RCLCPP_WARN( node_->get_logger(), "Start Moveit Planning & Execution [%s]", function.c_str() );
+    request_active_ = true;
     sendNamedPoseGoal( group, pose );
   } else {
     RCLCPP_WARN( node_->get_logger(), "No pose named %s found", function.c_str() );
@@ -150,7 +156,7 @@ void MoveitPlugin::sendNamedPoseGoal( const std::string &move_group, const std::
   this->action_client_->async_send_goal( move_group_goal_, send_goal_options );
 }
 
-void MoveitPlugin::cancelGoal()
+void MoveitPlugin::cancelGoal() const
 {
   if ( action_client_->wait_for_action_server( std::chrono::seconds( 5 ) ) ) {
     action_client_->async_cancel_all_goals();
@@ -164,6 +170,7 @@ void MoveitPlugin::resultCallback(
     RCLCPP_ERROR( node_->get_logger(), "Moveit action failed with result code %d",
                   static_cast<int>( result.code ) );
   }
+  request_active_ = false;
 }
 
 void MoveitPlugin::feedbackCallback(
@@ -178,6 +185,7 @@ void MoveitPlugin::goalResponseCallback(
 {
   if ( !goal_handle ) {
     RCLCPP_ERROR( node_->get_logger(), "Goal was rejected by server" );
+    request_active_ = false;
   } else {
     RCLCPP_INFO( node_->get_logger(), "Goal accepted by server, waiting for result" );
   }
@@ -235,13 +243,13 @@ double MoveitPlugin::getNormalizedJointPosition( const std::string &name ) const
 }
 
 std::string MoveitPlugin::toGroupPoseName( const std::string &group_name,
-                                           const std::string &pose_name ) const
+                                           const std::string &pose_name )
 {
   return group_name + "/" + pose_name;
 }
 
 std::pair<std::string, std::string>
-MoveitPlugin::fromGroupPoseName( const std::string &group_pose_name ) const
+MoveitPlugin::fromGroupPoseName( const std::string &group_pose_name )
 {
   const auto pos = group_pose_name.find_last_of( '/' );
   if ( pos == std::string::npos ) {
