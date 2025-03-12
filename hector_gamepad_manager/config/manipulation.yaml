@@ -126,8 +126,8 @@ buttons:
     function: "arm_group/back"
 
   23: # Cross up
-    plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
-    function: "arm_group/todo"
+    plugin: ""
+    function: ""
 
   24: # Cross down
     plugin: "hector_gamepad_manager_plugins::MoveitPlugin"

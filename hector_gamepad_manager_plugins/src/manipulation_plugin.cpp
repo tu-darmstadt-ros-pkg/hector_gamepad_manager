@@ -6,8 +6,6 @@ namespace hector_gamepad_manager_plugins
 void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
 {
   node_ = node;
-  RCLCPP_INFO(node_->get_logger(), "ManipulationPlugin Node namespace: %s", node_->get_namespace());
-  RCLCPP_INFO(node_->get_logger(), "ManipulationPlugin Node namespace: %s", node_->get_effective_namespace().c_str() );
   const auto plugin_namespace = getPluginName();
 
   node_->declare_parameter<double>( plugin_namespace + ".max_eef_linear_speed", 1.0 );
