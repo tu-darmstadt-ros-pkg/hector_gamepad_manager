@@ -215,10 +215,6 @@ void MoveitPlugin::initializeNamedPoses()
     }
     named_poses_[toGroupPoseName( group_state.group_, group_state.name_ )] = constraints;
   }
-  // print all poses
-  for ( const auto &pose : named_poses_ ) {
-    RCLCPP_WARN( node_->get_logger(), "Named pose: %s", pose.first.c_str() );
-  }
 }
 
 double MoveitPlugin::getJointPosition( const std::string &name ) const
