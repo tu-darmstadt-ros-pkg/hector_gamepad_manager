@@ -119,11 +119,11 @@ buttons:
 
   21: # Cross left
     plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
-    function: "arm_group/front"
+    function: "arm_group/back"
 
   22: # Cross right
     plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
-    function: "arm_group/back"
+    function: "arm_group/front"
 
   23: # Cross up
     plugin: ""
