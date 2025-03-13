@@ -14,11 +14,9 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
                                                            { "flipper_front_factor", 1.0 },
                                                            { "flipper_back_factor", 1.0 },
                                                        } );
-  node_->declare_parameters<std::string>( plugin_namespace,
-                                          {
-                                              { "standard_controller", "flipper_trajectory_controller" },
-                                              { "command_topic", "flipper_velocity_controller/commands"}
-                                          } );
+  node_->declare_parameters<std::string>(
+      plugin_namespace, { { "standard_controller", "flipper_trajectory_controller" },
+                          { "command_topic", "flipper_velocity_controller/commands" } } );
   node_->declare_parameters<std::vector<std::string>>(
       plugin_namespace,
       {
@@ -36,15 +34,13 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   teleop_controller_ =
       node_->get_parameter( plugin_namespace + ".teleop_controller" ).as_string_array();
 
-  std::string command_topic =
-      node_->get_parameter( plugin_namespace + ".command_topic" ).as_string();
+  std::string command_topic = node_->get_parameter( plugin_namespace + ".command_topic" ).as_string();
 
   param_cb_handler_ = node->add_on_set_parameters_callback(
       std::bind( &FlipperPlugin::setParamsCb, this, std::placeholders::_1 ) );
 
   flipper_command_publisher_ = node_->create_publisher<std_msgs::msg::Float64MultiArray>(
-      "/" + node_->get_parameter( "robot_namespace" ).as_string() + "/" + command_topic,
-      10 );
+      "/" + node_->get_parameter( "robot_namespace" ).as_string() + "/" + command_topic, 10 );
 
   controller_helper_.initialize( node, plugin_namespace );
   active_ = true;
@@ -85,17 +81,48 @@ std::string FlipperPlugin::getPluginName() { return "flipper_plugin"; }
 
 void FlipperPlugin::handlePress( const std::string &function )
 {
-  handleUserInput( 1, true, function );
+  // Activate respective indidual mode only if other is inactive
+  if ( function == "individual_front_flipper_control_mode" )
+    individual_front_flipper_mode_ = !individual_back_flipper_mode_;
+
+  if ( function == "individual_back_flipper_control_mode" )
+    individual_back_flipper_mode_ = !individual_front_flipper_mode_;
+
+  if ( individual_front_flipper_mode_ || individual_back_flipper_mode_ )
+    handleIndividualFlipperControlInput( 1, true, function );
+  else
+    handleBasicControlInput( 1, true, function );
 }
 
 void FlipperPlugin::handleRelease( const std::string &function )
 {
-  handleUserInput( 0, true, function );
+  // Activate respective indidual mode only if other is inactive
+  if ( function == "individual_front_flipper_control_mode" ) {
+    // Stop flipper before disable of mode
+    handleIndividualFlipperControlInput( 0, true, "flipper_front_up" );
+    handleIndividualFlipperControlInput( 0, true, "flipper_back_up" );
+    individual_front_flipper_mode_ = false;
+  }
+
+  if ( function == "individual_back_flipper_control_mode" ) {
+    // Stop flipper before disable
+    handleIndividualFlipperControlInput( 0, true, "flipper_front_up" );
+    handleIndividualFlipperControlInput( 0, true, "flipper_back_up" );
+    individual_back_flipper_mode_ = false;
+  }
+
+  if ( individual_front_flipper_mode_ || individual_back_flipper_mode_ )
+    handleIndividualFlipperControlInput( 0, true, function );
+  else
+    handleBasicControlInput( 0, true, function );
 }
 
 void FlipperPlugin::handleAxis( const std::string &function, const double value )
 {
-  handleUserInput( -1 * value, false, function );
+  if ( individual_front_flipper_mode_ || individual_back_flipper_mode_ )
+    handleIndividualFlipperControlInput( -1 * value, false, function );
+  else
+    handleBasicControlInput( -1 * value, false, function );
 }
 
 void FlipperPlugin::update()
@@ -133,8 +160,8 @@ void FlipperPlugin::deactivate()
   publishCommands();
 }
 
-void FlipperPlugin::handleUserInput( const double base_speed_factor, const bool is_button,
-                                     const std::string &function )
+void FlipperPlugin::handleBasicControlInput( const double base_speed_factor, const bool is_button,
+                                             const std::string &function )
 {
   if ( !active_ )
     return;
@@ -162,6 +189,54 @@ void FlipperPlugin::handleUserInput( const double base_speed_factor, const bool 
     } else {
       axis_vel_commands_[0] = vel;
       axis_vel_commands_[1] = vel;
+    }
+  }
+}
+
+void FlipperPlugin::handleIndividualFlipperControlInput( const double base_speed_factor,
+                                                         const bool is_button,
+                                                         const std::string &function )
+{
+  if ( !active_ )
+    return;
+
+  double vel = speed_ * base_speed_factor;
+
+  // Right side
+  if ( function == "flipper_front_up" || function == "flipper_front_down" ) {
+
+    if ( is_button ) {
+
+      if ( individual_front_flipper_mode_ )
+        button_vel_commands_[1] = vel * flipper_front_factor_;
+      else
+        button_vel_commands_[3] = vel * flipper_back_factor_;
+
+    } else {
+
+      if ( individual_front_flipper_mode_ )
+        axis_vel_commands_[1] = vel * flipper_front_factor_;
+      else
+        axis_vel_commands_[3] = vel * flipper_back_factor_;
+    }
+  }
+
+  // Left side
+  if ( function == "flipper_back_up" || function == "flipper_back_down" ) {
+
+    if ( is_button ) {
+
+      if ( individual_front_flipper_mode_ )
+        button_vel_commands_[0] = vel * flipper_front_factor_;
+      else
+        button_vel_commands_[2] = vel * flipper_back_factor_;
+
+    } else {
+
+      if ( individual_front_flipper_mode_ )
+        axis_vel_commands_[0] = vel * flipper_front_factor_;
+      else
+        axis_vel_commands_[2] = vel * flipper_back_factor_;
     }
   }
 }
