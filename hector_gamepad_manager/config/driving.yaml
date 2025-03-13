@@ -38,7 +38,7 @@ buttons:
 
   1: # Button B
     plugin: "hector_gamepad_manager_plugins::FlipperPlugin"
-    function: "individual_front_flipper_control_mode"
+    function: "individual_back_flipper_control_mode"
 
   2: # Button X
     plugin: "hector_gamepad_manager_plugins::DrivePlugin"
@@ -46,7 +46,7 @@ buttons:
 
   3: # Button Y
     plugin: "hector_gamepad_manager_plugins::FlipperPlugin"
-    function: "individual_back_flipper_control_mode"
+    function: "individual_front_flipper_control_mode"
 
   4: # Button LB
     plugin: "hector_gamepad_manager_plugins::FlipperPlugin"
