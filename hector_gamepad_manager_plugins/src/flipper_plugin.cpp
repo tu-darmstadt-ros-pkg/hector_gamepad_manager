@@ -82,11 +82,15 @@ std::string FlipperPlugin::getPluginName() { return "flipper_plugin"; }
 void FlipperPlugin::handlePress( const std::string &function )
 {
   // Activate respective indidual mode only if other is inactive
-  if ( function == "individual_front_flipper_control_mode" )
+  if ( function == "individual_front_flipper_control_mode" ){
     individual_front_flipper_mode_ = !individual_back_flipper_mode_;
+    return;
+  }
 
-  if ( function == "individual_back_flipper_control_mode" )
+  if ( function == "individual_back_flipper_control_mode" ){
     individual_back_flipper_mode_ = !individual_front_flipper_mode_;
+    return;
+  }
 
   if ( individual_front_flipper_mode_ || individual_back_flipper_mode_ )
     handleIndividualFlipperControlInput( 1, true, function );
@@ -102,6 +106,7 @@ void FlipperPlugin::handleRelease( const std::string &function )
     handleIndividualFlipperControlInput( 0, true, "flipper_front_up" );
     handleIndividualFlipperControlInput( 0, true, "flipper_back_up" );
     individual_front_flipper_mode_ = false;
+    return;
   }
 
   if ( function == "individual_back_flipper_control_mode" ) {
@@ -109,6 +114,7 @@ void FlipperPlugin::handleRelease( const std::string &function )
     handleIndividualFlipperControlInput( 0, true, "flipper_front_up" );
     handleIndividualFlipperControlInput( 0, true, "flipper_back_up" );
     individual_back_flipper_mode_ = false;
+    return;
   }
 
   if ( individual_front_flipper_mode_ || individual_back_flipper_mode_ )
