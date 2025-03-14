@@ -29,11 +29,11 @@ buttons:
 
   6: # Button Back
    package: "hector_gamepad_manager"
-   config: "driving"
+   config: "manipulation"
 
   7: # Button Start
    package: "hector_gamepad_manager"
-   config: "manipulation"
+   config: "driving"
 
   8: # Button Guide (Manufacturer Button)
    package: ""
