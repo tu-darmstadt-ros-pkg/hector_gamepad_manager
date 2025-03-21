@@ -19,19 +19,20 @@ void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   stop_controllers_ = node_->get_parameter( plugin_name + ".stop_controllers" ).as_string_array();
   // setup reconfigurable parameters
   velocity_scaling_factor_subscriber_ = hector::createReconfigurableParameter(
-      node_, plugin_name + ".max_velocity_scaling_factor", max_velocity_scaling_factor_,
+      node_, plugin_name + ".max_velocity_scaling_factor", std::ref( max_velocity_scaling_factor_ ),
       "Velocity scaling factor for moveit motion planning",
-      hector::ReconfigurableParameterOptions<double>().onValidate(
+      hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value >= 0.0 && value <= 1.0; } ) );
   acceleration_scaling_factor_subscriber_ = hector::createReconfigurableParameter(
-      node_, plugin_name + ".max_acceleration_scaling_factor", max_acceleration_scaling_factor_,
+      node_, plugin_name + ".max_acceleration_scaling_factor",
+      std::ref( max_acceleration_scaling_factor_ ),
       "Acceleration scaling factor for moveit motion planning",
-      hector::ReconfigurableParameterOptions<double>().onValidate(
+      hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value >= 0.0 && value <= 1.0; } ) );
   joint_tolerance_subscriber_ = hector::createReconfigurableParameter(
-      node_, plugin_name + ".joint_tolerance", joint_tolerance_,
+      node_, plugin_name + ".joint_tolerance", std::ref( joint_tolerance_ ),
       "Joint tolerance for moveit motion planning",
-      hector::ReconfigurableParameterOptions<double>().onValidate(
+      hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value >= 0.0; } ) );
 
   // setup action client
@@ -67,7 +68,7 @@ void MoveitPlugin::handlePress( const std::string &function )
     initializeNamedPoses();
     initializedNamedPoses = true;
   }
-  if (request_active_) {
+  if ( request_active_ ) {
     RCLCPP_WARN( node_->get_logger(), "Moveit action still active. Ignoring new request." );
     return;
   }
@@ -244,8 +245,7 @@ std::string MoveitPlugin::toGroupPoseName( const std::string &group_name,
   return group_name + "/" + pose_name;
 }
 
-std::pair<std::string, std::string>
-MoveitPlugin::fromGroupPoseName( const std::string &group_pose_name )
+std::pair<std::string, std::string> MoveitPlugin::fromGroupPoseName( const std::string &group_pose_name )
 {
   const auto pos = group_pose_name.find_last_of( '/' );
   if ( pos == std::string::npos ) {
