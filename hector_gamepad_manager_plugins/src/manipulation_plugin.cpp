@@ -140,7 +140,10 @@ void ManipulationPlugin::update()
   sendDriveCommand( cmd_vel_linear, cmd_vel_angular );
 }
 
-void ManipulationPlugin::activate() { active_ = true; }
+void ManipulationPlugin::activate() {
+  active_ = true;
+  controller_helper_.switchControllers( { twist_controller_name_ }, stop_controllers_ );
+}
 
 void ManipulationPlugin::deactivate()
 {
@@ -175,7 +178,7 @@ void ManipulationPlugin::reset()
   drive_cmd_.twist = geometry_msgs::msg::Twist();
   gripper_cmd_.data = 0.0;
   hold_mode_change_requested_ = false;
-  last_eef_cmd_zero_ = true;
+  last_eef_cmd_zero_ = false;
 }
 
 void ManipulationPlugin::sendDriveCommand( const double linear_speed, const double angular_speed )
