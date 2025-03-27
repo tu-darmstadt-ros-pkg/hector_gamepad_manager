@@ -11,31 +11,26 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
-find_package(rclcpp REQUIRED)
-find_package(std_msgs REQUIRED)
+add_library(${PROJECT_NAME} INTERFACE)
 
-
-add_library(hector_gamepad_manager_interface src/gamepad_plugin_interface.cpp)
-
-target_include_directories(hector_gamepad_manager_interface PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:include>
+target_include_directories(${PROJECT_NAME} INTERFACE
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+        "$<INSTALL_INTERFACE:include>"
 )
 
-ament_target_dependencies(hector_gamepad_manager_interface
-        rclcpp
-        std_msgs
+install(TARGETS ${PROJECT_NAME}
+        EXPORT "export_${PROJECT_NAME}"
+        ARCHIVE DESTINATION lib
+        LIBRARY DESTINATION lib
+        RUNTIME DESTINATION lib
+        INCLUDES DESTINATION include
 )
 
-ament_export_include_directories(include)
-install(TARGETS hector_gamepad_manager_interface
-        DESTINATION lib/${PROJECT_NAME}
-)
-
-install(
-        DIRECTORY include/
-        DESTINATION include
+install(DIRECTORY include/${PROJECT_NAME}/
+        DESTINATION include/${PROJECT_NAME}
 )
 
 
+#ament_export_libraries(${PROJECT_NAME})
+ament_export_targets("export_${PROJECT_NAME}")
 ament_package()
