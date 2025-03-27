@@ -18,7 +18,7 @@ find_package(ament_cmake REQUIRED)
 set(DEPENDENCIES
         controller_manager_msgs
         geometry_msgs
-        hector_gamepad_manager
+        hector_gamepad_manager_interface
         hector_ros2_utils
         moveit_msgs
         pluginlib

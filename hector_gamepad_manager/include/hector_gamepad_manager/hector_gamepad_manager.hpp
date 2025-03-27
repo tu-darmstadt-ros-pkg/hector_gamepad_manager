@@ -1,7 +1,7 @@
 #ifndef HECTOR_GAMEPAD_MANAGER_HECTOR_GAMEPAD_MANAGER_HPP
 #define HECTOR_GAMEPAD_MANAGER_HECTOR_GAMEPAD_MANAGER_HPP
 
-#include "hector_gamepad_manager/gamepad_function_plugin.hpp"
+#include "hector_gamepad_manager_interface/gamepad_plugin_interface.hpp"
 
 #include <pluginlib/class_loader.hpp>
 #include <rclcpp/rclcpp.hpp>
@@ -14,6 +14,7 @@ namespace hector_gamepad_manager
 class HectorGamepadManager
 {
 public:
+  using GamepadFunctionPlugin = hector_gamepad_manager_interface::GamepadFunctionPlugin;
   // Constructor
   explicit HectorGamepadManager( const rclcpp::Node::SharedPtr &node );
 
