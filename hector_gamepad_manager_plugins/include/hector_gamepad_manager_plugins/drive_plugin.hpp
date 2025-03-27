@@ -1,13 +1,13 @@
 #ifndef HECTOR_GAMEPAD_MANAGER_PLUGINS_DRIVE_PLUGIN_HPP
 #define HECTOR_GAMEPAD_MANAGER_PLUGINS_DRIVE_PLUGIN_HPP
 
-#include <hector_gamepad_manager/gamepad_function_plugin.hpp>
+#include <hector_gamepad_manager_interface/gamepad_plugin_interface.hpp>
 #include <hector_ros2_utils/parameters/reconfigurable_parameter.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 
 namespace hector_gamepad_manager_plugins
 {
-class DrivePlugin : public hector_gamepad_manager::GamepadFunctionPlugin
+class DrivePlugin : public hector_gamepad_manager_interface::GamepadFunctionPlugin
 {
 public:
 

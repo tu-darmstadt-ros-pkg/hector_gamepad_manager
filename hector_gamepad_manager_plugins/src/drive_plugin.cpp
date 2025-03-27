@@ -114,4 +114,4 @@ void DrivePlugin::sendDriveCommand( double linear_speed, double angular_speed )
 #include <pluginlib/class_list_macros.hpp>
 
 PLUGINLIB_EXPORT_CLASS( hector_gamepad_manager_plugins::DrivePlugin,
-                        hector_gamepad_manager::GamepadFunctionPlugin )
+                        hector_gamepad_manager_interface::GamepadFunctionPlugin )

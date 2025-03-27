@@ -16,6 +16,7 @@ set(DEPENDENCIES
         rclcpp
         sensor_msgs
         yaml-cpp
+        hector_gamepad_manager_interface
 )
 
 foreach(Dependency IN LISTS DEPENDENCIES)
@@ -23,7 +24,6 @@ foreach(Dependency IN LISTS DEPENDENCIES)
 endforeach()
 
 set(HEADERS
-        include/hector_gamepad_manager/gamepad_function_plugin.hpp
         include/hector_gamepad_manager/hector_gamepad_manager.hpp
 )
 

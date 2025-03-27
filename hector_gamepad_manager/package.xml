@@ -12,7 +12,9 @@
   <depend>pluginlib</depend>
   <depend>rclcpp</depend>
   <depend>sensor_msgs</depend>
+  <depend>hector_gamepad_manager_interface</depend>
 
+  <exec_depend>hector_gamepad_manager_plugins</exec_depend>
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
