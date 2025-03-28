@@ -3,7 +3,6 @@
 namespace hector_gamepad_manager_plugins
 {
 
-
 void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node )
 {
   node_ = node;
@@ -37,9 +36,7 @@ void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node )
       node_->create_publisher<geometry_msgs::msg::TwistStamped>( "cmd_vel", 1 );
 }
 
-std::string DrivePlugin::getPluginName(){
-  return "drive_plugin";
-}
+std::string DrivePlugin::getPluginName() { return "drive_plugin"; }
 
 void DrivePlugin::handleAxis( const std::string &function, const double value )
 {

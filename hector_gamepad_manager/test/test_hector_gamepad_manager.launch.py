@@ -28,7 +28,7 @@ def load_file(package_name, file_path):
         with open(absolute_file_path, "r") as file:
             return file.read()
     except (
-            EnvironmentError
+        EnvironmentError
     ):  # parent of IOError, OSError *and* WindowsError where available
         return None
 
@@ -41,25 +41,29 @@ def load_yaml(package_name, file_path):
         with open(absolute_file_path, "r") as file:
             return yaml.safe_load(file)
     except (
-            EnvironmentError
+        EnvironmentError
     ):  # parent of IOError, OSError *and* WindowsError where available
         return None
 
 
-def generate_hector_gamepad_manager_test_description(*args, gtest_name: SomeSubstitutionsType):
-    config = os.path.join(os.path.dirname(__file__), "config", "athena_plugin_config.yaml")
+def generate_hector_gamepad_manager_test_description(
+    *args, gtest_name: SomeSubstitutionsType
+):
+    config = os.path.join(
+        os.path.dirname(__file__), "config", "athena_plugin_config.yaml"
+    )
     hector_gamepad_manager = Node(
         package="hector_gamepad_manager",
         name="hector_gamepad_manager",
         executable="hector_gamepad_manager_node",
-        parameters=[config]
+        parameters=[config],
     )
     hector_gamepad_manager_gtest = launch_ros.actions.Node(
         executable=PathJoinSubstitution(
             [LaunchConfiguration("test_binary_dir"), gtest_name]
         ),
         output="screen",
-        #prefix=['xterm -e gdb --args']
+        # prefix=['xterm -e gdb --args']
     )
 
     return launch.LaunchDescription(
@@ -67,7 +71,7 @@ def generate_hector_gamepad_manager_test_description(*args, gtest_name: SomeSubs
             launch.actions.DeclareLaunchArgument(
                 name="test_binary_dir",
                 description="Binary directory of package "
-                            "containing test executables",
+                "containing test executables",
             ),
             hector_gamepad_manager,
             hector_gamepad_manager_gtest,
@@ -83,14 +87,12 @@ def generate_test_description():
 
 
 class TestGTestProcessActive(unittest.TestCase):
-
     def test_gtest_run_complete(self, proc_info, hector_gamepad_manager_gtest):
         proc_info.assertWaitForShutdown(hector_gamepad_manager_gtest, timeout=4000.0)
 
 
 @launch_testing.post_shutdown_test()
 class TestGTestProcessPostShutdown(unittest.TestCase):
-
     def test_gtest_pass(self, proc_info, hector_gamepad_manager_gtest):
         launch_testing.asserts.assertExitCodes(
             proc_info, process=hector_gamepad_manager_gtest

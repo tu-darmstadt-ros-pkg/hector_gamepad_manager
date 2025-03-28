@@ -60,7 +60,7 @@ void FlipperPlugin::handlePress( const std::string &function )
     return;
   }
 
-  if ( function == "individual_back_flipper_control_mode" ){
+  if ( function == "individual_back_flipper_control_mode" ) {
     individual_back_flipper_mode_ = !individual_front_flipper_mode_;
     return;
   }

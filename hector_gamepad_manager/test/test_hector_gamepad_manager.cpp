@@ -616,4 +616,3 @@ TEST_F( HectorGamepadManagerTest, FlipperCmdsReceived )
   for ( size_t i = 0; i < 4; ++i )
     EXPECT_EQ( fake_receiver_->flipper_cmd_sub_->msg_.data[i], -flipper_speed );
 }*/
-

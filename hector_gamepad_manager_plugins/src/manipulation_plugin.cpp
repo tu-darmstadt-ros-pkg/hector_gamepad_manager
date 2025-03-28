@@ -152,7 +152,8 @@ void ManipulationPlugin::update()
   sendDriveCommand( cmd_vel_linear, cmd_vel_angular );
 }
 
-void ManipulationPlugin::activate() {
+void ManipulationPlugin::activate()
+{
   active_ = true;
   controller_helper_.switchControllers( { twist_controller_name_ }, stop_controllers_ );
 }
