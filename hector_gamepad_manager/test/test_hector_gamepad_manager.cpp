@@ -95,9 +95,12 @@ public:
   T msg_;
   bool received_msg_ = false;
 
-  Subscriber( rclcpp::Node::SharedPtr node, const std::string &topic )
+  Subscriber( rclcpp::Node::SharedPtr node, const std::string &topic, bool latched = false )
   {
-    sub_ = node->create_subscription<T>( topic, 10, [this]( const std::shared_ptr<T> msg ) {
+    rclcpp::QoS qos_profile( rclcpp::KeepLast( 10 ) );
+    if ( latched )
+      qos_profile.durability( RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL );
+    sub_ = node->create_subscription<T>( topic, qos_profile, [this]( const std::shared_ptr<T> msg ) {
       msg_ = *msg;
       received_msg_ = true;
     } );
@@ -120,8 +123,9 @@ public:
 
   explicit FakeReceiver( const rclcpp::Node::SharedPtr &node ) : node_( node )
   {
+
     active_config_sub_ =
-        std::make_shared<Subscriber<std_msgs::msg::String>>( node_, "/ocs/active_config" );
+        std::make_shared<Subscriber<std_msgs::msg::String>>( node_, "/ocs/active_config", true );
     cmd_vel_sub_ =
         std::make_shared<Subscriber<geometry_msgs::msg::TwistStamped>>( node_, "/athena/cmd_vel" );
     twist_eef_sub_ = std::make_shared<Subscriber<geometry_msgs::msg::TwistStamped>>(
@@ -343,13 +347,14 @@ TEST_F( HectorGamepadManagerTest, SpeedButtons )
 // make sure zero twist is sent if switch to manipulation config
 TEST_F( HectorGamepadManagerTest, NoMoreCmdVelTwistWhenSwitchingToManipulationConfig )
 {
+  makeSureConfigIsActive( "driving" );
   fake_joy_node_->setAxis( "left_stick_left_right", 1.0 );
   fake_joy_node_->setAxis( "left_stick_up_down", 1.0 );
   fake_receiver_->reset();
   fake_joy_node_->publishJoyContinuously();
   ASSERT_TRUE( waitForMsg( fake_receiver_->cmd_vel_sub_, TIMEOUT ) );
 
-  // switch Config -> back button
+  // switch Config to manipulation -> back button
   fake_joy_node_->setButton( "back", 1 );
   fake_joy_node_->publishJoy();
   ASSERT_TRUE( waitForMsg( fake_receiver_->active_config_sub_, TIMEOUT ) );
