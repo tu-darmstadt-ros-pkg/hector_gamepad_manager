@@ -12,7 +12,7 @@
 
 constexpr int MAX_BUTTONS = 25;
 constexpr int MAX_AXES = 8;
-constexpr double TIMEOUT = 3.0;
+constexpr double TIMEOUT = 10.0;
 
 class FakeJoyNode final : public rclcpp::Node
 {

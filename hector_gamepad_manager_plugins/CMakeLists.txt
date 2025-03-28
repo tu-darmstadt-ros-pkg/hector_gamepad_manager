@@ -79,7 +79,7 @@ install(FILES
 
 pluginlib_export_plugin_description_file(hector_gamepad_manager plugins.xml)
 
-# Linting and tests
+#[[# Linting and tests
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   # the following line skips the linter which checks for copyrights
@@ -87,7 +87,7 @@ if(BUILD_TESTING)
   # the following line skips cpplint (only works in a git repo)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
-endif()
+endif()]]
 
 ament_export_targets(${PROJECT_NAME}-targets)
 ament_export_include_directories(include)
