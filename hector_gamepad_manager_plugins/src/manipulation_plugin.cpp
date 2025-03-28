@@ -140,7 +140,8 @@ void ManipulationPlugin::update()
   sendDriveCommand( cmd_vel_linear, cmd_vel_angular );
 }
 
-void ManipulationPlugin::activate() {
+void ManipulationPlugin::activate()
+{
   active_ = true;
   controller_helper_.switchControllers( { twist_controller_name_ }, stop_controllers_ );
 }
@@ -200,7 +201,6 @@ bool ManipulationPlugin::isZeroCmd() const
          rotate_roll_clockwise_ == 0.0 && rotate_roll_counter_clockwise_ == 0.0 &&
          open_gripper_ == 0.0 && close_gripper_ == 0.0;
 }
-
 
 } // namespace hector_gamepad_manager_plugins
 

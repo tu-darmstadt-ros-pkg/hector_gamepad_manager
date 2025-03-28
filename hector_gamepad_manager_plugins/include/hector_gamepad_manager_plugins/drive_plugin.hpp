@@ -3,7 +3,6 @@
 
 #include <hector_gamepad_manager_interface/gamepad_plugin_interface.hpp>
 
-
 #include <geometry_msgs/msg/twist_stamped.hpp>
 
 namespace hector_gamepad_manager_plugins
@@ -11,7 +10,6 @@ namespace hector_gamepad_manager_plugins
 class DrivePlugin : public hector_gamepad_manager_interface::GamepadFunctionPlugin
 {
 public:
-
   void initialize( const rclcpp::Node::SharedPtr &node ) override;
 
   std::string getPluginName() override;

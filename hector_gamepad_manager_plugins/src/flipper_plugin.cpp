@@ -82,12 +82,12 @@ std::string FlipperPlugin::getPluginName() { return "flipper_plugin"; }
 void FlipperPlugin::handlePress( const std::string &function )
 {
   // Activate respective indidual mode only if other is inactive
-  if ( function == "individual_front_flipper_control_mode" ){
+  if ( function == "individual_front_flipper_control_mode" ) {
     individual_front_flipper_mode_ = !individual_back_flipper_mode_;
     return;
   }
 
-  if ( function == "individual_back_flipper_control_mode" ){
+  if ( function == "individual_back_flipper_control_mode" ) {
     individual_back_flipper_mode_ = !individual_front_flipper_mode_;
     return;
   }

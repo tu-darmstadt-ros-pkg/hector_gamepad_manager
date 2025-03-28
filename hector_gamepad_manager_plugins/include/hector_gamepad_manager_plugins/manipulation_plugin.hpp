@@ -4,12 +4,11 @@
 #ifndef HECTOR_GAMEPAD_MANAGER_PLUGINS_MANIPULATION_PLUGIN_HPP
 #define HECTOR_GAMEPAD_MANAGER_PLUGINS_MANIPULATION_PLUGIN_HPP
 
+#include <geometry_msgs/msg/twist_stamped.hpp>
 #include <hector_gamepad_manager_interface/gamepad_plugin_interface.hpp>
 #include <hector_gamepad_manager_plugins/controller_helper.hpp>
-#include <geometry_msgs/msg/twist_stamped.hpp>
 #include <std_msgs/msg/float64.hpp>
 #include <std_srvs/srv/set_bool.hpp>
-
 
 namespace hector_gamepad_manager_plugins
 {
@@ -20,8 +19,8 @@ public:
 
   std::string getPluginName() override;
 
-  void handlePress(const std::string &function) override;
-  void handleRelease(const std::string &function) override;
+  void handlePress( const std::string &function ) override;
+  void handleRelease( const std::string &function ) override;
 
   void handleAxis( const std::string &function, const double value ) override;
 
@@ -38,7 +37,7 @@ public:
    */
   void sendDriveCommand( double linear_speed, double angular_speed );
 
-  bool isZeroCmd()const;
+  bool isZeroCmd() const;
 
   /**
    * Reset all motion commands to zero.
@@ -52,7 +51,6 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr drive_cmd_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr gripper_cmd_pub_;
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr hold_mode_client_;
-
 
   double max_eef_linear_speed_ = 0.0;
   double max_eef_angular_speed_ = 0.0;

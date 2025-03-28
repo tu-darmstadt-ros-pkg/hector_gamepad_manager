@@ -7,4 +7,4 @@
 namespace hector_gamepad_manager_interface
 {
 
-}// hector_gamepad_manager_interface
+} // namespace hector_gamepad_manager_interface

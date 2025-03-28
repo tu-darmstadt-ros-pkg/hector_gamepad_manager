@@ -22,7 +22,7 @@ public:
    * @brief Returns name of associated plugin
    *
    */
-  virtual std::string getPluginName()=0;
+  virtual std::string getPluginName() = 0;
 
   /**
    * @brief Handle button input events.

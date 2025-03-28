@@ -3,17 +3,16 @@
 namespace hector_gamepad_manager_plugins
 {
 
-
 void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node )
 {
   node_ = node;
   std::string plugin_namespace = getPluginName();
 
   node_->declare_parameters<double>( plugin_namespace, { { "max_linear_speed", 1.0 },
-                                                          { "max_angular_speed", 1.0 },
-                                                          { "slow_factor", 0.5 },
-                                                          { "normal_factor", 0.75 },
-                                                          { "fast_factor", 1.0 } } );
+                                                         { "max_angular_speed", 1.0 },
+                                                         { "slow_factor", 0.5 },
+                                                         { "normal_factor", 0.75 },
+                                                         { "fast_factor", 1.0 } } );
 
   max_linear_speed_ = node_->get_parameter( plugin_namespace + ".max_linear_speed" ).as_double();
 
@@ -29,9 +28,7 @@ void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node )
       node_->create_publisher<geometry_msgs::msg::TwistStamped>( "cmd_vel", 1 );
 }
 
-std::string DrivePlugin::getPluginName(){
-  return "drive_plugin";
-}
+std::string DrivePlugin::getPluginName() { return "drive_plugin"; }
 
 void DrivePlugin::handleAxis( const std::string &function, const double value )
 {
