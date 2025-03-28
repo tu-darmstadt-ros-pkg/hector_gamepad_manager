@@ -33,7 +33,7 @@ void ControllerHelper::switchControllers( std::vector<std::string> start_control
   bool switch_status = switch_controller_client_->wait_for_service( wait_dur );
   bool list_status = list_controllers_client_->wait_for_service( wait_dur );
 
-  if(!(switch_status && list_status)){
+  if ( !( switch_status && list_status ) ) {
     RCLCPP_ERROR( node_->get_logger(), "Controller manager services not available." );
     return;
   }
@@ -94,9 +94,9 @@ void ControllerHelper::switchControllerCb(
     rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedFuture response )
 {
 
-  if ( !(response.get()->ok) ) {
-    RCLCPP_ERROR( node_->get_logger(), "Controller switch for plugin %s failed" ,
-                 plugin_name_.c_str() );
+  if ( !( response.get()->ok ) ) {
+    RCLCPP_ERROR( node_->get_logger(), "Controller switch for plugin %s failed",
+                  plugin_name_.c_str() );
   }
 }
 

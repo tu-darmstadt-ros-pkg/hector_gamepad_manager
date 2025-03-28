@@ -82,12 +82,12 @@ std::string FlipperPlugin::getPluginName() { return "flipper_plugin"; }
 void FlipperPlugin::handlePress( const std::string &function )
 {
   // Activate respective indidual mode only if other is inactive
-  if ( function == "individual_front_flipper_control_mode" ){
+  if ( function == "individual_front_flipper_control_mode" ) {
     individual_front_flipper_mode_ = !individual_back_flipper_mode_;
     return;
   }
 
-  if ( function == "individual_back_flipper_control_mode" ){
+  if ( function == "individual_back_flipper_control_mode" ) {
     individual_back_flipper_mode_ = !individual_front_flipper_mode_;
     return;
   }
@@ -276,4 +276,4 @@ bool FlipperPlugin::checkCurrentCmdIsZero() const
 #include <pluginlib/class_list_macros.hpp>
 
 PLUGINLIB_EXPORT_CLASS( hector_gamepad_manager_plugins::FlipperPlugin,
-                        hector_gamepad_manager::GamepadFunctionPlugin )
+                        hector_gamepad_manager_interface::GamepadFunctionPlugin )

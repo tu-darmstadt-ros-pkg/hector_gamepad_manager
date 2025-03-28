@@ -31,7 +31,7 @@ private:
 
   rclcpp::Node::SharedPtr node_;
 
-  int regular_srv_timeout_;     // nanoseconds
+  int regular_srv_timeout_; // nanoseconds
 
   std::string plugin_name_;
 };
