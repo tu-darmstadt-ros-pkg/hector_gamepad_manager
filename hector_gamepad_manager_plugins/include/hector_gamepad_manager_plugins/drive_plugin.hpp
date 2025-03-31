@@ -2,7 +2,7 @@
 #define HECTOR_GAMEPAD_MANAGER_PLUGINS_DRIVE_PLUGIN_HPP
 
 #include <hector_gamepad_manager/gamepad_function_plugin.hpp>
-
+#include <hector_ros2_utils/parameters/reconfigurable_parameter.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 
 namespace hector_gamepad_manager_plugins
@@ -33,6 +33,13 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr drive_command_publisher_;
   geometry_msgs::msg::TwistStamped drive_command_;
 
+  hector::ParameterSubscription max_linear_speed_param_sub_;
+  hector::ParameterSubscription max_angular_speed_param_sub_;
+  hector::ParameterSubscription slow_factor_param_sub_;
+  hector::ParameterSubscription fast_factor_param_sub_;
+
+
+
   double max_linear_speed_ = 0.0;
   double max_angular_speed_ = 0.0;
 
@@ -40,7 +47,7 @@ private:
   double steer_value_ = 0.0;
 
   double slow_factor_ = 0.0;
-  double normal_factor_ = 0.0;
+  const double normal_factor_ = 1.0;
   double fast_factor_ = 0.0;
   bool fast_mode_active_ = false;
   bool slow_mode_active_ = false;

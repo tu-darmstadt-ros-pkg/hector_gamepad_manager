@@ -6,14 +6,26 @@ namespace hector_gamepad_manager_plugins
 void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
 {
   node_ = node;
-
   const std::string plugin_namespace = getPluginName();
 
-  node_->declare_parameters<double>( plugin_namespace, {
-                                                           { "speed", 1.5 },
-                                                           { "flipper_front_factor", 1.0 },
-                                                           { "flipper_back_factor", 1.0 },
-                                                       } );
+  // Setup reconfigurable Parameters
+  speed_sub_ = hector::createReconfigurableParameter(
+      node, plugin_namespace + ".speed", std::ref( speed_ ),
+      "Flipper Speed",
+      hector::ParameterOptions<double>().onValidate(
+          []( const auto &value ) { return value > 0.0; } ) );
+  flipper_front_factor_param_sub_ = hector::createReconfigurableParameter(
+      node, plugin_namespace + ".flipper_front_factor", std::ref( flipper_front_factor_ ),
+      "Flipper Front Factor",
+      hector::ParameterOptions<double>().onValidate(
+          []( const auto &value ) { return value > 0.0; } ) );
+  flipper_back_factor_param_sub_ = hector::createReconfigurableParameter(
+      node, plugin_namespace + ".flipper_back_factor", std::ref( flipper_back_factor_ ),
+      "Flipper Back Factor",
+      hector::ParameterOptions<double>().onValidate(
+          []( const auto &value ) { return value > 0.0; } ) );
+
+  // Setup static parameters
   node_->declare_parameters<std::string>(
       plugin_namespace, { { "standard_controller", "flipper_trajectory_controller" },
                           { "command_topic", "flipper_velocity_controller/commands" } } );
@@ -23,22 +35,13 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
           { "teleop_controller",
             { "self_collision_avoidance_controller", "flipper_velocity_controller" } },
       } );
-
-  speed_ = node_->get_parameter( plugin_namespace + ".speed" ).as_double();
-  flipper_front_factor_ =
-      node_->get_parameter( plugin_namespace + ".flipper_front_factor" ).as_double();
-  flipper_back_factor_ =
-      node_->get_parameter( plugin_namespace + ".flipper_back_factor" ).as_double();
   standard_controller_ =
       node_->get_parameter( plugin_namespace + ".standard_controller" ).as_string();
   teleop_controller_ =
       node_->get_parameter( plugin_namespace + ".teleop_controller" ).as_string_array();
 
-  std::string command_topic = node_->get_parameter( plugin_namespace + ".command_topic" ).as_string();
-
-  param_cb_handler_ = node->add_on_set_parameters_callback(
-      std::bind( &FlipperPlugin::setParamsCb, this, std::placeholders::_1 ) );
-
+  // Setup Flipper Command Publisher
+  const std::string command_topic = node_->get_parameter( plugin_namespace + ".command_topic" ).as_string();
   flipper_command_publisher_ = node_->create_publisher<std_msgs::msg::Float64MultiArray>(
       "/" + node_->get_parameter( "robot_namespace" ).as_string() + "/" + command_topic, 10 );
 
@@ -46,42 +49,12 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   active_ = true;
 }
 
-rcl_interfaces::msg::SetParametersResult
-FlipperPlugin::setParamsCb( const std::vector<rclcpp::Parameter> &parameters )
-{
-  auto result = rcl_interfaces::msg::SetParametersResult();
-  result.successful = true;
-  const auto plugin_namespace = getPluginName();
-
-  for ( const auto &parameter : parameters ) {
-    if ( parameter.get_type() == rclcpp::ParameterType::PARAMETER_DOUBLE &&
-         parameter.get_name().find( plugin_namespace ) != std::string::npos ) {
-      const double val = parameter.as_double();
-      if ( val <= 0 ) {
-        result.successful = false;
-        result.reason = "Can't set a negative or null speed for: " + parameter.get_name();
-        break;
-      }
-
-      if ( parameter.get_name() == plugin_namespace + ".speed" )
-        speed_ = val;
-
-      if ( parameter.get_name() == plugin_namespace + ".flipper_front_factor" )
-        flipper_front_factor_ = val;
-
-      if ( parameter.get_name() == plugin_namespace + ".flipper_back_factor" )
-        flipper_back_factor_ = val;
-    }
-  }
-
-  return result;
-}
 
 std::string FlipperPlugin::getPluginName() { return "flipper_plugin"; }
 
 void FlipperPlugin::handlePress( const std::string &function )
 {
-  // Activate respective indidual mode only if other is inactive
+  // Activate respective individual mode only if other is inactive
   if ( function == "individual_front_flipper_control_mode" ){
     individual_front_flipper_mode_ = !individual_back_flipper_mode_;
     return;
@@ -100,7 +73,7 @@ void FlipperPlugin::handlePress( const std::string &function )
 
 void FlipperPlugin::handleRelease( const std::string &function )
 {
-  // Activate respective indidual mode only if other is inactive
+  // Activate respective individual mode only if other is inactive
   if ( function == "individual_front_flipper_control_mode" ) {
     // Stop flipper before disable of mode
     handleIndividualFlipperControlInput( 0, true, "flipper_front_up" );

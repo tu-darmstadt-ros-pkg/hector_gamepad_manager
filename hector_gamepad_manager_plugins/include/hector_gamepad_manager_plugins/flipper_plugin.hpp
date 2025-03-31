@@ -4,7 +4,7 @@
 #include <hector_gamepad_manager/gamepad_function_plugin.hpp>
 
 #include "hector_gamepad_manager_plugins/controller_helper.hpp"
-#include "rcl_interfaces/msg/set_parameters_result.hpp"
+#include <hector_ros2_utils/parameters/reconfigurable_parameter.hpp>
 #include "std_msgs/msg/float64_multi_array.hpp"
 
 namespace hector_gamepad_manager_plugins
@@ -32,6 +32,10 @@ private:
   rclcpp::Node::SharedPtr node_;
 
   rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr flipper_command_publisher_;
+
+  hector::ParameterSubscription speed_sub_;
+  hector::ParameterSubscription flipper_front_factor_param_sub_;
+  hector::ParameterSubscription flipper_back_factor_param_sub_;
 
   double speed_ = 0.0;
   double flipper_front_factor_ = 0.0;
@@ -66,8 +70,6 @@ private:
 
   bool checkCurrentCmdIsZero() const;
 
-  rcl_interfaces::msg::SetParametersResult
-  setParamsCb( const std::vector<rclcpp::Parameter> &parameters );
 };
 } // namespace hector_gamepad_manager_plugins
 
