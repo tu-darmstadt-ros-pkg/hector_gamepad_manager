@@ -8,33 +8,45 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   node_ = node;
   const auto plugin_namespace = getPluginName();
 
-  node_->declare_parameter<double>( plugin_namespace + ".max_eef_linear_speed", 1.0 );
-  node_->declare_parameter<double>( plugin_namespace + ".max_eef_angular_speed", 1.0 );
-  node_->declare_parameter<double>( plugin_namespace + ".max_drive_linear_speed", 1.0 );
-  node_->declare_parameter<double>( plugin_namespace + ".max_drive_angular_speed", 1.0 );
-  node_->declare_parameter<double>( plugin_namespace + ".max_gripper_speed", 1.0 );
+  // Setup reconfigurable parameters
+  max_eef_linear_speed_param_sub_ = hector::createReconfigurableParameter(
+      node, plugin_namespace + ".max_eef_linear_speed", std::ref( max_eef_linear_speed_ ),
+      "Maximum Linear Speed of the End Effector",
+      hector::ParameterOptions<double>().onValidate(
+          []( const auto &value ) { return value > 0.0; } ) );
+  max_eef_angular_speed_param_sub_ = hector::createReconfigurableParameter(
+      node, plugin_namespace + ".max_eef_angular_speed", std::ref( max_eef_angular_speed_ ),
+      "Maximum Angular Speed of the End Effector",
+      hector::ParameterOptions<double>().onValidate(
+          []( const auto &value ) { return value > 0.0; } ) );
+  max_gripper_speed_param_sub_ = hector::createReconfigurableParameter(
+      node, plugin_namespace + ".max_gripper_speed", std::ref( max_gripper_speed_ ),
+      "Maximum Speed of the Gripper",
+      hector::ParameterOptions<double>().onValidate(
+          []( const auto &value ) { return value > 0.0; } ) );
+  max_drive_linear_speed_param_sub_ = hector::createReconfigurableParameter(
+      node, plugin_namespace + ".max_drive_linear_speed", std::ref( max_drive_linear_speed_ ),
+      "Maximum Linear Speed of the Base",
+      hector::ParameterOptions<double>().onValidate(
+          []( const auto &value ) { return value > 0.0; } ) );
+  max_drive_angular_speed_param_sub_ = hector::createReconfigurableParameter(
+      node, plugin_namespace + ".max_drive_angular_speed", std::ref( max_drive_angular_speed_ ),
+      "Maximum Angular Speed of the Base",
+      hector::ParameterOptions<double>().onValidate(
+          []( const auto &value ) { return value > 0.0; } ) );
 
+  // Setup static parameters
   node_->declare_parameter<std::string>( plugin_namespace + ".twist_controller_name",
                                          "moveit_twist_controller" );
   node_->declare_parameter<std::vector<std::string>>(
       plugin_namespace + ".stop_controllers",
       { "arm_trajectory_controller", "gripper_trajectory_controller" } );
-
-  max_eef_linear_speed_ =
-      node_->get_parameter( plugin_namespace + ".max_eef_linear_speed" ).as_double();
-  max_eef_angular_speed_ =
-      node_->get_parameter( plugin_namespace + ".max_eef_angular_speed" ).as_double();
-  max_drive_linear_speed_ =
-      node_->get_parameter( plugin_namespace + ".max_drive_linear_speed" ).as_double();
-  max_drive_angular_speed_ =
-      node_->get_parameter( plugin_namespace + ".max_drive_angular_speed" ).as_double();
-  max_gripper_speed_ = node_->get_parameter( plugin_namespace + ".max_gripper_speed" ).as_double();
-
   twist_controller_name_ =
       node_->get_parameter( plugin_namespace + ".twist_controller_name" ).as_string();
   stop_controllers_ =
       node_->get_parameter( plugin_namespace + ".stop_controllers" ).as_string_array();
 
+  // Setup publishers and clients
   eef_cmd_pub_ = node_->create_publisher<geometry_msgs::msg::TwistStamped>(
       twist_controller_name_ + "/eef_cmd", 10 );
   drive_cmd_pub_ = node_->create_publisher<geometry_msgs::msg::TwistStamped>( "cmd_vel", 10 );
@@ -197,7 +209,6 @@ bool ManipulationPlugin::isZeroCmd() const
          rotate_roll_clockwise_ == 0.0 && rotate_roll_counter_clockwise_ == 0.0 &&
          open_gripper_ == 0.0 && close_gripper_ == 0.0;
 }
-
 
 } // namespace hector_gamepad_manager_plugins
 

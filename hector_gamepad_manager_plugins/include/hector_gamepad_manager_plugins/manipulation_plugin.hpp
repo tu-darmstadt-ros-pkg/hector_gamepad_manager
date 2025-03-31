@@ -6,6 +6,7 @@
 
 #include <hector_gamepad_manager/gamepad_function_plugin.hpp>
 #include <hector_gamepad_manager_plugins/controller_helper.hpp>
+#include <hector_ros2_utils/parameters/reconfigurable_parameter.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <std_msgs/msg/float64.hpp>
 #include <std_srvs/srv/set_bool.hpp>
@@ -53,7 +54,12 @@ private:
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr gripper_cmd_pub_;
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr hold_mode_client_;
 
-
+  hector::ParameterSubscription max_eef_linear_speed_param_sub_;
+  hector::ParameterSubscription max_eef_angular_speed_param_sub_;
+  hector::ParameterSubscription max_gripper_speed_param_sub_;
+  hector::ParameterSubscription max_drive_linear_speed_param_sub_;
+  hector::ParameterSubscription max_drive_angular_speed_param_sub_;
+  
   double max_eef_linear_speed_ = 0.0;
   double max_eef_angular_speed_ = 0.0;
   double max_gripper_speed_ = 0.0;
