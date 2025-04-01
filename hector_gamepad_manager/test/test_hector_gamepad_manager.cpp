@@ -276,6 +276,7 @@ TEST_F( HectorGamepadManagerTest, SwitchConfig )
 TEST_F( HectorGamepadManagerTest, CmdVel )
 {
   // driving config
+  makeSureConfigIsActive( "driving" );
   fake_joy_node_->setAxis( "left_stick_left_right", 0.5 );
   fake_joy_node_->setAxis( "left_stick_up_down", 0.5 );
   fake_joy_node_->publishJoy();
