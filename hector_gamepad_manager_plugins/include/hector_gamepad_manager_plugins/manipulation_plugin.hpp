@@ -8,7 +8,6 @@
 #include <hector_gamepad_manager_interface/gamepad_plugin_interface.hpp>
 #include <hector_gamepad_manager_plugins/controller_helper.hpp>
 #include <hector_ros2_utils/parameters/reconfigurable_parameter.hpp>
-#include <geometry_msgs/msg/twist_stamped.hpp>
 #include <std_msgs/msg/float64.hpp>
 #include <std_srvs/srv/set_bool.hpp>
 

@@ -307,7 +307,7 @@ TEST_F( HectorGamepadManagerTest, SpeedButtons )
   // normal speed is 0.6
   constexpr double max_linear_speed = 1.1;
   constexpr double max_angular_speed = 1.5;
-  constexpr double normal_factor = 0.6;
+  constexpr double normal_factor = 1.0;
   constexpr double fast_factor = 2.0;
   constexpr double slow_factor = 0.3;
 

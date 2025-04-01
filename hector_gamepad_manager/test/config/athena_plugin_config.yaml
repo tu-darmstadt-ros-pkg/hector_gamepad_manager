@@ -4,7 +4,6 @@
         robot_namespace: "athena"
         ocs_namespace: "ocs"
         drive_plugin:
-            normal_factor: 0.6
             slow_factor: 0.3
             fast_factor: 2.0
             max_angular_speed: 1.5

@@ -10,20 +10,19 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
 
   // Setup reconfigurable Parameters
   speed_sub_ = hector::createReconfigurableParameter(
-      node, plugin_namespace + ".speed", std::ref( speed_ ),
-      "Flipper Speed",
+      node, plugin_namespace + ".speed", std::ref( speed_ ), "Flipper Speed",
       hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value > 0.0; } ) );
   flipper_front_factor_param_sub_ = hector::createReconfigurableParameter(
       node, plugin_namespace + ".flipper_front_factor", std::ref( flipper_front_factor_ ),
-      "Flipper Front Factor",
-      hector::ParameterOptions<double>().onValidate(
-          []( const auto &value ) { return value > 0.0; } ) );
+      "Flipper Front Factor", hector::ParameterOptions<double>().onValidate( []( const auto &value ) {
+        return value > 0.0;
+      } ) );
   flipper_back_factor_param_sub_ = hector::createReconfigurableParameter(
       node, plugin_namespace + ".flipper_back_factor", std::ref( flipper_back_factor_ ),
-      "Flipper Back Factor",
-      hector::ParameterOptions<double>().onValidate(
-          []( const auto &value ) { return value > 0.0; } ) );
+      "Flipper Back Factor", hector::ParameterOptions<double>().onValidate( []( const auto &value ) {
+        return value > 0.0;
+      } ) );
 
   // Setup static parameters
   node_->declare_parameters<std::string>(
@@ -41,7 +40,8 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
       node_->get_parameter( plugin_namespace + ".teleop_controller" ).as_string_array();
 
   // Setup Flipper Command Publisher
-  const std::string command_topic = node_->get_parameter( plugin_namespace + ".command_topic" ).as_string();
+  const std::string command_topic =
+      node_->get_parameter( plugin_namespace + ".command_topic" ).as_string();
   flipper_command_publisher_ = node_->create_publisher<std_msgs::msg::Float64MultiArray>(
       "/" + node_->get_parameter( "robot_namespace" ).as_string() + "/" + command_topic, 10 );
 
@@ -49,13 +49,12 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   active_ = true;
 }
 
-
 std::string FlipperPlugin::getPluginName() { return "flipper_plugin"; }
 
 void FlipperPlugin::handlePress( const std::string &function )
 {
   // Activate respective individual mode only if other is inactive
-  if ( function == "individual_front_flipper_control_mode" ){
+  if ( function == "individual_front_flipper_control_mode" ) {
     individual_front_flipper_mode_ = !individual_back_flipper_mode_;
     return;
   }

@@ -1,9 +1,9 @@
 #ifndef HECTOR_GAMEPAD_MANAGER_PLUGINS_DRIVE_PLUGIN_HPP
 #define HECTOR_GAMEPAD_MANAGER_PLUGINS_DRIVE_PLUGIN_HPP
 
+#include <geometry_msgs/msg/twist_stamped.hpp>
 #include <hector_gamepad_manager_interface/gamepad_plugin_interface.hpp>
 #include <hector_ros2_utils/parameters/reconfigurable_parameter.hpp>
-#include <geometry_msgs/msg/twist_stamped.hpp>
 
 namespace hector_gamepad_manager_plugins
 {
@@ -36,8 +36,6 @@ private:
   hector::ParameterSubscription max_angular_speed_param_sub_;
   hector::ParameterSubscription slow_factor_param_sub_;
   hector::ParameterSubscription fast_factor_param_sub_;
-
-
 
   double max_linear_speed_ = 0.0;
   double max_angular_speed_ = 0.0;

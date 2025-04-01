@@ -9,28 +9,28 @@ void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node )
   const std::string plugin_namespace = getPluginName();
 
   max_linear_speed_param_sub_ = hector::createReconfigurableParameter(
-      node, plugin_namespace + ".max_linear_speed", std::ref(max_linear_speed_),
+      node, plugin_namespace + ".max_linear_speed", std::ref( max_linear_speed_ ),
       "Maximum linear speed in m/s in Normal Mode.",
       hector::ParameterOptions<double>().onValidate(
-          [](const auto &value) { return value > 0.0; }));
+          []( const auto &value ) { return value > 0.0; } ) );
 
   max_angular_speed_param_sub_ = hector::createReconfigurableParameter(
-      node, plugin_namespace + ".max_angular_speed", std::ref(max_angular_speed_),
+      node, plugin_namespace + ".max_angular_speed", std::ref( max_angular_speed_ ),
       "Maximum angular speed in rad/s in Normal Mode.",
       hector::ParameterOptions<double>().onValidate(
-          [](const auto &value) { return value > 0.0; }));
+          []( const auto &value ) { return value > 0.0; } ) );
 
   slow_factor_param_sub_ = hector::createReconfigurableParameter(
-      node, plugin_namespace + ".slow_factor", std::ref(slow_factor_),
+      node, plugin_namespace + ".slow_factor", std::ref( slow_factor_ ),
       "Scaling factor for speed in Slow Mode.",
       hector::ParameterOptions<double>().onValidate(
-          [](const auto &value) { return value > 0.0 && value < 1.0; }));
+          []( const auto &value ) { return value > 0.0 && value < 1.0; } ) );
 
   fast_factor_param_sub_ = hector::createReconfigurableParameter(
-      node, plugin_namespace + ".fast_factor", std::ref(fast_factor_),
+      node, plugin_namespace + ".fast_factor", std::ref( fast_factor_ ),
       "Scaling factor for speed in Fast Mode.",
       hector::ParameterOptions<double>().onValidate(
-          [](const auto &value) { return value >= 1.0; }));
+          []( const auto &value ) { return value >= 1.0; } ) );
 
   drive_command_publisher_ =
       node_->create_publisher<geometry_msgs::msg::TwistStamped>( "cmd_vel", 1 );
