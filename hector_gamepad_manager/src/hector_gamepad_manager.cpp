@@ -4,7 +4,7 @@ namespace hector_gamepad_manager
 {
 HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node )
     : plugin_loader_( "hector_gamepad_manager",
-                      "hector_gamepad_manager_interface::GamepadFunctionPlugin" )
+                      "hector_gamepad_plugin_interface::GamepadFunctionPlugin" )
 {
   // declare & get parameters
   node->declare_parameter<std::string>( "config_name", "athena" );

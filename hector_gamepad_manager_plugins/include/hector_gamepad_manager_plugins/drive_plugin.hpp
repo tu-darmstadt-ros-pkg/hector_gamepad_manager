@@ -2,12 +2,12 @@
 #define HECTOR_GAMEPAD_MANAGER_PLUGINS_DRIVE_PLUGIN_HPP
 
 #include <geometry_msgs/msg/twist_stamped.hpp>
-#include <hector_gamepad_manager_interface/gamepad_plugin_interface.hpp>
+#include <hector_gamepad_plugin_interface/gamepad_plugin_interface.hpp>
 #include <hector_ros2_utils/parameters/reconfigurable_parameter.hpp>
 
 namespace hector_gamepad_manager_plugins
 {
-class DrivePlugin : public hector_gamepad_manager_interface::GamepadFunctionPlugin
+class DrivePlugin : public hector_gamepad_plugin_interface::GamepadFunctionPlugin
 {
 public:
   void initialize( const rclcpp::Node::SharedPtr &node ) override;

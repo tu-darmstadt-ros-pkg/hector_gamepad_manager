@@ -1,7 +1,7 @@
 #ifndef HECTOR_GAMEPAD_MANAGER_PLUGINS_FLIPPER_PLUGIN_HPP
 #define HECTOR_GAMEPAD_MANAGER_PLUGINS_FLIPPER_PLUGIN_HPP
 
-#include <hector_gamepad_manager_interface/gamepad_plugin_interface.hpp>
+#include <hector_gamepad_plugin_interface/gamepad_plugin_interface.hpp>
 
 #include "hector_gamepad_manager_plugins/controller_helper.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
@@ -9,7 +9,7 @@
 
 namespace hector_gamepad_manager_plugins
 {
-class FlipperPlugin : public hector_gamepad_manager_interface::GamepadFunctionPlugin
+class FlipperPlugin : public hector_gamepad_plugin_interface::GamepadFunctionPlugin
 {
 public:
   void initialize( const rclcpp::Node::SharedPtr &node ) override;

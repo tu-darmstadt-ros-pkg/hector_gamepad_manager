@@ -248,4 +248,4 @@ bool FlipperPlugin::checkCurrentCmdIsZero() const
 #include <pluginlib/class_list_macros.hpp>
 
 PLUGINLIB_EXPORT_CLASS( hector_gamepad_manager_plugins::FlipperPlugin,
-                        hector_gamepad_manager_interface::GamepadFunctionPlugin )
+                        hector_gamepad_plugin_interface::GamepadFunctionPlugin )

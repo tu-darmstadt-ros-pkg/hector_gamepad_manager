@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(hector_gamepad_manager_interface)
+project(hector_gamepad_plugin_interface)
 
 # Default to C++17
 if(NOT CMAKE_CXX_STANDARD)

@@ -219,4 +219,4 @@ bool ManipulationPlugin::isZeroCmd() const
 #include <pluginlib/class_list_macros.hpp>
 
 PLUGINLIB_EXPORT_CLASS( hector_gamepad_manager_plugins::ManipulationPlugin,
-                        hector_gamepad_manager_interface::GamepadFunctionPlugin )
+                        hector_gamepad_plugin_interface::GamepadFunctionPlugin )

@@ -13,7 +13,7 @@ axes:
 
   3: # Right joystick left/right
     plugin: "hector_gamepad_manager_plugins::ManipulationPlugin"
-      function: "rotate_yaw"
+    function: "rotate_yaw"
 
   4: # Right joystick up/down
     plugin: "hector_gamepad_manager_plugins::ManipulationPlugin"
