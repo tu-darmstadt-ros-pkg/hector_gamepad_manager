@@ -6,8 +6,8 @@
 #define HECTOR_GAMEPAD_MANAGER_PLUGINS_MOVEIT_PLUGIN_HPP
 
 #include <geometry_msgs/msg/twist_stamped.hpp>
-#include <hector_gamepad_manager/gamepad_function_plugin.hpp>
 #include <hector_gamepad_manager_plugins/controller_helper.hpp>
+#include <hector_gamepad_plugin_interface/gamepad_plugin_interface.hpp>
 #include <hector_ros2_utils/parameters/reconfigurable_parameter.hpp>
 #include <moveit_msgs/action/move_group.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
@@ -15,7 +15,7 @@
 
 namespace hector_gamepad_manager_plugins
 {
-class MoveitPlugin final : public hector_gamepad_manager::GamepadFunctionPlugin
+class MoveitPlugin final : public hector_gamepad_plugin_interface::GamepadFunctionPlugin
 {
 public:
   void initialize( const rclcpp::Node::SharedPtr &node ) override;

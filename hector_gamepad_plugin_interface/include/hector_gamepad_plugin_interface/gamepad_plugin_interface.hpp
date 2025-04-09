@@ -3,7 +3,7 @@
 
 #include <rclcpp/rclcpp.hpp>
 
-namespace hector_gamepad_manager
+namespace hector_gamepad_plugin_interface
 {
 class GamepadFunctionPlugin
 {
@@ -22,7 +22,7 @@ public:
    * @brief Returns name of associated plugin
    *
    */
-  virtual std::string getPluginName()=0;
+  virtual std::string getPluginName() = 0;
 
   /**
    * @brief Handle button input events.
@@ -115,6 +115,6 @@ protected:
   // The current state of the buttons per function.
   std::unordered_map<std::string, bool> button_states_;
 };
-} // namespace hector_gamepad_manager
+} // namespace hector_gamepad_plugin_interface
 
 #endif // HECTOR_GAMEPAD_MANAGER_GAMEPAD_FUNCTION_PLUGIN_HPP

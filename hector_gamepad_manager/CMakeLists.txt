@@ -16,6 +16,7 @@ set(DEPENDENCIES
         rclcpp
         sensor_msgs
         yaml-cpp
+        hector_gamepad_plugin_interface
 )
 
 foreach(Dependency IN LISTS DEPENDENCIES)
@@ -23,7 +24,6 @@ foreach(Dependency IN LISTS DEPENDENCIES)
 endforeach()
 
 set(HEADERS
-        include/hector_gamepad_manager/gamepad_function_plugin.hpp
         include/hector_gamepad_manager/hector_gamepad_manager.hpp
 )
 
@@ -47,17 +47,18 @@ install(DIRECTORY include/ DESTINATION include)
 install(TARGETS hector_gamepad_manager_node DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
 
-if (BUILD_TESTING)
-    find_package(ament_lint_auto REQUIRED)
-    # the following line skips the linter which checks for copyrights
-    # comment the line when a copyright and license is added to all source files
-    set(ament_cmake_copyright_FOUND TRUE)
-    # the following line skips cpplint (only works in a git repo)
-    # comment the line when this package is in a git repo and when
-    # a copyright and license is added to all source files
-    set(ament_cmake_cpplint_FOUND TRUE)
-    ament_lint_auto_find_test_dependencies()
+
+if(BUILD_TESTING)
+    find_package(ament_cmake_gtest REQUIRED)
+    find_package(ros_testing REQUIRED)
+    ament_add_gtest_executable(${PROJECT_NAME}_test
+            test/test_hector_gamepad_manager.cpp
+    )
+    target_link_libraries(${PROJECT_NAME}_test ${PROJECT_NAME})
+    ament_target_dependencies(${PROJECT_NAME}_test ${THIS_PACKAGE_INCLUDE_DEPENDS})
+    add_ros_test(test/test_hector_gamepad_manager.launch.py ARGS "test_binary_dir:=${CMAKE_CURRENT_BINARY_DIR}")
 endif ()
+
 
 ament_export_targets(${PROJECT_NAME}-targets)
 ament_export_include_directories(include)

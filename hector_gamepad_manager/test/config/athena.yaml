@@ -1,0 +1,105 @@
+# This file maps the buttons to config switches
+# If a button is pressed, the corresponding config will be loaded
+# The buttons used here will block the button mappings for these buttons in ALL other configs
+default_config: "driving" # config used at startup
+buttons:
+  0: # Button A
+    package: ""
+    config: ""
+
+  1: # Button B
+    package: ""
+    config: ""
+
+  2: # Button X
+   package: ""
+   config: ""
+
+  3: # Button Y
+   package: ""
+   config: ""
+
+  4: # Button LB
+   package: ""
+   config: ""
+
+  5: # Button RB
+   package: ""
+   config: ""
+
+  6: # Button Back
+   package: "hector_gamepad_manager"
+   config: "manipulation"
+
+  7: # Button Start
+   package: "hector_gamepad_manager"
+   config: "driving"
+
+  8: # Button Guide (Manufacturer Button)
+   package: ""
+   config: ""
+
+  9: # Left joystick press
+   package: ""
+   config: ""
+
+  10: # Right joystick press
+   package: ""
+   config: ""
+
+  # -------------------- All the axes can also be used as buttons if specified here --------------------
+  11: # Left joystick left
+   package: ""
+   config: ""
+
+  12: # Left joystick right
+   package: ""
+   config: ""
+
+  13: # Left joystick up
+   package: ""
+   config: ""
+
+  14: # Left joystick down
+   package: ""
+   config: ""
+
+  15: # LT
+   package: ""
+   config: ""
+
+  16: # Right joystick left
+   package: ""
+   config: ""
+
+  17: # Right joystick right
+   package: ""
+   config: ""
+
+  18: # Right joystick up
+   package: ""
+   config: ""
+
+  19: # Right joystick down
+   package: ""
+   config: ""
+
+  20: # RT
+   package: ""
+   config: ""
+
+  21: # Cross left
+   package: ""
+   config: ""
+
+  22: # Cross right
+   package: ""
+   config: ""
+
+  23: # Cross up
+   package: ""
+   config: ""
+
+  24: # Cross down
+   package: ""
+   config: ""
