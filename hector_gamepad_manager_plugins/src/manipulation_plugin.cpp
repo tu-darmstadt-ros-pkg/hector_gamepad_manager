@@ -34,6 +34,11 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
       "Maximum Angular Speed of the Base",
       hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value > 0.0; } ) );
+  eef_twist_frame_param_sub_ = hector::createReconfigurableParameter(
+      node, plugin_namespace + ".eef_twist_frame", std::ref(eef_cmd_.header.frame_id),
+      "Frame of the End Effector Twist",
+      hector::ParameterOptions<std::string>().onValidate(
+          []( const auto &value ) { return !value.empty(); } ) );
 
   // Setup static parameters
   node_->declare_parameter<std::string>( plugin_namespace + ".twist_controller_name",
