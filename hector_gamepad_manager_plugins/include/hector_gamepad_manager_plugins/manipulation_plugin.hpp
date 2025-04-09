@@ -58,6 +58,7 @@ private:
   hector::ParameterSubscription max_gripper_speed_param_sub_;
   hector::ParameterSubscription max_drive_linear_speed_param_sub_;
   hector::ParameterSubscription max_drive_angular_speed_param_sub_;
+  hector::ParameterSubscription eef_twist_frame_param_sub_;
 
   double max_eef_linear_speed_ = 0.0;
   double max_eef_angular_speed_ = 0.0;

@@ -17,6 +17,7 @@
         manipulation_plugin:
             max_eef_linear_speed: 0.15
             max_eef_angular_speed: 0.25
+            eef_twist_frame: "gripper_grasp_main_link"
             max_gripper_speed: 0.2
             max_drive_linear_speed: 0.5
             max_drive_angular_speed: 0.5
