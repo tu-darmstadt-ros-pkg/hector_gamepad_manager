@@ -1,7 +1,7 @@
 # This file maps the buttons to config switches
 # If a button is pressed, the corresponding config will be loaded
 # The buttons used here will block the button mappings for these buttons in ALL other configs
-default_config: "driving" # config used at startup
+default_config: "driving_simple" # config used at startup
 buttons:
   0: # Button A
     package: ""
@@ -33,7 +33,7 @@ buttons:
 
   7: # Button Start
    package: "hector_gamepad_manager"
-   config: "driving"
+   config: "driving_simple"
 
   8: # Button Guide (Manufacturer Button)
    package: ""
