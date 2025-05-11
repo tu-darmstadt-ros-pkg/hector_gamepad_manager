@@ -54,8 +54,8 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   eef_cmd_pub_ = node_->create_publisher<geometry_msgs::msg::TwistStamped>(
       twist_controller_name_ + "/eef_cmd", 10 );
   drive_cmd_pub_ = node_->create_publisher<geometry_msgs::msg::TwistStamped>( "cmd_vel", 10 );
-  gripper_cmd_pub_ =
-      node_->create_publisher<std_msgs::msg::Float64>( twist_controller_name_ + "/gripper_cmd", 10 );
+  gripper_cmd_pub_ = node_->create_publisher<std_msgs::msg::Float64>(
+      twist_controller_name_ + "/gripper_vel_cmd", 10 );
   hold_mode_client_ =
       node_->create_client<std_srvs::srv::SetBool>( twist_controller_name_ + "/hold_mode" );
   controller_helper_.initialize( node, plugin_namespace );

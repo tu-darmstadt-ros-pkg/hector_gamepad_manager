@@ -131,7 +131,7 @@ public:
     twist_eef_sub_ = std::make_shared<Subscriber<geometry_msgs::msg::TwistStamped>>(
         node_, "/athena/moveit_twist_controller/eef_cmd" );
     gripper_cmd_sub_ = std::make_shared<Subscriber<std_msgs::msg::Float64>>(
-        node_, "/athena/moveit_twist_controller/gripper_cmd" );
+        node_, "/athena/moveit_twist_controller/gripper_vel_cmd" );
     flipper_cmd_sub_ = std::make_shared<Subscriber<std_msgs::msg::Float64MultiArray>>(
         node_, "/athena/flipper_velocity_controller/commands" );
   }
