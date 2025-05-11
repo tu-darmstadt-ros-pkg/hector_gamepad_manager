@@ -11,7 +11,7 @@
             speed: 1.5  # max of dynamixel motors
             standard_controller: "flipper_trajectory_controller"
             teleop_controller:
-                - "self_collision_avoidance_controller" 
+                - "self_collision_avoidance_controller"
                 - "flipper_velocity_controller"
             command_topic: "flipper_velocity_controller/commands"
         manipulation_plugin:
