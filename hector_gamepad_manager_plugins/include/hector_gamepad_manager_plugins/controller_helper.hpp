@@ -3,6 +3,7 @@
 
 #include "controller_manager_msgs/srv/list_controllers.hpp"
 #include "controller_manager_msgs/srv/switch_controller.hpp"
+#include <controller_orchestrator/controller_orchestrator.hpp>
 #include <rclcpp/rclcpp.hpp>
 
 namespace hector_gamepad_manager_plugins
@@ -16,8 +17,7 @@ public:
 
   void initialize( const rclcpp::Node::SharedPtr &node, std::string plugin_name );
 
-  void switchControllers( std::vector<std::string> start_controllers,
-                          std::vector<std::string> stop_controllers );
+  void switchControllers( std::vector<std::string> start_controllers );
 
 private:
   rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedPtr switch_controller_client_;
@@ -30,6 +30,7 @@ private:
       rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedFuture response );
 
   rclcpp::Node::SharedPtr node_;
+  std::shared_ptr<controller_orchestrator::ControllerOrchestrator> controller_orchestrator_;
 
   int regular_srv_timeout_; // nanoseconds
 

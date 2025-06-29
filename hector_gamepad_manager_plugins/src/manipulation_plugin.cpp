@@ -42,13 +42,13 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   // Setup static parameters
   node_->declare_parameter<std::string>( plugin_namespace + ".twist_controller_name",
                                          "moveit_twist_controller" );
-  node_->declare_parameter<std::vector<std::string>>(
-      plugin_namespace + ".stop_controllers",
-      { "arm_trajectory_controller", "gripper_trajectory_controller" } );
+  // node_->declare_parameter<std::vector<std::string>>(
+  //     plugin_namespace + ".stop_controllers",
+  //     { "arm_trajectory_controller", "gripper_trajectory_controller" } );
   twist_controller_name_ =
       node_->get_parameter( plugin_namespace + ".twist_controller_name" ).as_string();
-  stop_controllers_ =
-      node_->get_parameter( plugin_namespace + ".stop_controllers" ).as_string_array();
+  // stop_controllers_ =
+  //     node_->get_parameter( plugin_namespace + ".stop_controllers" ).as_string_array();
 
   // Setup publishers and clients
   eef_cmd_pub_ = node_->create_publisher<geometry_msgs::msg::TwistStamped>(
@@ -143,7 +143,7 @@ void ManipulationPlugin::update()
   const bool is_zero_cmd = isZeroCmd();
   // make sure controllers are active
   if ( last_eef_cmd_zero_ && !is_zero_cmd ) {
-    controller_helper_.switchControllers( { twist_controller_name_ }, stop_controllers_ );
+    controller_helper_.switchControllers( { twist_controller_name_ } /*, stop_controllers_ */ );
   }
   // avoid repeatedly sending zero commands
   if ( !( last_eef_cmd_zero_ && is_zero_cmd ) ) {
@@ -159,7 +159,7 @@ void ManipulationPlugin::update()
 void ManipulationPlugin::activate()
 {
   active_ = true;
-  controller_helper_.switchControllers( { twist_controller_name_ }, stop_controllers_ );
+  controller_helper_.switchControllers( { twist_controller_name_ } /*, stop_controllers_ */ );
 }
 
 void ManipulationPlugin::deactivate()
