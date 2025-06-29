@@ -1,4 +1,5 @@
 #include "hector_gamepad_manager_plugins/controller_helper.hpp"
+#include <controller_orchestrator/controller_orchestrator.hpp>
 
 namespace hector_gamepad_manager_plugins
 {
@@ -7,43 +8,45 @@ void ControllerHelper::initialize( const rclcpp::Node::SharedPtr &node, std::str
 {
 
   node_ = node;
+  controller_orchestrator_ = std::make_shared<controller_orchestrator::ControllerOrchestrator>(
+      node_, "/" + node_->get_parameter( "robot_namespace" ).as_string() + "controller_manager" );
 
-  std::string switch_controllers_srv = "/" + node_->get_parameter( "robot_namespace" ).as_string() +
-                                       "/controller_manager/switch_controller";
-  switch_controller_client_ =
-      node->create_client<controller_manager_msgs::srv::SwitchController>( switch_controllers_srv );
-  std::string list_controllers_srv = "/" + node_->get_parameter( "robot_namespace" ).as_string() +
-                                     "/controller_manager/list_controllers";
-  list_controllers_client_ =
-      node->create_client<controller_manager_msgs::srv::ListControllers>( list_controllers_srv );
+  // std::string switch_controllers_srv = "/" + node_->get_parameter( "robot_namespace" ).as_string() +
+  //                                      "/controller_manager/switch_controller";
+  // switch_controller_client_ =
+  //     node->create_client<controller_manager_msgs::srv::SwitchController>( switch_controllers_srv );
+  // std::string list_controllers_srv = "/" + node_->get_parameter( "robot_namespace" ).as_string() +
+  //                                    "/controller_manager/list_controllers";
+  // list_controllers_client_ =
+  //     node->create_client<controller_manager_msgs::srv::ListControllers>( list_controllers_srv );
 
   regular_srv_timeout_ = 10000;
 
   plugin_name_ = plugin_name;
 }
 
-void ControllerHelper::switchControllers( std::vector<std::string> start_controllers,
-                                          std::vector<std::string> stop_controllers )
+void ControllerHelper::switchControllers( std::vector<std::string> start_controllers )
 {
-
-  if ( start_controllers.empty() && stop_controllers.empty() )
+  if ( start_controllers.empty() )
     return;
 
-  std::chrono::nanoseconds wait_dur = std::chrono::nanoseconds( regular_srv_timeout_ );
-  bool switch_status = switch_controller_client_->wait_for_service( wait_dur );
-  bool list_status = list_controllers_client_->wait_for_service( wait_dur );
+  // std::chrono::nanoseconds wait_dur = std::chrono::nanoseconds( regular_srv_timeout_ );
+  // bool switch_status = switch_controller_client_->wait_for_service( wait_dur );
+  // bool list_status = list_controllers_client_->wait_for_service( wait_dur );
 
-  if ( !( switch_status && list_status ) ) {
-    RCLCPP_ERROR( node_->get_logger(), "Controller manager services not available." );
-    return;
-  }
+  (void)controller_orchestrator_->smartSwitchController( start_controllers, regular_srv_timeout_ );
 
-  list_controllers_client_->async_send_request(
-      std::make_shared<controller_manager_msgs::srv::ListControllers::Request>(),
-      [this, start_controllers, stop_controllers](
-          rclcpp::Client<controller_manager_msgs::srv::ListControllers>::SharedFuture response ) {
-        this->controllerListCb( response, start_controllers, stop_controllers );
-      } );
+  // if ( !( switch_status && list_status ) ) {
+  //   RCLCPP_ERROR( node_->get_logger(), "Controller manager services not available." );
+  //   return;
+  // }
+  //
+  // list_controllers_client_->async_send_request(
+  //     std::make_shared<controller_manager_msgs::srv::ListControllers::Request>(),
+  //     [this, start_controllers, stop_controllers](
+  //         rclcpp::Client<controller_manager_msgs::srv::ListControllers>::SharedFuture response ) {
+  //       this->controllerListCb( response, start_controllers, stop_controllers );
+  //     } );
 }
 
 void ControllerHelper::controllerListCb(
