@@ -9,7 +9,7 @@ void ControllerHelper::initialize( const rclcpp::Node::SharedPtr &node, std::str
 
   node_ = node;
   controller_orchestrator_ = std::make_shared<controller_orchestrator::ControllerOrchestrator>(
-      node_, "/" + node_->get_parameter( "robot_namespace" ).as_string() + "controller_manager" );
+      node_, "/" + node_->get_parameter( "robot_namespace" ).as_string() + "/controller_manager" );
 
   // std::string switch_controllers_srv = "/" + node_->get_parameter( "robot_namespace" ).as_string() +
   //                                      "/controller_manager/switch_controller";
