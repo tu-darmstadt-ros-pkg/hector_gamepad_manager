@@ -23,18 +23,8 @@ private:
   rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedPtr switch_controller_client_;
   rclcpp::Client<controller_manager_msgs::srv::ListControllers>::SharedPtr list_controllers_client_;
 
-  void controllerListCb(
-      rclcpp::Client<controller_manager_msgs::srv::ListControllers>::SharedFuture response,
-      std::vector<std::string> start_controllers );
-  void switchControllerCb(
-      rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedFuture response );
-
   rclcpp::Node::SharedPtr node_;
   std::shared_ptr<controller_orchestrator::ControllerOrchestrator> controller_orchestrator_;
-
-  int regular_srv_timeout_; // nanoseconds
-
-  std::string plugin_name_;
 };
 } // namespace hector_gamepad_manager_plugins
 
