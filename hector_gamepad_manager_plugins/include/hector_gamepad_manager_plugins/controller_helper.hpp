@@ -25,7 +25,7 @@ private:
 
   void controllerListCb(
       rclcpp::Client<controller_manager_msgs::srv::ListControllers>::SharedFuture response,
-      std::vector<std::string> start_controllers, std::vector<std::string> stop_controllers );
+      std::vector<std::string> start_controllers );
   void switchControllerCb(
       rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedFuture response );
 

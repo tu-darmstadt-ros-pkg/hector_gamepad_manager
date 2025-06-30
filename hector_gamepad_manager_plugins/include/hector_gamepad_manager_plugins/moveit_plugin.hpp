@@ -58,7 +58,6 @@ private:
   std::string robot_description_semantic_;
   std::map<std::string, moveit_msgs::msg::Constraints> named_poses_; // map <group>_<pose_name> to constraints
   std::vector<std::string> start_controllers_;
-  std::vector<std::string> stop_controllers_;
   ControllerHelper controller_helper_{};
   sensor_msgs::msg::JointState joint_state_;
   rclcpp::Node::SharedPtr node_;

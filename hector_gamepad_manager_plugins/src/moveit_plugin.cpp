@@ -14,10 +14,7 @@ void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   node_ = node;
   const std::string plugin_name = getPluginName();
   node_->declare_parameter<std::vector<std::string>>( plugin_name + ".start_controllers" );
-  // node_->declare_parameter<std::vector<std::string>>( plugin_name + ".stop_controllers" );
   start_controllers_ = node_->get_parameter( plugin_name + ".start_controllers" ).as_string_array();
-  // stop_controllers_ = node_->get_parameter( plugin_name + ".stop_controllers"
-  // ).as_string_array(); setup reconfigurable parameters
   velocity_scaling_factor_subscriber_ = hector::createReconfigurableParameter(
       node_, plugin_name + ".max_velocity_scaling_factor", std::ref( max_velocity_scaling_factor_ ),
       "Velocity scaling factor for moveit motion planning",
@@ -74,7 +71,7 @@ void MoveitPlugin::handlePress( const std::string &function )
   }
   // function is <group_name>_<pose_name>
   if ( named_poses_.count( function ) > 0 ) {
-    controller_helper_.switchControllers( start_controllers_ /*, stop_controllers_*/ );
+    controller_helper_.switchControllers( start_controllers_ );
     const auto [group, pose] = fromGroupPoseName( function );
     RCLCPP_WARN( node_->get_logger(), "Start Moveit Planning & Execution [%s]", function.c_str() );
     request_active_ = true;
