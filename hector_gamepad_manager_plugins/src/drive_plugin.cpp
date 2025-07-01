@@ -53,6 +53,8 @@ void DrivePlugin::handlePress( const std::string &function )
     fast_mode_active_ = true;
   } else if ( function == "slow" ) {
     slow_mode_active_ = true;
+  } else if ( function == "invert_steering" ) {
+    invert_steering_ = !invert_steering_;
   }
 }
 
@@ -77,9 +79,10 @@ void DrivePlugin::update()
   } else if ( fast_mode_active_ ) {
     speed_factor = fast_factor_;
   }
+  const double steering_inv = invert_steering_ ? -1.0 : 1.0;
 
-  sendDriveCommand( drive_value_ * max_linear_speed_ * speed_factor,
-                    steer_value_ * max_angular_speed_ * speed_factor );
+  sendDriveCommand( steering_inv * drive_value_ * max_linear_speed_ * speed_factor,
+                    steering_inv * max_angular_speed_ * speed_factor );
 }
 
 void DrivePlugin::activate()
