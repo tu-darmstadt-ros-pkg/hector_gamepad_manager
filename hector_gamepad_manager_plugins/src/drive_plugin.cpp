@@ -34,6 +34,10 @@ void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node )
 
   drive_command_publisher_ =
       node_->create_publisher<geometry_msgs::msg::TwistStamped>( "cmd_vel", 1 );
+
+  // TODO: USE OPERATROR STATION NODE
+  inverted_steering_publisher =
+      node_->create_publisher<std_msgs::msg::Bool>( "inverted_steering", 1 );
 }
 
 std::string DrivePlugin::getPluginName() { return "drive_plugin"; }
@@ -55,6 +59,9 @@ void DrivePlugin::handlePress( const std::string &function )
     slow_mode_active_ = true;
   } else if ( function == "invert_steering" ) {
     invert_steering_ = !invert_steering_;
+    std_msgs::msg::Bool msg;
+    msg.data = invert_steering_;
+    inverted_steering_publisher->publish( msg );
   }
 }
 
