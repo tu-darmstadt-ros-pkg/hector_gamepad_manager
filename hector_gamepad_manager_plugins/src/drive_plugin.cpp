@@ -89,7 +89,7 @@ void DrivePlugin::update()
   const double steering_inv = invert_steering_ ? -1.0 : 1.0;
 
   sendDriveCommand( steering_inv * drive_value_ * max_linear_speed_ * speed_factor,
-                    steering_inv * max_angular_speed_ * speed_factor );
+                    steering_inv * steer_value_ * max_angular_speed_ * speed_factor );
 }
 
 void DrivePlugin::activate()
