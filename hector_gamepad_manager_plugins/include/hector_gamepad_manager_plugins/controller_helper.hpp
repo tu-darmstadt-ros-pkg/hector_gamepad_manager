@@ -24,6 +24,9 @@ private:
   rclcpp::Client<controller_manager_msgs::srv::ListControllers>::SharedPtr list_controllers_client_;
 
   rclcpp::Node::SharedPtr node_;
+
+  int regular_srv_timeout_; // nanoseconds
+
   std::shared_ptr<controller_orchestrator::ControllerOrchestrator> controller_orchestrator_;
 };
 } // namespace hector_gamepad_manager_plugins
