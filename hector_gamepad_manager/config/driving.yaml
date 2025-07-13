@@ -12,12 +12,12 @@ axes:
     function: "flipper_back_down"
 
   3: # Right joystick left/right
-    plugin: ""
-    function: ""
+    plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
+    function: "orbit_yaw"
 
   4: # Right joystick up/down
-    plugin: ""
-    function: ""
+    plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
+    function: "orbit_theta"
 
   5: # RT
     plugin: "hector_gamepad_manager_plugins::FlipperPlugin"

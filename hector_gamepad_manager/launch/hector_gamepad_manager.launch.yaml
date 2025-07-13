@@ -9,6 +9,8 @@ launch:
 - arg:
     name: "ocs_namespace"
     default: "ocs"
+- arg:
+    name: rviz_node_name
 
 - node:
     pkg: "hector_gamepad_manager"
@@ -22,4 +24,6 @@ launch:
         value: "$(var robot_namespace)"
       - name: "ocs_namespace"
         value: "$(var ocs_namespace)"
+      - name: "view_control_plugin.rviz_node_name"
+        value: "$(var rviz_node_name)"
       - from: "$(find-pkg-share hector_gamepad_manager)/config/$(var config_name)_plugin_config.yaml"

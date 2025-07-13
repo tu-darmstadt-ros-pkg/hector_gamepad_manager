@@ -119,7 +119,7 @@ bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::st
           try {
             std::shared_ptr<GamepadFunctionPlugin> plugin =
                 plugin_loader_.createSharedInstance( plugin_name );
-            plugin->initialize( robot_ns_node_ );
+            plugin->initialize( robot_ns_node_, ocs_ns_node_ );
             plugins_[plugin_name] = plugin;
             RCLCPP_INFO( ocs_ns_node_->get_logger(), "Loaded plugin: %s", plugin_name.c_str() );
           } catch ( const std::exception &e ) {
