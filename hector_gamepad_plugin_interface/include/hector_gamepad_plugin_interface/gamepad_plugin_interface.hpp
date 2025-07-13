@@ -16,7 +16,7 @@ public:
    *
    * @param node The ROS node that the plugin is associated with.
    */
-  virtual void initialize( const rclcpp::Node::SharedPtr &node ) = 0;
+  virtual void initialize( const rclcpp::Node::SharedPtr &node_robot_ns, const rclcpp::Node::SharedPtr &node_operator_ns ) = 0;
 
   /**
    * @brief Returns name of associated plugin

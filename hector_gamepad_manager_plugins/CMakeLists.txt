@@ -13,7 +13,7 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
-
+find_package(eigen3_cmake_module REQUIRED)
 # Define a list of dependencies in alphabetical order
 set(DEPENDENCIES
     controller_manager_msgs
@@ -27,7 +27,9 @@ set(DEPENDENCIES
     rclcpp_action
     sensor_msgs
     srdfdom
-    std_srvs)
+    std_srvs
+    hector_rviz_plugins_msgs
+    Eigen3)
 
 foreach(dependency IN LISTS DEPENDENCIES)
   find_package(${dependency} REQUIRED)
@@ -38,11 +40,12 @@ set(HEADERS
     include/hector_gamepad_manager_plugins/flipper_plugin.hpp
     include/hector_gamepad_manager_plugins/controller_helper.hpp
     include/hector_gamepad_manager_plugins/manipulation_plugin.hpp
+    include/hector_gamepad_manager_plugins/view_control_plugin.hpp
     include/hector_gamepad_manager_plugins/moveit_plugin.hpp)
 
 set(SOURCES
     src/drive_plugin.cpp src/manipulation_plugin.cpp src/flipper_plugin.cpp
-    src/controller_helper.cpp src/moveit_plugin.cpp)
+    src/controller_helper.cpp src/moveit_plugin.cpp src/view_control_plugin.cpp)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES} ${HEADERS})
 target_include_directories(

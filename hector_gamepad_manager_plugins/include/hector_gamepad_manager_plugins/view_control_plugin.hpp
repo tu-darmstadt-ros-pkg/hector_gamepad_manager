@@ -26,7 +26,8 @@ public:
   using TrackFrame = hector_rviz_plugins_msgs::srv::TrackFrame;
   using Point = geometry_msgs::msg::Point;
   /* Game‑pad plugin API -------------------------------------------------- */
-  void initialize( const rclcpp::Node::SharedPtr &node_robot_ns, const rclcpp::Node::SharedPtr &node_operator_ns  ) override;
+  void initialize( const rclcpp::Node::SharedPtr &node_robot_ns,
+                   const rclcpp::Node::SharedPtr &node_operator_ns ) override;
   std::string getPluginName() override { return "view_control_plugin"; }
 
   void handleAxis( const std::string &function, double value ) override;
@@ -56,7 +57,7 @@ private:
   bool tracking_on_{ false };
 
   Eigen::Vector3d eye_{ 0, 0, 3 }; ///< eye‑focus vector (world)
-  Eigen::Vector3d focus{0,0,0};
+  Eigen::Vector3d focus{ 0, 0, 0 };
   geometry_msgs::msg::Point focus_point_{}; ///< world‑frame focus
 
   /* live axis values ----------------------------------------------------- */
@@ -76,7 +77,7 @@ private:
 
   /* hacks ------------------------------------------------------- */
   int skip_x_ = 3;
-  int counter_ =0;
+  int counter_ = 0;
 };
 } // namespace hector_gamepad_manager_plugins
 

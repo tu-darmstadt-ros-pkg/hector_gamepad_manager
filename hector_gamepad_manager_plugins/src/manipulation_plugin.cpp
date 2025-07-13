@@ -3,39 +3,39 @@
 namespace hector_gamepad_manager_plugins
 {
 
-void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
+void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node_robot_ns, const rclcpp::Node::SharedPtr &node_operator_ns  )
 {
-  node_ = node;
+  node_ = node_robot_ns;
   const auto plugin_namespace = getPluginName();
 
   // Setup reconfigurable parameters
   max_eef_linear_speed_param_sub_ = hector::createReconfigurableParameter(
-      node, plugin_namespace + ".max_eef_linear_speed", std::ref( max_eef_linear_speed_ ),
+      node_robot_ns, plugin_namespace + ".max_eef_linear_speed", std::ref( max_eef_linear_speed_ ),
       "Maximum Linear Speed of the End Effector",
       hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value > 0.0; } ) );
   max_eef_angular_speed_param_sub_ = hector::createReconfigurableParameter(
-      node, plugin_namespace + ".max_eef_angular_speed", std::ref( max_eef_angular_speed_ ),
+      node_robot_ns, plugin_namespace + ".max_eef_angular_speed", std::ref( max_eef_angular_speed_ ),
       "Maximum Angular Speed of the End Effector",
       hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value > 0.0; } ) );
   max_gripper_speed_param_sub_ = hector::createReconfigurableParameter(
-      node, plugin_namespace + ".max_gripper_speed", std::ref( max_gripper_speed_ ),
+      node_robot_ns, plugin_namespace + ".max_gripper_speed", std::ref( max_gripper_speed_ ),
       "Maximum Speed of the Gripper",
       hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value > 0.0; } ) );
   max_drive_linear_speed_param_sub_ = hector::createReconfigurableParameter(
-      node, plugin_namespace + ".max_drive_linear_speed", std::ref( max_drive_linear_speed_ ),
+      node_robot_ns, plugin_namespace + ".max_drive_linear_speed", std::ref( max_drive_linear_speed_ ),
       "Maximum Linear Speed of the Base",
       hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value > 0.0; } ) );
   max_drive_angular_speed_param_sub_ = hector::createReconfigurableParameter(
-      node, plugin_namespace + ".max_drive_angular_speed", std::ref( max_drive_angular_speed_ ),
+      node_robot_ns, plugin_namespace + ".max_drive_angular_speed", std::ref( max_drive_angular_speed_ ),
       "Maximum Angular Speed of the Base",
       hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value > 0.0; } ) );
   eef_twist_frame_param_sub_ = hector::createReconfigurableParameter(
-      node, plugin_namespace + ".eef_twist_frame", std::ref( eef_cmd_.header.frame_id ),
+      node_robot_ns, plugin_namespace + ".eef_twist_frame", std::ref( eef_cmd_.header.frame_id ),
       "Frame of the End Effector Twist",
       hector::ParameterOptions<std::string>().onValidate(
           []( const auto &value ) { return !value.empty(); } ) );
@@ -58,7 +58,7 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
       twist_controller_name_ + "/gripper_vel_cmd", 10 );
   hold_mode_client_ =
       node_->create_client<std_srvs::srv::SetBool>( twist_controller_name_ + "/hold_mode" );
-  controller_helper_.initialize( node, plugin_namespace );
+  controller_helper_.initialize( node_robot_ns, plugin_namespace );
 }
 
 std::string ManipulationPlugin::getPluginName() { return "manipulation_plugin"; }

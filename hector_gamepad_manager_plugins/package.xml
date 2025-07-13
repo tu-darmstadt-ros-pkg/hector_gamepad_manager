@@ -21,6 +21,8 @@
   <depend>sensor_msgs</depend>
   <depend>srdfdom</depend>
   <depend>std_srvs</depend>
+  <depend>hector_rviz_plugins_msgs</depend>
+  <depend>eigen</depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

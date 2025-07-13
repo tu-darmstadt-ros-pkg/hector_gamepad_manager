@@ -3,31 +3,31 @@
 namespace hector_gamepad_manager_plugins
 {
 
-void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node )
+void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node_robot_ns, const rclcpp::Node::SharedPtr &node_operator_ns  )
 {
-  node_ = node;
+  node_ = node_robot_ns;
   const std::string plugin_namespace = getPluginName();
 
   max_linear_speed_param_sub_ = hector::createReconfigurableParameter(
-      node, plugin_namespace + ".max_linear_speed", std::ref( max_linear_speed_ ),
+      node_robot_ns, plugin_namespace + ".max_linear_speed", std::ref( max_linear_speed_ ),
       "Maximum linear speed in m/s in Normal Mode.",
       hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value > 0.0; } ) );
 
   max_angular_speed_param_sub_ = hector::createReconfigurableParameter(
-      node, plugin_namespace + ".max_angular_speed", std::ref( max_angular_speed_ ),
+      node_robot_ns, plugin_namespace + ".max_angular_speed", std::ref( max_angular_speed_ ),
       "Maximum angular speed in rad/s in Normal Mode.",
       hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value > 0.0; } ) );
 
   slow_factor_param_sub_ = hector::createReconfigurableParameter(
-      node, plugin_namespace + ".slow_factor", std::ref( slow_factor_ ),
+      node_robot_ns, plugin_namespace + ".slow_factor", std::ref( slow_factor_ ),
       "Scaling factor for speed in Slow Mode.",
       hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value > 0.0 && value < 1.0; } ) );
 
   fast_factor_param_sub_ = hector::createReconfigurableParameter(
-      node, plugin_namespace + ".fast_factor", std::ref( fast_factor_ ),
+      node_robot_ns, plugin_namespace + ".fast_factor", std::ref( fast_factor_ ),
       "Scaling factor for speed in Fast Mode.",
       hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value >= 1.0; } ) );

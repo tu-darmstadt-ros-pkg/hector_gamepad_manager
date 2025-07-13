@@ -116,13 +116,12 @@ void ViewControlPlugin::update()
     counter_++;
     return; // skip some frames to avoid flooding the service calls
   }
-  RCLCPP_INFO_STREAM( node_->get_logger(), "ViewControlPlugin::update(): orbit_yaw_ = "
-                                           << orbit_yaw_ << ", orbit_theta_ = " << orbit_theta_
-                                           << ", translate_x_ = " << translate_x_
-                                           << ", translate_y_ = " << translate_y_
-                                           << ", zoom_in_ = " << zoom_in_
-                                           << ", zoom_out_ = " << zoom_out_
-                                           << ", move_z_dir_ = " << move_z_dir_ );
+  RCLCPP_INFO_STREAM( node_->get_logger(),
+                      "ViewControlPlugin::update(): orbit_yaw_ = "
+                          << orbit_yaw_ << ", orbit_theta_ = " << orbit_theta_
+                          << ", translate_x_ = " << translate_x_
+                          << ", translate_y_ = " << translate_y_ << ", zoom_in_ = " << zoom_in_
+                          << ", zoom_out_ = " << zoom_out_ << ", move_z_dir_ = " << move_z_dir_ );
   const double dt = 1.0 / 60.0;
 
   /* ------ zoom ----------------------------------------------------- */
@@ -211,4 +210,4 @@ void ViewControlPlugin::deactivate()
 /* ----------------------- plugin export ----------------------------- */
 } // namespace hector_gamepad_manager_plugins
 PLUGINLIB_EXPORT_CLASS( hector_gamepad_manager_plugins::ViewControlPlugin,
-                        hector_gamepad_plugin_interface::GamepadFunctionPlugin)
+                        hector_gamepad_plugin_interface::GamepadFunctionPlugin )

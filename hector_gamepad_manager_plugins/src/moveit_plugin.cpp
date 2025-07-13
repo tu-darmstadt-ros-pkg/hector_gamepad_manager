@@ -9,9 +9,9 @@
 
 namespace hector_gamepad_manager_plugins
 {
-void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node )
+void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node_robot_ns, const rclcpp::Node::SharedPtr &node_operator_ns  )
 {
-  node_ = node;
+  node_ = node_robot_ns;
   const std::string plugin_name = getPluginName();
   node_->declare_parameter<std::vector<std::string>>( plugin_name + ".start_controllers" );
   node_->declare_parameter<std::vector<std::string>>( plugin_name + ".stop_controllers" );
@@ -52,7 +52,7 @@ void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node )
         robot_description_semantic_ = msg->data;
         robot_description_semantic_subscriber_.reset();
       } );
-  controller_helper_.initialize( node, plugin_name );
+  controller_helper_.initialize( node_robot_ns, plugin_name );
   joint_state_subscriber_ = node_->create_subscription<sensor_msgs::msg::JointState>(
       "joint_states", 10,
       [this]( const sensor_msgs::msg::JointState::SharedPtr msg ) { joint_state_ = *msg; } );
