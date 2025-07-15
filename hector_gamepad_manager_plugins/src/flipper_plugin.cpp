@@ -3,7 +3,7 @@
 namespace hector_gamepad_manager_plugins
 {
 
-void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node_robot_ns, const rclcpp::Node::SharedPtr &node_operator_ns  )
+void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node_robot_ns )
 {
   node_ = node_robot_ns;
   const std::string plugin_namespace = getPluginName();

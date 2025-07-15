@@ -3,7 +3,7 @@
 namespace hector_gamepad_manager_plugins
 {
 
-void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node_robot_ns, const rclcpp::Node::SharedPtr &node_operator_ns  )
+void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node_robot_ns )
 {
   node_ = node_robot_ns;
   const std::string plugin_namespace = getPluginName();

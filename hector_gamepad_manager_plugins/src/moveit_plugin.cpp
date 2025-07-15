@@ -9,7 +9,7 @@
 
 namespace hector_gamepad_manager_plugins
 {
-void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node_robot_ns, const rclcpp::Node::SharedPtr &node_operator_ns  )
+void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node_robot_ns )
 {
   node_ = node_robot_ns;
   const std::string plugin_name = getPluginName();

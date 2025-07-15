@@ -8,8 +8,7 @@ namespace hector_gamepad_manager_plugins
 {
 
 /* --------------------------- initialisation ------------------------ */
-void ViewControlPlugin::initialize( const rclcpp::Node::SharedPtr &node_robot_ns,
-                                    const rclcpp::Node::SharedPtr &node_operator_ns )
+void ViewControlPlugin::initialize( const rclcpp::Node::SharedPtr &node_robot_ns )
 {
   node_ = node_robot_ns;
 
@@ -95,8 +94,6 @@ void ViewControlPlugin::handleHold( const std::string &function )
     rviz_cmd_msg.translation.z = -0.5 * translate_speed_;
   interacted_ = true;
 }
-
-void ViewControlPlugin::handleRelease( const std::string &f ) { }
 
 /* ----------------------------- update ------------------------------ */
 void ViewControlPlugin::update()

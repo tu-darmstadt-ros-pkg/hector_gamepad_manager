@@ -34,13 +34,11 @@ public:
   using TrackFrame = hector_rviz_plugins_msgs::srv::TrackFrame;
   using Point = geometry_msgs::msg::Point;
   /* Game‑pad plugin API -------------------------------------------------- */
-  void initialize( const rclcpp::Node::SharedPtr &node_robot_ns,
-                   const rclcpp::Node::SharedPtr &node_operator_ns ) override;
+  void initialize( const rclcpp::Node::SharedPtr &node_robot_ns ) override;
   std::string getPluginName() override { return "view_control_plugin"; }
 
   void handleAxis( const std::string &function, double value ) override;
   void handlePress( const std::string &function ) override;
-  void handleRelease( const std::string &function ) override;
   void handleHold( const std::string &function ) override;
 
   /* no special per‑frame “hold” handling; defaults inherited */

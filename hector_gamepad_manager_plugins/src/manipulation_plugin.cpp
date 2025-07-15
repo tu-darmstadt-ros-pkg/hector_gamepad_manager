@@ -3,7 +3,7 @@
 namespace hector_gamepad_manager_plugins
 {
 
-void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node_robot_ns, const rclcpp::Node::SharedPtr &node_operator_ns  )
+void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node_robot_ns )
 {
   node_ = node_robot_ns;
   const auto plugin_namespace = getPluginName();
@@ -15,8 +15,8 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node_robot_n
       hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value > 0.0; } ) );
   max_eef_angular_speed_param_sub_ = hector::createReconfigurableParameter(
-      node_robot_ns, plugin_namespace + ".max_eef_angular_speed", std::ref( max_eef_angular_speed_ ),
-      "Maximum Angular Speed of the End Effector",
+      node_robot_ns, plugin_namespace + ".max_eef_angular_speed",
+      std::ref( max_eef_angular_speed_ ), "Maximum Angular Speed of the End Effector",
       hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value > 0.0; } ) );
   max_gripper_speed_param_sub_ = hector::createReconfigurableParameter(
@@ -25,13 +25,13 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node_robot_n
       hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value > 0.0; } ) );
   max_drive_linear_speed_param_sub_ = hector::createReconfigurableParameter(
-      node_robot_ns, plugin_namespace + ".max_drive_linear_speed", std::ref( max_drive_linear_speed_ ),
-      "Maximum Linear Speed of the Base",
+      node_robot_ns, plugin_namespace + ".max_drive_linear_speed",
+      std::ref( max_drive_linear_speed_ ), "Maximum Linear Speed of the Base",
       hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value > 0.0; } ) );
   max_drive_angular_speed_param_sub_ = hector::createReconfigurableParameter(
-      node_robot_ns, plugin_namespace + ".max_drive_angular_speed", std::ref( max_drive_angular_speed_ ),
-      "Maximum Angular Speed of the Base",
+      node_robot_ns, plugin_namespace + ".max_drive_angular_speed",
+      std::ref( max_drive_angular_speed_ ), "Maximum Angular Speed of the Base",
       hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value > 0.0; } ) );
   eef_twist_frame_param_sub_ = hector::createReconfigurableParameter(
