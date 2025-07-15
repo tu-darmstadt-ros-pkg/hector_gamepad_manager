@@ -5,6 +5,7 @@
 #ifndef VIEWER_PLUGIN_HPP
 #define VIEWER_PLUGIN_HPP
 
+#include <hector_rviz_plugins_msgs/msg/relative_view_controller_cmd.hpp>
 #include <hector_rviz_plugins_msgs/srv/move_eye.hpp>
 #include <hector_rviz_plugins_msgs/srv/move_eye_and_focus.hpp>
 #include <hector_rviz_plugins_msgs/srv/set_view_mode.hpp>
@@ -33,51 +34,29 @@ public:
   void handleAxis( const std::string &function, double value ) override;
   void handlePress( const std::string &function ) override;
   void handleRelease( const std::string &function ) override;
+  void handleHold( const std::string &function ) override;
 
   /* no special per‑frame “hold” handling; defaults inherited */
 
   void update() override;
   void activate() override { active_ = true; }
   void deactivate() override;
+  void reset();
 
 private:
-  /* helper methods ------------------------------------------------------- */
-  bool waitForServicesOnce();
-  void translateWorld( const Eigen::Vector3d &delta_world );
-  void orbit( double d_yaw, double d_pitch );
-
-  /* service clients ------------------------------------------------------ */
-  rclcpp::Client<hector_rviz_plugins_msgs::srv::MoveEye>::SharedPtr move_eye_cli_;
-  rclcpp::Client<hector_rviz_plugins_msgs::srv::MoveEyeAndFocus>::SharedPtr move_eye_focus_cli_;
-  rclcpp::Client<hector_rviz_plugins_msgs::srv::SetViewMode>::SharedPtr mode_cli_;
-  rclcpp::Client<hector_rviz_plugins_msgs::srv::TrackFrame>::SharedPtr track_cli_;
+  rclcpp::Publisher<hector_rviz_plugins_msgs::msg::RelativeViewControllerCmd>::SharedPtr view_controller_pub_;
+  hector_rviz_plugins_msgs::msg::RelativeViewControllerCmd rviz_cmd_msg;
 
   /* runtime state -------------------------------------------------------- */
-  bool services_ready_{ false };
-  bool tracking_on_{ false };
-
-  Eigen::Vector3d eye_{ 0, 0, 3 }; ///< eye‑focus vector (world)
-  Eigen::Vector3d focus{ 0, 0, 0 };
-  geometry_msgs::msg::Point focus_point_{}; ///< world‑frame focus
-
-  /* live axis values ----------------------------------------------------- */
-  double orbit_yaw_{ 0.0 };
-  double orbit_theta_{ 0.0 };
-  double translate_x_{ 0.0 };
-  double translate_y_{ 0.0 };
-  double zoom_in_{ 0.0 };
-  double zoom_out_{ 0.0 };
-  int move_z_dir_{ 0 }; ///< +1 up, –1 down, 0 idle
+  bool stop_tracking_{ false };
+  bool switch_to_3d_mode_{ true };
+  bool disable_animation_{ true };
 
   /* tunable speeds ------------------------------------------------------- */
   double orbit_speed_{ 1.5 };     ///< rad/s
   double zoom_speed_{ 2.0 };      ///< m/s
   double translate_speed_{ 1.0 }; ///< m/s
   double preset_distance_{ 4.0 }; ///< m (distance from base_link in presets)
-
-  /* hacks ------------------------------------------------------- */
-  int skip_x_ = 3;
-  int counter_ = 0;
 };
 } // namespace hector_gamepad_manager_plugins
 

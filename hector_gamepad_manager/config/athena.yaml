@@ -36,8 +36,8 @@ buttons:
    config: "driving"
 
   8: # Button Guide (Manufacturer Button)
-   package: ""
-   config: ""
+   package: "hector_gamepad_manager"
+   config: "view_control"
 
   9: # Left joystick press
    package: ""
