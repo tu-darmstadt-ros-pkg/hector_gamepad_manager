@@ -56,6 +56,10 @@ jobs:
           path: src/hector_ros2_utils
       - uses: actions/checkout@v4
         with:
+          repository: tu-darmstadt-ros-pkg/hector_rviz_plugins
+          path: src/hector_rviz_plugins
+      - uses: actions/checkout@v4
+        with:
           path: src/repo
       - name: rosdep
         run: |
