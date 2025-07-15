@@ -110,3 +110,31 @@ Additionally, in the hold mode the robot can be driven while the end-effector re
 - `open_gripper`: Open the gripper.
 - `close_gripper`: Close the gripper.
 - `hold_mode`: Toggle the hold mode. In hold mode the robot can be driven while the end-effector remains at its current position in the world frame.
+
+
+## ViewControl Plugin
+This plugin allows to control the camera in rviz. You can zoom, translate and rotate the camera perspective.
+You have to select the HectorViewController in rviz.
+
+### Functions
+#### Axis
+
+* `translate_x`: Translate the camera view towards the robot.
+* `translate_y`: Translate the camera view left and right.
+* `zoom_in`: Zoom the camera in.
+* `zoom_out`: Zoom the camera out.
+* `orbit_yaw`: Orbit the camera horizontally around the target.
+* `orbit_theta`: Orbit the camera vertically around the target.
+
+#### Buttons
+
+* `move_up`: Move the camera upward in world coordinates.
+* `move_down`: Move the camera downward in world coordinates.
+* `toggle_tracking`: Toggle tracking of the configured frame.
+* `activate_2d_mode`: Switch to 2D viewing mode.
+* `preset_front`: Move the camera to a predefined front-facing position.
+* `preset_back`: Move the camera to a predefined rear-facing position.
+* `preset_left`: Move the camera to a predefined left-side position.
+* `preset_right`: Move the camera to a predefined right-side position.
+
+

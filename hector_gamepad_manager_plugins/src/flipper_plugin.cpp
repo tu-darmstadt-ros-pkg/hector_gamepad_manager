@@ -3,23 +3,23 @@
 namespace hector_gamepad_manager_plugins
 {
 
-void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
+void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node_robot_ns )
 {
-  node_ = node;
+  node_ = node_robot_ns;
   const std::string plugin_namespace = getPluginName();
 
   // Setup reconfigurable Parameters
   speed_sub_ = hector::createReconfigurableParameter(
-      node, plugin_namespace + ".speed", std::ref( speed_ ), "Flipper Speed",
+      node_robot_ns, plugin_namespace + ".speed", std::ref( speed_ ), "Flipper Speed",
       hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value > 0.0; } ) );
   flipper_front_factor_param_sub_ = hector::createReconfigurableParameter(
-      node, plugin_namespace + ".flipper_front_factor", std::ref( flipper_front_factor_ ),
+      node_robot_ns, plugin_namespace + ".flipper_front_factor", std::ref( flipper_front_factor_ ),
       "Flipper Front Factor", hector::ParameterOptions<double>().onValidate( []( const auto &value ) {
         return value > 0.0;
       } ) );
   flipper_back_factor_param_sub_ = hector::createReconfigurableParameter(
-      node, plugin_namespace + ".flipper_back_factor", std::ref( flipper_back_factor_ ),
+      node_robot_ns, plugin_namespace + ".flipper_back_factor", std::ref( flipper_back_factor_ ),
       "Flipper Back Factor", hector::ParameterOptions<double>().onValidate( []( const auto &value ) {
         return value > 0.0;
       } ) );
@@ -45,7 +45,7 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   flipper_command_publisher_ = node_->create_publisher<std_msgs::msg::Float64MultiArray>(
       "/" + node_->get_parameter( "robot_namespace" ).as_string() + "/" + command_topic, 10 );
 
-  controller_helper_.initialize( node, plugin_namespace );
+  controller_helper_.initialize( node_robot_ns, plugin_namespace );
   active_ = true;
 }
 

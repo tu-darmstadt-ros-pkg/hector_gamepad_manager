@@ -16,7 +16,7 @@ namespace hector_gamepad_manager_plugins
 class ManipulationPlugin final : public hector_gamepad_plugin_interface::GamepadFunctionPlugin
 {
 public:
-  void initialize( const rclcpp::Node::SharedPtr &node ) override;
+  void initialize( const rclcpp::Node::SharedPtr &node_robot_ns ) override;
 
   std::string getPluginName() override;
 

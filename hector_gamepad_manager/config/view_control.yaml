@@ -1,15 +1,15 @@
 axes:
   0: # Left joystick left/right
-    plugin: "hector_gamepad_manager_plugins::DrivePlugin"
-    function: "steer"
+    plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
+    function: "translate_x"
 
   1: # Left joystick up/down
-    plugin: "hector_gamepad_manager_plugins::DrivePlugin"
-    function: "drive"
+    plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
+    function: "translate_y"
 
   2: # LT
-    plugin: "hector_gamepad_manager_plugins::FlipperPlugin"
-    function: "flipper_back_down"
+    plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
+    function: "zoom_in"
 
   3: # Right joystick left/right
     plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
@@ -20,8 +20,8 @@ axes:
     function: "orbit_theta"
 
   5: # RT
-    plugin: "hector_gamepad_manager_plugins::FlipperPlugin"
-    function: "flipper_front_down"
+    plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
+    function: "zoom_out"
 
   6: # Cross left/right
     plugin: ""
@@ -33,28 +33,28 @@ axes:
 
 buttons:
   0: # Button A
-    plugin: "hector_gamepad_manager_plugins::DrivePlugin"
-    function: "fast"
+    plugin: ""
+    function: ""
 
   1: # Button B
-    plugin: "hector_gamepad_manager_plugins::FlipperPlugin"
-    function: "individual_back_flipper_control_mode"
+    plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
+    function: "toggle_tracking"
 
   2: # Button X
-    plugin: "hector_gamepad_manager_plugins::DrivePlugin"
-    function: "slow"
+    plugin: ""
+    function: ""
 
   3: # Button Y
-    plugin: "hector_gamepad_manager_plugins::FlipperPlugin"
-    function: "individual_front_flipper_control_mode"
+    plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
+    function: "activate_2d_mode"
 
   4: # Button LB
-    plugin: "hector_gamepad_manager_plugins::FlipperPlugin"
-    function: "flipper_back_up"
+    plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
+    function: "move_up"
 
   5: # Button RB
-    plugin: "hector_gamepad_manager_plugins::FlipperPlugin"
-    function: "flipper_front_up"
+    plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
+    function: "move_down"
 
   6: # Button Back
     plugin: ""
@@ -118,17 +118,17 @@ buttons:
     function: ""
 
   21: # Cross left
-    plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
-    function: "flipper_group/tub"
+    plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
+    function: "preset_left"
 
   22: # Cross right
-    plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
-    function: "flipper_group/compact"
+    plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
+    function: "preset_right"
 
   23: # Cross up
-    plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
-    function: "flipper_group/up"
+    plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
+    function: "preset_front"
 
   24: # Cross down
-    plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
-    function: "flipper_group/flat"
+    plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
+    function: "preset_back"
