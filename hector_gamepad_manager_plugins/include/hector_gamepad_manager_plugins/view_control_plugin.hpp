@@ -21,6 +21,13 @@ namespace hector_gamepad_manager_plugins
 class ViewControlPlugin : public hector_gamepad_plugin_interface::GamepadFunctionPlugin
 {
 public:
+  enum PresetDirection {
+    FRONT = 0,
+    BACK = 1,
+    LEFT = 2,
+    RIGHT = 3,
+    NONE = 4,
+  };
   using MoveEye = hector_rviz_plugins_msgs::srv::MoveEye;
   using MoveEyeAndFocus = hector_rviz_plugins_msgs::srv::MoveEyeAndFocus;
   using SetViewMode = hector_rviz_plugins_msgs::srv::SetViewMode;
@@ -46,17 +53,29 @@ public:
 private:
   rclcpp::Publisher<hector_rviz_plugins_msgs::msg::RelativeViewControllerCmd>::SharedPtr view_controller_pub_;
   hector_rviz_plugins_msgs::msg::RelativeViewControllerCmd rviz_cmd_msg;
+  rclcpp::Client<hector_rviz_plugins_msgs::srv::MoveEyeAndFocus>::SharedPtr move_eye_and_focus_client_;
+  rclcpp::Client<hector_rviz_plugins_msgs::srv::TrackFrame>::SharedPtr track_frame_client_;
+  rclcpp::Client<hector_rviz_plugins_msgs::srv::SetViewMode>::SharedPtr set_view_mode_client_;
 
   /* runtime state -------------------------------------------------------- */
-  bool stop_tracking_{ false };
+  bool tracking_active_{ false };
   bool switch_to_3d_mode_{ true };
   bool disable_animation_{ true };
+
+  bool activate_tracking_{ false }; // request to activate tracking
+  bool activate_2d_mode_{ false };
+
+  PresetDirection preset_direction_{ PresetDirection::FRONT };
 
   /* tunable speeds ------------------------------------------------------- */
   double orbit_speed_{ 1.5 };     ///< rad/s
   double zoom_speed_{ 2.0 };      ///< m/s
   double translate_speed_{ 1.0 }; ///< m/s
-  double preset_distance_{ 4.0 }; ///< m (distance from base_link in presets)
+  double preset_distance_{ 2.0 }; ///< m (distance from base_link in presets)
+  double preset_eye_height_{ 1.5 };
+  double preset_focus_height_{ 0.25 };
+  std::string tracked_frame_;
+  bool interacted_{ false };
 };
 } // namespace hector_gamepad_manager_plugins
 

@@ -37,16 +37,16 @@ buttons:
     function: ""
 
   1: # Button B
-    plugin: ""
-    function: ""
+    plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
+    function: "toggle_tracking"
 
   2: # Button X
     plugin: ""
     function: ""
 
   3: # Button Y
-    plugin: ""
-    function: ""
+    plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
+    function: "activate_2d_mode"
 
   4: # Button LB
     plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
@@ -118,17 +118,17 @@ buttons:
     function: ""
 
   21: # Cross left
-    plugin: ""
-    function: ""
+    plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
+    function: "preset_left"
 
   22: # Cross right
-    plugin: ""
-    function: ""
+    plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
+    function: "preset_right"
 
   23: # Cross up
-    plugin: ""
-    function: ""
+    plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
+    function: "preset_front"
 
   24: # Cross down
-    plugin: ""
-    function: ""
+    plugin: "hector_gamepad_manager_plugins::ViewControlPlugin"
+    function: "preset_back"
