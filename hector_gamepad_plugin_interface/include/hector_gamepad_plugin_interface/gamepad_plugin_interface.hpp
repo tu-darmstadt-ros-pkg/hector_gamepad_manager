@@ -5,18 +5,20 @@
 
 namespace hector_gamepad_plugin_interface
 {
+struct Blackboard {
+  std::unordered_map<std::string, bool> data_; // for now just bools
+};
 class GamepadFunctionPlugin
 {
 public:
   // Destructor
   virtual ~GamepadFunctionPlugin() = default;
 
-  /**
-   * @brief Initialize function that is called when the plugin is loaded.
-   *
-   * @param node The ROS node that the plugin is associated with.
-   */
-  virtual void initialize( const rclcpp::Node::SharedPtr &node ) = 0;
+  void initializePlugin( const rclcpp::Node::SharedPtr &node, std::shared_ptr<Blackboard> blackborad )
+  {
+    blackboard_ = blackborad;
+    initialize( node );
+  }
 
   /**
    * @brief Returns name of associated plugin
@@ -106,6 +108,12 @@ public:
   bool isActive() const { return active_; }
 
 protected:
+  /**
+   * @brief Initialize function that is called when the plugin is loaded.
+   *
+   * @param node The ROS node that the plugin is associated with.
+   */
+  virtual void initialize( const rclcpp::Node::SharedPtr &node ) = 0;
   // The ROS node
   rclcpp::Node::SharedPtr node_;
 
@@ -114,6 +122,8 @@ protected:
 
   // The current state of the buttons per function.
   std::unordered_map<std::string, bool> button_states_;
+
+  std::shared_ptr<Blackboard> blackboard_;
 };
 } // namespace hector_gamepad_plugin_interface
 

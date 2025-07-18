@@ -108,10 +108,19 @@ void FlipperPlugin::update()
   if ( !active_ )
     return;
 
-  vel_commands_[0] = axis_vel_commands_[0] + button_vel_commands_[0];
-  vel_commands_[1] = axis_vel_commands_[1] + button_vel_commands_[1];
-  vel_commands_[2] = axis_vel_commands_[2] + button_vel_commands_[2];
-  vel_commands_[3] = axis_vel_commands_[3] + button_vel_commands_[3];
+  // check inverted steering
+  if ( blackboard_->data_.find( "inverted_steering" ) != blackboard_->data_.end() &&
+       blackboard_->data_["inverted_steering"] ) {
+    vel_commands_[3] = axis_vel_commands_[0] + button_vel_commands_[0]; // flipper_br_joint
+    vel_commands_[2] = axis_vel_commands_[1] + button_vel_commands_[1]; // flipper_bl_joint
+    vel_commands_[1] = axis_vel_commands_[2] + button_vel_commands_[2]; // flipper_fr_joint
+    vel_commands_[0] = axis_vel_commands_[3] + button_vel_commands_[3]; // flipper_fl_joint
+  } else {
+    vel_commands_[0] = axis_vel_commands_[0] + button_vel_commands_[0]; // flipper_fl_joint
+    vel_commands_[1] = axis_vel_commands_[1] + button_vel_commands_[1]; // flipper_fr_joint
+    vel_commands_[2] = axis_vel_commands_[2] + button_vel_commands_[2]; // flipper_bl_joint
+    vel_commands_[3] = axis_vel_commands_[3] + button_vel_commands_[3]; // flipper_br_joint
+  }
 
   const bool current_cmd_zero = checkCurrentCmdIsZero();
 

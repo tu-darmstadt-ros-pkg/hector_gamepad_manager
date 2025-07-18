@@ -81,7 +81,7 @@ void ControllerHelper::controllerListCb(
   auto switch_request = std::make_shared<controller_manager_msgs::srv::SwitchController::Request>();
   switch_request->activate_controllers = start_controllers;
   switch_request->deactivate_controllers = stop_controllers;
-  switch_request->strictness = controller_manager_msgs::srv::SwitchController::Request::STRICT;
+  switch_request->strictness = controller_manager_msgs::srv::SwitchController::Request::BEST_EFFORT;
   switch_request->activate_asap = false;
   switch_request->timeout = rclcpp::Duration( 1, 0 );
 
