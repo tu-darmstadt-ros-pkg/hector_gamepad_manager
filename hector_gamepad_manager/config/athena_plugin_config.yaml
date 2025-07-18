@@ -13,6 +13,7 @@
             teleop_controller:
                 - "self_collision_avoidance_controller"
                 - "flipper_velocity_controller"
+                - "vel_to_pos_controller"
             command_topic: "flipper_velocity_controller/commands"
         manipulation_plugin:
             max_eef_linear_speed: 0.15
@@ -25,4 +26,4 @@
             stop_controllers: ["arm_trajectory_controller", "gripper_trajectory_controller"]
         moveit_plugin:
             start_controllers: ["arm_trajectory_controller", "gripper_trajectory_controller", "flipper_trajectory_controller"]
-            stop_controllers: ["moveit_twist_controller", "flipper_velocity_controller", "self_collision_avoidance_controller"]
+            stop_controllers: ["moveit_twist_controller", "flipper_velocity_controller", "self_collision_avoidance_controller", "vel_to_pos_controller"]
