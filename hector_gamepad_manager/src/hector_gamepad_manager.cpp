@@ -4,7 +4,8 @@ namespace hector_gamepad_manager
 {
 HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node )
     : plugin_loader_( "hector_gamepad_manager",
-                      "hector_gamepad_plugin_interface::GamepadFunctionPlugin" )
+                      "hector_gamepad_plugin_interface::GamepadFunctionPlugin" ),
+      blackboard_( std::make_shared<hector_gamepad_plugin_interface::Blackboard>() )
 {
   // declare & get parameters
   node->declare_parameter<std::string>( "config_name", "athena" );
@@ -119,7 +120,7 @@ bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::st
           try {
             std::shared_ptr<GamepadFunctionPlugin> plugin =
                 plugin_loader_.createSharedInstance( plugin_name );
-            plugin->initialize( robot_ns_node_ );
+            plugin->initializePlugin( robot_ns_node_, blackboard_ );
             plugins_[plugin_name] = plugin;
             RCLCPP_INFO( ocs_ns_node_->get_logger(), "Loaded plugin: %s", plugin_name.c_str() );
           } catch ( const std::exception &e ) {

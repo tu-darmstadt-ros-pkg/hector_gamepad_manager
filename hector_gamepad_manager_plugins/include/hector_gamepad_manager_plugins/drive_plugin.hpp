@@ -51,7 +51,6 @@ private:
   bool fast_mode_active_ = false;
   bool slow_mode_active_ = false;
   bool last_cmd_zero_ = false;
-  bool invert_steering_ = false;
 };
 } // namespace hector_gamepad_manager_plugins
 

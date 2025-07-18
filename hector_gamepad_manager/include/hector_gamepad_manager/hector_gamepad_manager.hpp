@@ -75,6 +75,8 @@ private:
   // stores the plugins present in the active configuration file
   std::vector<std::shared_ptr<GamepadFunctionPlugin>> active_plugins_;
 
+  std::shared_ptr<hector_gamepad_plugin_interface::Blackboard> blackboard_;
+
   // Deadzone to consider an axis as pressed
   static constexpr float AXIS_DEADZONE = 0.5;
 

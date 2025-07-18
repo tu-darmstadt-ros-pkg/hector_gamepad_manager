@@ -38,6 +38,7 @@ void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node )
   // TODO: use inverted operator specific athena/ui namespace (see view controller PR)
   inverted_steering_publisher =
       node_->create_publisher<std_msgs::msg::Bool>( "inverted_steering", 1 );
+  blackboard_->data_["inverted_steering"] = false;
 }
 
 std::string DrivePlugin::getPluginName() { return "drive_plugin"; }
@@ -58,9 +59,9 @@ void DrivePlugin::handlePress( const std::string &function )
   } else if ( function == "slow" ) {
     slow_mode_active_ = true;
   } else if ( function == "invert_steering" ) {
-    invert_steering_ = !invert_steering_;
+    blackboard_->data_["inverted_steering"] = !blackboard_->data_["inverted_steering"];
     std_msgs::msg::Bool msg;
-    msg.data = invert_steering_;
+    msg.data = blackboard_->data_["inverted_steering"];
     inverted_steering_publisher->publish( msg );
   }
 }
@@ -86,10 +87,10 @@ void DrivePlugin::update()
   } else if ( fast_mode_active_ ) {
     speed_factor = fast_factor_;
   }
-  const double steering_inv = invert_steering_ ? -1.0 : 1.0;
+  const double steering_inv = blackboard_->data_["inverted_steering"] ? -1.0 : 1.0;
 
   sendDriveCommand( steering_inv * drive_value_ * max_linear_speed_ * speed_factor,
-                    steering_inv * steer_value_ * max_angular_speed_ * speed_factor );
+                    steer_value_ * max_angular_speed_ * speed_factor );
 }
 
 void DrivePlugin::activate()
