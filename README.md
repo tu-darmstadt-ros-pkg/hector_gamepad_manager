@@ -78,6 +78,7 @@ This plugin is used to drive the robot using a gamepad.
 - `steer`: Left and right steering of the robot. Default button: (Left joystick left/right)
 - `fast`: Fast driving mode. Default button: (A)
 - `slow`: Slow driving mode. Default button: (X)
+- `invert_steering`: Inverts Forward/Backward and Left/Right Steering: (Manufacturer Button)
 
 ## FlipperPlugin
 

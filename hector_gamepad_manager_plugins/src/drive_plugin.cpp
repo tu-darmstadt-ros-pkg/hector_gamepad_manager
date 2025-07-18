@@ -35,7 +35,7 @@ void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node )
   drive_command_publisher_ =
       node_->create_publisher<geometry_msgs::msg::TwistStamped>( "cmd_vel", 1 );
 
-  // TODO: USE OPERATROR STATION NODE
+  // TODO: use inverted operator specific athena/ui namespace (see view controller PR)
   inverted_steering_publisher =
       node_->create_publisher<std_msgs::msg::Bool>( "inverted_steering", 1 );
 }
