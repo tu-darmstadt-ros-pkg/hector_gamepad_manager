@@ -15,16 +15,16 @@ public:
   ControllerHelper() = default;
   ~ControllerHelper() = default;
 
-  void initialize( const rclcpp::Node::SharedPtr &node, std::string plugin_name );
+  void initialize( const rclcpp::Node::SharedPtr &node, const std::string &plugin_name );
 
-  void switchControllers( std::vector<std::string> start_controllers ) const;
+  void switchControllers( const std::vector<std::string> &start_controllers ) const;
 
 private:
   rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedPtr switch_controller_client_;
   rclcpp::Client<controller_manager_msgs::srv::ListControllers>::SharedPtr list_controllers_client_;
 
   rclcpp::Node::SharedPtr node_;
-
+  std::string plugin_name_;
   std::shared_ptr<controller_orchestrator::ControllerOrchestrator> controller_orchestrator_;
 };
 } // namespace hector_gamepad_manager_plugins

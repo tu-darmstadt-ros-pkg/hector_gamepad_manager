@@ -8,10 +8,7 @@ int main( int argc, char **argv )
   const auto node = std::make_shared<rclcpp::Node>( "hector_gamepad_manager_node" );
   auto hector_gamepad_manager =
       std::make_shared<hector_gamepad_manager::HectorGamepadManager>( node );
-  std::shared_ptr<rclcpp::Executor> executor =
-      std::make_shared<rclcpp::executors::MultiThreadedExecutor>();
-  executor->add_node( node );
-  executor->spin();
+  rclcpp::spin( node );
   rclcpp::shutdown();
   return 0;
 }
