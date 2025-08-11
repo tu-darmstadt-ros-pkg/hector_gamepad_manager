@@ -34,8 +34,8 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
           { "teleop_controller",
             { "self_collision_avoidance_controller", "flipper_velocity_controller" } },
       } );
-  standard_controller_ =
-      node_->get_parameter( plugin_namespace + ".standard_controller" ).as_string();
+  // standard_controller_ =
+  //     node_->get_parameter( plugin_namespace + ".standard_controller" ).as_string();
   teleop_controller_ =
       node_->get_parameter( plugin_namespace + ".teleop_controller" ).as_string_array();
 
@@ -125,7 +125,7 @@ void FlipperPlugin::update()
   const bool current_cmd_zero = checkCurrentCmdIsZero();
 
   if ( last_cmd_zero_ && !current_cmd_zero )
-    controller_helper_.switchControllers( teleop_controller_, { standard_controller_ } );
+    controller_helper_.switchControllers( teleop_controller_ /*, { standard_controller_ } */ );
 
   if ( !( last_cmd_zero_ && current_cmd_zero ) )
     publishCommands();

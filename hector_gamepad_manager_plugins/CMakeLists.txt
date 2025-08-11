@@ -1,22 +1,20 @@
-cmake_minimum_required(VERSION 3.8)
-project(hector_gamepad_manager_plugins)
+cmake_minimum_required(VERSION 3.16)
+project(hector_gamepad_manager_plugins LANGUAGES CXX)
 
-# Default to C++17
-if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD 17)
-  set(CMAKE_CXX_STANDARD_REQUIRED ON)
-endif()
+# Default to C++17 if(NOT CMAKE_CXX_STANDARD) set(CMAKE_CXX_STANDARD 17)
+# set(CMAKE_CXX_STANDARD_REQUIRED ON) endif()
 
-if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
+# if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+# add_compile_options(-Wall -Wextra -Wpedantic) endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_gen_version_h REQUIRED)
 
 # Define a list of dependencies in alphabetical order
 set(DEPENDENCIES
     controller_manager_msgs
+    controller_orchestrator
     geometry_msgs
     hector_gamepad_plugin_interface
     hector_ros2_utils
@@ -34,15 +32,15 @@ foreach(dependency IN LISTS DEPENDENCIES)
 endforeach()
 
 set(HEADERS
+    include/hector_gamepad_manager_plugins/controller_helper.hpp
     include/hector_gamepad_manager_plugins/drive_plugin.hpp
     include/hector_gamepad_manager_plugins/flipper_plugin.hpp
-    include/hector_gamepad_manager_plugins/controller_helper.hpp
     include/hector_gamepad_manager_plugins/manipulation_plugin.hpp
     include/hector_gamepad_manager_plugins/moveit_plugin.hpp)
 
 set(SOURCES
-    src/drive_plugin.cpp src/manipulation_plugin.cpp src/flipper_plugin.cpp
-    src/controller_helper.cpp src/moveit_plugin.cpp)
+    src/controller_helper.cpp src/drive_plugin.cpp src/flipper_plugin.cpp
+    src/manipulation_plugin.cpp src/moveit_plugin.cpp)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES} ${HEADERS})
 target_include_directories(
@@ -50,6 +48,8 @@ target_include_directories(
                          $<INSTALL_INTERFACE:include>)
 
 ament_target_dependencies(${PROJECT_NAME} PUBLIC ${DEPENDENCIES})
+# target_link_libraries(${PROJECT_NAME} PRIVATE
+# controller_orchestrator::controller_orchestrator)
 
 install(
   TARGETS ${PROJECT_NAME}

@@ -83,7 +83,6 @@ private:
   double close_gripper_ = 0.0;
 
   std::string twist_controller_name_;
-  std::vector<std::string> stop_controllers_;
   ControllerHelper controller_helper_{};
   geometry_msgs::msg::TwistStamped eef_cmd_;
   geometry_msgs::msg::TwistStamped drive_cmd_;
