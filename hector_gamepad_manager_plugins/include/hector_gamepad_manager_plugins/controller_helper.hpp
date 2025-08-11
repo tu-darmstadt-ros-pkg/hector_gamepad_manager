@@ -17,7 +17,7 @@ public:
 
   void initialize( const rclcpp::Node::SharedPtr &node, std::string plugin_name );
 
-  void switchControllers( std::vector<std::string> start_controllers );
+  void switchControllers( std::vector<std::string> start_controllers ) const;
 
 private:
   rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedPtr switch_controller_client_;

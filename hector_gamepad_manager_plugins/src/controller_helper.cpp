@@ -13,7 +13,7 @@ void ControllerHelper::initialize( const rclcpp::Node::SharedPtr &node, std::str
       node_, "/" + node_->get_parameter( "robot_namespace" ).as_string() + "/controller_manager" );
 }
 
-void ControllerHelper::switchControllers( std::vector<std::string> start_controllers )
+void ControllerHelper::switchControllers( std::vector<std::string> start_controllers ) const
 {
   if ( start_controllers.empty() )
     return;
