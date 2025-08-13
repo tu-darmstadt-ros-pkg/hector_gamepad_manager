@@ -16,23 +16,20 @@ find_package(ament_cmake REQUIRED)
 add_library(${PROJECT_NAME} INTERFACE)
 
 target_include_directories(
-        ${PROJECT_NAME}
-        INTERFACE
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
-        "$<INSTALL_INTERFACE:include>"
-)
+  ${PROJECT_NAME}
+  INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+            "$<INSTALL_INTERFACE:include>")
 
 install(
-        TARGETS ${PROJECT_NAME}
-        EXPORT "export_${PROJECT_NAME}"
-        ARCHIVE DESTINATION lib
-        LIBRARY DESTINATION lib
-        RUNTIME DESTINATION lib
-        INCLUDES DESTINATION include
-)
+  TARGETS ${PROJECT_NAME}
+  EXPORT "export_${PROJECT_NAME}"
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION lib
+  INCLUDES
+  DESTINATION include)
 
-install(DIRECTORY include/${PROJECT_NAME}/
-        DESTINATION include/${PROJECT_NAME})
+install(DIRECTORY include/${PROJECT_NAME}/ DESTINATION include/${PROJECT_NAME})
 
 ament_export_targets("export_${PROJECT_NAME}")
 
@@ -43,8 +40,8 @@ include(CTest)
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
 
-  # test/test_blackboard.cpp should include:
-  #   #include <hector_gamepad_plugin_interface/blackboard.hpp>
+  # test/test_blackboard.cpp should include: #include
+  # <hector_gamepad_plugin_interface/blackboard.hpp>
   ament_add_gtest(test_blackboard test/test_blackboard.cpp)
   if(TARGET test_blackboard)
     target_link_libraries(test_blackboard ${PROJECT_NAME})
