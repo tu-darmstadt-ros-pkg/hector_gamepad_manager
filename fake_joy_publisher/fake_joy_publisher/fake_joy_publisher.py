@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, Tuple, Optional, Set, List, Callable
 import time
+import re
 
 import rclpy
 from rclpy.node import Node
@@ -53,6 +54,10 @@ def _pkg_config_path(pkg: str, name: str) -> str:
 def _load_yaml(path: str) -> dict:
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
+
+def _safe_func_name(name: str) -> str:
+    """Map a function string to a safe, lowercase method identifier."""
+    return re.sub(r'[^0-9a-zA-Z]+', '_', name).strip('_').lower()
 
 def _request_params_sync(node: Node, target_node_fqn: str, names: Tuple[str, ...]) -> Dict[str, Optional[str]]:
     """
@@ -122,6 +127,12 @@ def _find_manager_fqn(node: Node, basename: str, timeout_sec: float = 5.0) -> st
         f"Seen nodes: {all_nodes}"
     )
 
+def _keys_in_mode_axis(keys: Set["Key"], mode: "Mode") -> Set["Key"]:
+    return {k for k in keys if k in mode.axis_map}
+
+def _keys_in_mode_button(keys: Set["Key"], mode: "Mode") -> Set["Key"]:
+    return {k for k in keys if k in mode.button_map}
+
 
 class FakeJoyPublisher(Node):
     """
@@ -135,6 +146,12 @@ class FakeJoyPublisher(Node):
       deflect(plugin, function, value)
         - For LT/RT (axes 2,5): value in [0,1]  (0 = neutral, 1 = fully pressed)
         - For others:           value in [-1,1]
+
+    Dynamic helpers (added via __getattr__):
+      - <axis_func>(value)          -> deflect(plugin, func, value)
+      - press_<button_func>()       -> press(plugin, func)
+      - hold_<button_func>()        -> hold(plugin, func)
+      - release_<button_func>()     -> release(plugin, func)
     """
 
     def __init__(self,
@@ -185,6 +202,11 @@ class FakeJoyPublisher(Node):
                 )
             except Exception as e:
                 raise RuntimeError(f"Default mode '{self._default_mode_name}' not loadable: {e}")
+
+        # ---- Build reverse indices for dynamic methods ----
+        self._axis_name_to_keys: Dict[str, Set[Key]] = {}
+        self._button_name_to_keys: Dict[str, Set[Key]] = {}
+        self._reindex_functions()
 
         # ---- Track manager-reported active config & wait until received ----
         self._current_manager_config: Optional[str] = None
@@ -238,6 +260,90 @@ class FakeJoyPublisher(Node):
         # Store logical intent; mapping/validation occurs in timer publish.
         self._deflected_axes[Key(plugin, function)] = float(value)
 
+    # ---------- Dynamic method plumbing ----------
+    def _reindex_functions(self) -> None:
+        """Build reverse indices from normalized function name -> Keys."""
+        axis_index: Dict[str, Set[Key]] = {}
+        button_index: Dict[str, Set[Key]] = {}
+
+        for mode in self._modes.values():
+            for key in mode.axis_map.keys():
+                s = _safe_func_name(key.function)
+                axis_index.setdefault(s, set()).add(key)
+            for key in mode.button_map.keys():
+                s = _safe_func_name(key.function)
+                button_index.setdefault(s, set()).add(key)
+
+        self._axis_name_to_keys = axis_index
+        self._button_name_to_keys = button_index
+
+    def __getattr__(self, name: str):
+        """
+        Dynamic helpers:
+          - <axis_func>(value)          -> deflect(plugin, func, value)
+          - press_<button_func>()       -> press(plugin, func)
+          - hold_<button_func>()        -> hold(plugin, func)
+          - release_<button_func>()     -> release(plugin, func)
+        Resolution prefers functions present in the current active mode
+        when ambiguous; otherwise raises AttributeError with details.
+        """
+        # Button helpers with prefixes
+        for prefix, caller in (
+                ("press_", self.press),
+                ("hold_", self.hold),
+                ("release_", self.release),
+        ):
+            if name.startswith(prefix):
+                fn_safe = name[len(prefix):].lower()
+                candidates = self._button_name_to_keys.get(fn_safe, set())
+                if not candidates:
+                    candidates = self._button_name_to_keys.get(_safe_func_name(fn_safe), set())
+                if not candidates:
+                    raise AttributeError(f"No button function named '{fn_safe}' found")
+
+                mode = self._modes.get(self._active_mode)
+                if mode:
+                    in_mode = _keys_in_mode_button(candidates, mode)
+                    if len(in_mode) == 1:
+                        key = next(iter(in_mode))
+                        return lambda: caller(key.plugin, key.function)
+                    elif len(in_mode) > 1:
+                        raise AttributeError(
+                            f"Ambiguous button '{fn_safe}' in active mode '{self._active_mode}': "
+                            f"{[f'{k.plugin}::{k.function}' for k in sorted(in_mode, key=lambda x:(x.plugin,x.function))]}"
+                        )
+                if len(candidates) == 1:
+                    key = next(iter(candidates))
+                    return lambda: caller(key.plugin, key.function)
+                raise AttributeError(
+                    f"Ambiguous button '{fn_safe}' across modes: "
+                    f"{[f'{k.plugin}::{k.function}' for k in sorted(candidates, key=lambda x:(x.plugin,x.function))]}"
+                )
+
+        # Axis helper (no prefix) -> deflect(value)
+        fn_safe = _safe_func_name(name)
+        candidates = self._axis_name_to_keys.get(fn_safe, set())
+        if not candidates:
+            raise AttributeError(f"No axis function named '{name}' found")
+        mode = self._modes.get(self._active_mode)
+        if mode:
+            in_mode = _keys_in_mode_axis(candidates, mode)
+            if len(in_mode) == 1:
+                key = next(iter(in_mode))
+                return lambda value: self.deflect(key.plugin, key.function, value)
+            elif len(in_mode) > 1:
+                raise AttributeError(
+                    f"Ambiguous axis '{name}' in active mode '{self._active_mode}': "
+                    f"{[f'{k.plugin}::{k.function}' for k in sorted(in_mode, key=lambda x:(x.plugin,x.function))]}"
+                )
+        if len(candidates) == 1:
+            key = next(iter(candidates))
+            return lambda value: self.deflect(key.plugin, key.function, value)
+        raise AttributeError(
+            f"Ambiguous axis '{name}' across modes: "
+            f"{[f'{k.plugin}::{k.function}' for k in sorted(candidates, key=lambda x:(x.plugin,x.function))]}"
+        )
+
     # ---------- Internals ----------
     def _active_config_cb(self, msg: String) -> None:
         # Update manager-reported config and keep local active mode in sync
@@ -257,14 +363,15 @@ class FakeJoyPublisher(Node):
             m = self._find_mode_for_key(key)
             if m is None:
                 raise KeyError(f"{key} not found in any loaded mode")
-            target_modes.add(m)
+            if m != self._current_manager_config:
+                target_modes.add(m)
 
         if len(target_modes) > 1:
             # Impossible configuration: inputs span multiple non-active modes
             raise RuntimeError(f"Conflicting intents across multiple modes: {sorted(target_modes)}")
 
         # If a switch is needed, publish a switch-only Joy and wait for manager confirmation
-        if len(target_modes) == 1 and self._current_manager_config != next(iter(target_modes)):
+        if len(target_modes) == 1:
             target = next(iter(target_modes))
             if target not in self._config_to_button:
                 raise RuntimeError(f"No meta button mapped for target mode '{target}'")
@@ -393,11 +500,12 @@ class FakeJoyPublisher(Node):
 def main():
     rclpy.init()
     node = FakeJoyPublisher()
-    node.deflect("hector_gamepad_manager_plugins::DrivePlugin", "drive", 0.5)
-    node.deflect("hector_gamepad_manager_plugins::DrivePlugin", "steer", 0.1)
-    node.deflect("hector_gamepad_manager_plugins::FlipperPlugin", "flipper_back_down", 1.0)
-    node.hold("hector_gamepad_manager_plugins::FlipperPlugin", "flipper_front_up")
-    node.deflect("hector_gamepad_manager_plugins::ManipulationPlugin", "move_up_down", 0.5)
+    # dynamic examples (work after initial active_config is received)
+    node.drive(0.5)
+    # node.press_flipper_back_down()
+    node.hold_flipper_back_up()
+    # node.release_flipper_back_down()
+    #node.deflect("hector_gamepad_manager_plugins::ManipulationPlugin", "move_up_down", 0.5)
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
