@@ -1,0 +1,13 @@
+launch:
+  - arg:
+      name: name
+      default: fake_joy_publisher
+      description: node name
+  - node:
+      pkg: fake_joy_publisher
+      exec: fake_joy_publisher
+      name: "$(var name)"
+      output: screen
+      param:
+        - name: param
+          value: 1.0
