@@ -33,15 +33,9 @@ install(DIRECTORY include/${PROJECT_NAME}/ DESTINATION include/${PROJECT_NAME})
 
 ament_export_targets("export_${PROJECT_NAME}")
 
-# --------------------------
-# Tests
-# --------------------------
-include(CTest)
 if(BUILD_TESTING)
   find_package(ament_cmake_gtest REQUIRED)
 
-  # test/test_blackboard.cpp should include: #include
-  # <hector_gamepad_plugin_interface/blackboard.hpp>
   ament_add_gtest(test_blackboard test/test_blackboard.cpp)
   if(TARGET test_blackboard)
     target_link_libraries(test_blackboard ${PROJECT_NAME})
