@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Tuple, Optional, Set
+from typing import Dict, Tuple, Optional, Set, List, Callable
+import time
 
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 from rcl_interfaces.srv import GetParameters
+from rcl_interfaces.msg import ParameterType as PT
 from sensor_msgs.msg import Joy
 import yaml
 from ament_index_python.packages import get_package_share_directory
@@ -15,14 +17,6 @@ from ament_index_python.packages import get_package_share_directory
 # =========================
 # Axis layout (Joy message)
 # =========================
-# 0: LX     neutral 0
-# 1: LY     neutral 0
-# 2: LT     neutral +1   (special trigger)
-# 3: RX     neutral 0
-# 4: RY     neutral 0
-# 5: RT     neutral +1   (special trigger)
-# 6: DPad X neutral 0
-# 7: DPad Y neutral 0
 AXIS_COUNT = 8
 BUTTON_COUNT = 11
 
@@ -30,7 +24,7 @@ AXIS_NEUTRALS = [0.0] * AXIS_COUNT
 AXIS_NEUTRALS[2] = 1.0  # LT neutral
 AXIS_NEUTRALS[5] = 1.0  # RT neutral
 
-# Axes that behave like "buttons" logically: API uses [0,1], Joy raw must be [1..-1]
+# Axes that behave like "button-style triggers" logically (0..1) but publish raw [1..-1]
 SPECIAL_TRIGGER_AXES = {2, 5}
 
 @dataclass(frozen=True)
@@ -59,20 +53,73 @@ def _load_yaml(path: str) -> dict:
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
-def _request_params_sync(node: Node, target_node_name: str, names: Tuple[str, ...]) -> Dict[str, Optional[str]]:
-    client = node.create_client(GetParameters, f"{target_node_name}/get_parameters")
+def _request_params_sync(node: Node, target_node_fqn: str, names: Tuple[str, ...]) -> Dict[str, Optional[str]]:
+    """
+    Fetch parameter values from another node. Returns strings or None if not set/not string.
+    """
+    service = f"{target_node_fqn}/get_parameters"
+    client = node.create_client(GetParameters, service)
     if not client.wait_for_service(timeout_sec=5.0):
-        raise RuntimeError(f"Parameter service not available: {target_node_name}/get_parameters")
+        raise RuntimeError(f"Parameter service not available: {service}")
+
     req = GetParameters.Request()
     req.names = list(names)
     fut = client.call_async(req)
     rclpy.spin_until_future_complete(node, fut, timeout_sec=5.0)
     if not fut.done() or fut.result() is None:
-        raise RuntimeError(f"Failed to get parameters from {target_node_name}")
-    out = {}
+        raise RuntimeError(f"Failed to get parameters from {target_node_fqn}")
+
+    out: Dict[str, Optional[str]] = {}
     for n, v in zip(names, fut.result().values):
-        out[n] = v.string_value
+        if v.type == PT.PARAMETER_STRING:
+            out[n] = v.string_value
+        else:
+            out[n] = None  # treat NOT_SET / wrong type as absent
     return out
+
+def _rank_manager_candidate(
+        my_ns: str, basename: str, name: str, ns: str
+) -> tuple:
+    """
+    Higher tuple = better candidate. Preference:
+    1) Same namespace
+    2) Name startswith basename
+    3) Name contains basename
+    4) Shorter extra suffix
+    """
+    same_ns = int(ns == my_ns)
+    starts = int(name.startswith(basename))
+    contains = int(basename in name)
+    # extra suffix length if startswith, else length penalty
+    extra_len = len(name) - len(basename) if starts else len(name)
+    return (same_ns, starts, contains, - (1000 - min(extra_len, 1000)))
+
+def _find_manager_fqn(node: Node, basename: str, timeout_sec: float = 5.0) -> str:
+    """
+    Find a node whose name includes `basename` (e.g., 'hector_gamepad_manager').
+    Prefer same namespace + startswith. Returns fully-qualified name '/ns/name'.
+    """
+    deadline = time.time() + timeout_sec
+    my_ns = node.get_namespace()
+    best = None
+    while time.time() < deadline:
+        candidates = node.get_node_names_and_namespaces()
+        ranked = []
+        for name, ns in candidates:
+            if basename in name:
+                ranked.append(( _rank_manager_candidate(my_ns, basename, name, ns), name, ns ))
+        if ranked:
+            ranked.sort(reverse=True)
+            _, name, ns = ranked[0]
+            fqn = f"{ns.rstrip('/')}/{name}".replace("//", "/")
+            return fqn
+        time.sleep(0.1)
+    # no match: provide diagnostics
+    all_nodes = ", ".join([f"{ns.rstrip('/')}/{name}".replace('//','/') for name, ns in node.get_node_names_and_namespaces()])
+    raise RuntimeError(
+        f"Could not find a node containing '{basename}' in its name. "
+        f"Seen nodes: {all_nodes}"
+    )
 
 
 class FakeJoyPublisher(Node):
@@ -98,12 +145,16 @@ class FakeJoyPublisher(Node):
         self.declare_parameter("joy_rate_hz", float(joy_rate_hz))
         self._joy_rate_hz = float(self.get_parameter("joy_rate_hz").value)
 
-        manager_fqn = f"{self.get_namespace().rstrip('/')}/{manager_node_basename}".replace("//", "/")
+        # ---- Find the actual manager node FQN (handles random suffixes) ----
+        manager_fqn = _find_manager_fqn(self, manager_node_basename)
+
+        # ---- Pull config_name & ocs_namespace from that node ----
         params = _request_params_sync(self, manager_fqn, ("config_name", "ocs_namespace"))
         config_name = params.get("config_name") or "athena"
         ocs_ns = params.get("ocs_namespace") or "ocs"
-        self.get_logger().info(f"Using manager config_name='{config_name}', ocs_namespace='{ocs_ns}'")
+        self.get_logger().info(f"Using manager '{manager_fqn}' with config_name='{config_name}', ocs_namespace='{ocs_ns}'")
 
+        # ---- Load meta-config & modes ----
         meta = _load_yaml(_pkg_config_path("hector_gamepad_manager", config_name))
         self._default_mode_name: str = meta.get("default_config", "driving")
         self._config_switch_reserved_buttons: Set[int] = set()
@@ -133,14 +184,13 @@ class FakeJoyPublisher(Node):
 
         self._active_mode: str = self._default_mode_name
 
-        # Physical Joy state (raw values) and logical intents
+        # Physical Joy state and logical intents
         self._axes = self._neutral_axes()
         self._buttons = [0] * BUTTON_COUNT
-
-        # We store *logical* axis intents here (0..1 for LT/RT, -1..1 for others)
-        self._deflected_axes: Dict[Key, float] = {}
+        self._deflected_axes: Dict[Key, float] = {}  # logical values (0..1 for triggers, else -1..1)
         self._held_buttons: Set[Key] = set()
 
+        # Publisher
         qos = QoSProfile(depth=1)
         qos.history = HistoryPolicy.KEEP_LAST
         qos.reliability = ReliabilityPolicy.BEST_EFFORT
@@ -312,7 +362,7 @@ class FakeJoyPublisher(Node):
     def _logical_to_raw(self, axis_idx: int, value: float) -> float:
         """
         Convert a logical axis value to raw Joy space.
-        - LT/RT (2,5): logical [0..1] -> raw [1..-1]  via  raw = 1 - 2*logical
+        - LT/RT (2,5): logical [0..1] -> raw [1..-1] via raw = 1 - 2*value
         - others:      logical [-1..1] passthrough
         """
         if axis_idx in SPECIAL_TRIGGER_AXES:
@@ -320,18 +370,14 @@ class FakeJoyPublisher(Node):
         return value
 
 
-# -----------------------------
-# Entrypoint (optional run)
-# -----------------------------
 def main():
     rclpy.init()
-    node = FakeJoyPublisher(
-        manager_node_basename="/hector_gamepad_manager_node_aljoschalegionpro_984685_8407127964393618653"
-    )
-    node.deflect("hector_gamepad_manager_plugins::DrivePlugin", "drive", 0.5)
-    node.deflect("hector_gamepad_manager_plugins::DrivePlugin", "steer", 0.1)
-    node.deflect("hector_gamepad_manager_plugins::FlipperPlugin", "flipper_back_down", 1.0)
-    node.hold("hector_gamepad_manager_plugins::FlipperPlugin", "flipper_front_up")
+    node = FakeJoyPublisher()
+    # node.deflect("hector_gamepad_manager_plugins::DrivePlugin", "drive", 0.5)
+    # node.deflect("hector_gamepad_manager_plugins::DrivePlugin", "steer", 0.1)
+    # node.deflect("hector_gamepad_manager_plugins::FlipperPlugin", "flipper_back_down", 1.0)
+    # node.hold("hector_gamepad_manager_plugins::FlipperPlugin", "flipper_front_up")
+    node.deflect("hector_gamepad_manager_plugins::ManipulationPlugin", "move_up_down", 0.5)
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
@@ -339,7 +385,6 @@ def main():
     finally:
         node.destroy_node()
         rclpy.shutdown()
-
 
 if __name__ == "__main__":
     main()
