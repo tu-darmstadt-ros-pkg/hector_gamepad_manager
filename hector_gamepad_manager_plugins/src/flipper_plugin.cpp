@@ -109,8 +109,7 @@ void FlipperPlugin::update()
     return;
 
   // check inverted steering
-  if ( blackboard_->data_.find( "inverted_steering" ) != blackboard_->data_.end() &&
-       blackboard_->data_["inverted_steering"] ) {
+  if ( blackboard_->value_or<bool>( "inverted_steering", false ) ) {
     vel_commands_[3] = axis_vel_commands_[0] + button_vel_commands_[0]; // flipper_br_joint
     vel_commands_[2] = axis_vel_commands_[1] + button_vel_commands_[1]; // flipper_bl_joint
     vel_commands_[1] = axis_vel_commands_[2] + button_vel_commands_[2]; // flipper_fr_joint
@@ -245,11 +244,8 @@ void FlipperPlugin::publishCommands() const
 
 bool FlipperPlugin::checkCurrentCmdIsZero() const
 {
-  for ( const double cmd : vel_commands_ ) {
-    if ( cmd != 0.0 )
-      return false;
-  }
-  return true;
+  return std::all_of( vel_commands_.begin(), vel_commands_.end(),
+                      []( const double cmd ) { return cmd == 0.0; } );
 }
 
 } // namespace hector_gamepad_manager_plugins
