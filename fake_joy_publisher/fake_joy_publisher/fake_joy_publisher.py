@@ -159,6 +159,8 @@ class FakeJoyPublisher(Node):
         self._default_mode_name: str = meta.get("default_config", "driving")
         self._config_switch_reserved_buttons: Set[int] = set()
         modes_to_load: Dict[str, str] = {}
+        # NEW: map config_name -> button index for switch-only publish
+        self._config_to_button: Dict[str, int] = {}
 
         for k, v in (meta.get("buttons") or {}).items():
             idx = int(k)
@@ -167,6 +169,7 @@ class FakeJoyPublisher(Node):
             if pkg and cfg:
                 modes_to_load[cfg] = pkg
                 self._config_switch_reserved_buttons.add(idx)
+                self._config_to_button[cfg] = idx  # NEW
 
         self._modes: Dict[str, Mode] = {}
         for mode_name, pkg in modes_to_load.items():
@@ -189,6 +192,8 @@ class FakeJoyPublisher(Node):
         self._buttons = [0] * BUTTON_COUNT
         self._deflected_axes: Dict[Key, float] = {}  # logical values (0..1 for triggers, else -1..1)
         self._held_buttons: Set[Key] = set()
+        # NEW: one-shot presses to apply next publish
+        self._pending_one_shot_keys: Set[Key] = set()
 
         # Publisher
         qos = QoSProfile(depth=1)
@@ -203,72 +208,114 @@ class FakeJoyPublisher(Node):
 
     # ---------- Public API ----------
     def press(self, plugin: str, function: str) -> None:
-        self._set_button(plugin, function, value=1, persistent=False)
+        # Record a one-shot press; mapping will occur in the timer publish.
+        self._pending_one_shot_keys.add(Key(plugin, function))
 
     def hold(self, plugin: str, function: str) -> None:
-        self._set_button(plugin, function, value=1, persistent=True)
+        # Record a persistent press; mapping will occur in the timer publish.
+        self._held_buttons.add(Key(plugin, function))
 
     def release(self, plugin: str, function: str) -> None:
         key = Key(plugin, function)
-        mapping = self._get_mapping_for_key(key)
-        if mapping.button_idx is None:
-            raise ValueError(f"{key} is not a button in active mode '{self._active_mode}'")
-        self._buttons[mapping.button_idx] = 0
         self._held_buttons.discard(key)
+        self._pending_one_shot_keys.discard(key)
 
     def deflect(self, plugin: str, function: str, value: float) -> None:
-        key = Key(plugin, function)
-        # ensure mode
-        if not self._key_available_in_mode(self._active_mode, key):
-            target = self._find_mode_for_key(key)
-            self._attempt_mode_switch(target, reason=f"deflect({key})")
-
-        mapping = self._get_mapping_for_key(key)
-        if mapping.axis_idx is None:
-            raise ValueError(f"{key} is not an axis in active mode '{self._active_mode}'")
-
-        # Validate by axis kind and convert logical -> raw
-        if mapping.axis_idx in SPECIAL_TRIGGER_AXES:
-            if not (0.0 <= value <= 1.0):
-                raise ValueError("LT/RT logical value must be in [0, 1]")
-        else:
-            if not (-1.0 <= value <= 1.0):
-                raise ValueError("Axis value must be in [-1, 1]")
-
-        self._deflected_axes[key] = float(value)
-        self._axes[mapping.axis_idx] = self._logical_to_raw(mapping.axis_idx, float(value))
+        # Store logical intent; mapping/validation occurs in timer publish.
+        self._deflected_axes[Key(plugin, function)] = float(value)
 
     # ---------- Internals ----------
     def _on_timer(self) -> None:
-        # Re-assert held/deflected intents to physical state before publishing
-        for key in list(self._held_buttons):
-            m = self._get_mapping_for_key(key)
-            if m.button_idx is not None:
-                self._buttons[m.button_idx] = 1
-        for key, logical in list(self._deflected_axes.items()):
-            m = self._get_mapping_for_key(key)
-            if m.axis_idx is not None:
-                self._axes[m.axis_idx] = self._logical_to_raw(m.axis_idx, logical)
+        # Determine if a mode switch is required based on *current intents*
+        intents: Set[Key] = set(self._held_buttons) | set(self._pending_one_shot_keys) | set(self._deflected_axes.keys())
+        target_modes: Set[str] = set()
 
+        for key in intents:
+            m = self._find_mode_for_key(key)
+            if m is None:
+                raise KeyError(f"{key} not found in any loaded mode")
+            if m != self._active_mode:
+                target_modes.add(m)
+
+        if len(target_modes) > 1:
+            # Impossible configuration: inputs span multiple non-active modes
+            raise RuntimeError(f"Conflicting intents across multiple modes: {sorted(target_modes)}")
+        elif len(target_modes) == 1:
+            target = next(iter(target_modes))
+            # Publish a *switch-only* Joy: only the meta button for that config is pressed
+            if target not in self._config_to_button:
+                raise RuntimeError(f"No meta button mapped for target mode '{target}'")
+            switch_btn = self._config_to_button[target]
+
+            # First message: switch-only
+            msg_switch = Joy()
+            msg_switch.header.stamp = self.get_clock().now().to_msg()
+            msg_switch.axes = self._neutral_axes()
+            msg_switch.buttons = [0] * BUTTON_COUNT
+            if 0 <= switch_btn < BUTTON_COUNT:
+                msg_switch.buttons[switch_btn] = 1
+            self._pub.publish(msg_switch)
+
+            # Wait half the timer interval
+            time.sleep(0.5 / max(self._joy_rate_hz, 1.0))
+
+            # Assume manager switched; update local mode
+            self._active_mode = target
+
+        # Now publish the *actual* Joy based on current active mode and intents
+        axes = self._neutral_axes()
+        buttons = [0] * BUTTON_COUNT
+        mode = self._modes[self._active_mode]
+
+        # Apply held buttons
+        for key in list(self._held_buttons):
+            if key in mode.button_map:
+                buttons[mode.button_map[key]] = 1
+            else:
+                # held key not in this mode -> impossible combo
+                raise RuntimeError(f"Held button {key} not available in active mode '{self._active_mode}'")
+
+        # Apply one-shot presses
+        for key in list(self._pending_one_shot_keys):
+            if key in mode.button_map:
+                buttons[mode.button_map[key]] = 1
+            else:
+                raise RuntimeError(f"Pressed button {key} not available in active mode '{self._active_mode}'")
+        # Clear one-shots after publishing
+        self._pending_one_shot_keys.clear()
+
+        # Apply axes (with logical->raw mapping, and validation by axis index)
+        for key, logical in list(self._deflected_axes.items()):
+            if key not in mode.axis_map:
+                raise RuntimeError(f"Axis {key} not available in active mode '{self._active_mode}'")
+            idx = mode.axis_map[key]
+            # Validate ranges now that we know the axis index
+            if idx in SPECIAL_TRIGGER_AXES:
+                if not (0.0 <= logical <= 1.0):
+                    raise ValueError(f"LT/RT logical value must be in [0, 1], got {logical}")
+            else:
+                if not (-1.0 <= logical <= 1.0):
+                    raise ValueError(f"Axis logical value must be in [-1, 1], got {logical}")
+            axes[idx] = self._logical_to_raw(idx, logical)
+
+        # Publish final message
         msg = Joy()
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.axes = list(self._axes)
-        msg.buttons = list(self._buttons)
+        msg.axes = axes
+        msg.buttons = buttons
         self._pub.publish(msg)
 
     def _set_button(self, plugin: str, function: str, value: int, persistent: bool) -> None:
+        # UNUSED in the simplified flow but kept for API compatibility if called internally.
         key = Key(plugin, function)
-        if not self._key_available_in_mode(self._active_mode, key):
-            target = self._find_mode_for_key(key)
-            self._attempt_mode_switch(target, reason=f"button({key})")
-        mapping = self._get_mapping_for_key(key)
-        if mapping.button_idx is None:
-            raise ValueError(f"{key} is not a button in active mode '{self._active_mode}'")
-        self._buttons[mapping.button_idx] = 1 if value else 0
-        if persistent and value:
-            self._held_buttons.add(key)
+        if value:
+            if persistent:
+                self._held_buttons.add(key)
+            else:
+                self._pending_one_shot_keys.add(key)
         else:
             self._held_buttons.discard(key)
+            self._pending_one_shot_keys.discard(key)
 
     def _parse_mode(self, name: str, cfg: dict, reserved_buttons: Set[int]) -> Mode:
         buttons = {}
@@ -314,11 +361,10 @@ class FakeJoyPublisher(Node):
         return None
 
     def _attempt_mode_switch(self, target_mode: Optional[str], reason: str) -> None:
-        if target_mode is None:
-            raise KeyError(f"No mode contains requested input ({reason})")
-        if target_mode == self._active_mode:
+        # Kept for backward compatibility; not used in simplified switching.
+        if target_mode is None or target_mode == self._active_mode:
             return
-
+        # Minimal safety check (not invoked in new flow)
         missing: Set[Key] = set()
         for key in self._held_buttons:
             if not self._key_available_in_mode(target_mode, key):
@@ -331,25 +377,7 @@ class FakeJoyPublisher(Node):
             raise RuntimeError(
                 f"Cannot switch mode to '{target_mode}' for {reason}: active inputs not present in target mode: {details}"
             )
-
-        self.get_logger().info(f"Switching mode: '{self._active_mode}' -> '{target_mode}' due to {reason}")
-        self._reset_physical_state()
         self._active_mode = target_mode
-
-        # Re-apply logical intents into physical state (with proper mapping)
-        for key in list(self._held_buttons):
-            mode = self._modes[self._active_mode]
-            if key in mode.button_map:
-                self._buttons[mode.button_map[key]] = 1
-            else:
-                self._held_buttons.discard(key)
-        for key, logical in list(self._deflected_axes.items()):
-            mode = self._modes[self._active_mode]
-            if key in mode.axis_map:
-                idx = mode.axis_map[key]
-                self._axes[idx] = self._logical_to_raw(idx, logical)
-            else:
-                self._deflected_axes.pop(key, None)
 
     # ----- Mapping & neutral helpers -----
     def _neutral_axes(self) -> list[float]:
@@ -373,11 +401,11 @@ class FakeJoyPublisher(Node):
 def main():
     rclpy.init()
     node = FakeJoyPublisher()
-    # node.deflect("hector_gamepad_manager_plugins::DrivePlugin", "drive", 0.5)
-    # node.deflect("hector_gamepad_manager_plugins::DrivePlugin", "steer", 0.1)
-    # node.deflect("hector_gamepad_manager_plugins::FlipperPlugin", "flipper_back_down", 1.0)
-    # node.hold("hector_gamepad_manager_plugins::FlipperPlugin", "flipper_front_up")
-    node.deflect("hector_gamepad_manager_plugins::ManipulationPlugin", "move_up_down", 0.5)
+    #node.deflect("hector_gamepad_manager_plugins::DrivePlugin", "drive", 0.5)
+    #node.deflect("hector_gamepad_manager_plugins::DrivePlugin", "steer", 0.1)
+    #node.deflect("hector_gamepad_manager_plugins::FlipperPlugin", "flipper_back_down", 1.0)
+    #node.hold("hector_gamepad_manager_plugins::FlipperPlugin", "flipper_front_up")
+    node.deflect("hector_gamepad_manager_plugins::ManipulationPlugin", "move_up_down", -0.5)
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
