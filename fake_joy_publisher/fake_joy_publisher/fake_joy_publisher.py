@@ -260,6 +260,17 @@ class FakeJoyPublisher(Node):
         # Store logical intent; mapping/validation occurs in timer publish.
         self._deflected_axes[Key(plugin, function)] = float(value)
 
+    def clear_all(self):
+        """Clear all held buttons and deflected axes."""
+        self._held_buttons.clear()
+        self._deflected_axes.clear()
+        self._pending_one_shot_keys.clear()
+        self._reset_physical_state()
+
+    def log_intents(self) -> None:
+        """Log current intents for debugging."""
+        self.get_logger().info(f"Intents: held={self._held_buttons}, one-shots={self._pending_one_shot_keys}, deflected={self._deflected_axes}")
+
     # ---------- Dynamic method plumbing ----------
     def _reindex_functions(self) -> None:
         """Build reverse indices from normalized function name -> Keys."""
@@ -359,19 +370,20 @@ class FakeJoyPublisher(Node):
         intents: Set[Key] = set(self._held_buttons) | set(self._pending_one_shot_keys) | set(self._deflected_axes.keys())
         target_modes: Set[str] = set()
 
+        self.get_logger().info(f"on_timer: intents={intents}, held={self._held_buttons}, one-shots={self._pending_one_shot_keys}, deflected={self._deflected_axes}")
         for key in intents:
             m = self._find_mode_for_key(key)
+            self.get_logger().info(f"Key {key} found in mode {m} #44")
             if m is None:
                 raise KeyError(f"{key} not found in any loaded mode")
-            if m != self._current_manager_config:
-                target_modes.add(m)
+            target_modes.add(m)
 
         if len(target_modes) > 1:
             # Impossible configuration: inputs span multiple non-active modes
             raise RuntimeError(f"Conflicting intents across multiple modes: {sorted(target_modes)}")
 
         # If a switch is needed, publish a switch-only Joy and wait for manager confirmation
-        if len(target_modes) == 1:
+        if len(target_modes) == 1 and self._current_manager_config != next(iter(target_modes)):
             target = next(iter(target_modes))
             if target not in self._config_to_button:
                 raise RuntimeError(f"No meta button mapped for target mode '{target}'")

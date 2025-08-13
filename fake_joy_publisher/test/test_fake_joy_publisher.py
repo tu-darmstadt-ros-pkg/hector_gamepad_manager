@@ -28,19 +28,19 @@ def generate_test_description():
     # Configure a clean OCS/robot namespace for the test
     ocs_ns = "test_ocs"
     robot_ns = "test_robot"
-
-    # Most setups provide an 'athena' meta-config out of the box in hector_gamepad_manager
-    # If your installation differs, change this string here.
     config_name = "athena"
 
-    # hector_gamepad_manager executable name can vary; most packages export a default node executable.
-    # Replace 'hector_gamepad_manager_node' below with your actual executable if needed.
+    gpm_share = get_package_share_directory("hector_gamepad_manager")
+    plugin_cfg = os.path.join(gpm_share, "config", f"{config_name}_plugin_config.yaml")
+    if not os.path.isfile(plugin_cfg):
+        raise FileNotFoundError(f"Missing plugin config: {plugin_cfg}")
     gamepad_manager = launch_ros.actions.Node(
         package="hector_gamepad_manager",
         executable="hector_gamepad_manager_node",
-        name="hector_gamepad_manager_node",
+        name="hector_gamepad_manager",
         output="screen",
         parameters=[
+            plugin_cfg,
             {"config_name": config_name},
             {"ocs_namespace": ocs_ns},
             {"robot_namespace": robot_ns},
@@ -51,7 +51,7 @@ def generate_test_description():
     ld = launch.LaunchDescription(
         [
             gamepad_manager,
-            launch.actions.TimerAction(period=4.0, actions=[launch_testing.actions.ReadyToTest()]),
+            launch.actions.TimerAction(period=8.0, actions=[launch_testing.actions.ReadyToTest()]),
         ]
     )
 
@@ -214,6 +214,9 @@ class TestFakeJoyPublisher(unittest.TestCase):
     def test_03_mode_switch_sequence(self):
         """Request an input in another mode -> see switch-only Joy first, then manager active_config change, then actual input."""
         # Heuristic: try to find any function that lives in a mode different from current.
+        self.fake.clear_all()  # Reset all intents to start fresh
+        self.fake.get_logger().info("Testing mode switch sequence...")
+        self.fake.log_intents()
         current = self.fake._active_mode
         target_key = None
         target_mode = None
@@ -299,9 +302,12 @@ class TestFakeJoyPublisher(unittest.TestCase):
             self.fake.deflect(k0.plugin, k0.function, 0.1)
 
         if k1 in self.fake._modes[m1].button_map:
-            self.fake._pending_one_shot_keys.add(k1)
+            self.fake.hold(k1.plugin, k1.function)
         else:
             self.fake.deflect(k1.plugin, k1.function, 0.1)
+
+        # log k0 and k1 for debugging
+        self.fake.get_logger().info(f"Testing conflict with keys: {k0} in mode {m0}, {k1} in mode {m1}")
 
         # Call _on_timer directly to capture the exception deterministically (rather than crashing the timer thread)
         with self.assertRaises(RuntimeError):
@@ -314,6 +320,7 @@ class TestFakeJoyPublisher(unittest.TestCase):
 
     def test_05_one_shot_press_lasts_one_tick(self):
         """press_* should be high for one publish cycle only."""
+        self.fake.clear_all()
         # Find a button in the current active mode
         mode = self.fake._modes[self.fake._active_mode]
         if not mode.button_map:
@@ -328,6 +335,7 @@ class TestFakeJoyPublisher(unittest.TestCase):
         self.fake._on_timer()
         self.assertTrue(self.probe.wait_for_joy_msgs(1, 1.0))
         first = self.probe.joy_msgs[-1]
+        self.fake.get_logger().info(f"First Joy: {first}")
         self.assertEqual(first.buttons[idx], 1)
 
         # Next publish => should be released
