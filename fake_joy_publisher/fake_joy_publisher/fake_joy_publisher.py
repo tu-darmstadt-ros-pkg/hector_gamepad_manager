@@ -7,10 +7,11 @@ import time
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
 from rcl_interfaces.srv import GetParameters
 from rcl_interfaces.msg import ParameterType as PT
 from sensor_msgs.msg import Joy
+from std_msgs.msg import String
 import yaml
 from ament_index_python.packages import get_package_share_directory
 
@@ -159,7 +160,7 @@ class FakeJoyPublisher(Node):
         self._default_mode_name: str = meta.get("default_config", "driving")
         self._config_switch_reserved_buttons: Set[int] = set()
         modes_to_load: Dict[str, str] = {}
-        # NEW: map config_name -> button index for switch-only publish
+        # map config_name -> button index for switch-only publish
         self._config_to_button: Dict[str, int] = {}
 
         for k, v in (meta.get("buttons") or {}).items():
@@ -169,7 +170,7 @@ class FakeJoyPublisher(Node):
             if pkg and cfg:
                 modes_to_load[cfg] = pkg
                 self._config_switch_reserved_buttons.add(idx)
-                self._config_to_button[cfg] = idx  # NEW
+                self._config_to_button[cfg] = idx
 
         self._modes: Dict[str, Mode] = {}
         for mode_name, pkg in modes_to_load.items():
@@ -185,6 +186,19 @@ class FakeJoyPublisher(Node):
             except Exception as e:
                 raise RuntimeError(f"Default mode '{self._default_mode_name}' not loadable: {e}")
 
+        # ---- Track manager-reported active config & wait until received ----
+        self._current_manager_config: Optional[str] = None
+        qos_cfg = QoSProfile(depth=1)
+        qos_cfg.reliability = ReliabilityPolicy.RELIABLE
+        qos_cfg.durability = DurabilityPolicy.TRANSIENT_LOCAL
+        self._active_config_sub = self.create_subscription(
+            String,
+            f"{ocs_ns.strip('/')}/active_config",
+            self._active_config_cb,
+            qos_cfg,
+        )
+
+        # Local view of active mode (kept in sync with manager)
         self._active_mode: str = self._default_mode_name
 
         # Physical Joy state and logical intents
@@ -192,7 +206,7 @@ class FakeJoyPublisher(Node):
         self._buttons = [0] * BUTTON_COUNT
         self._deflected_axes: Dict[Key, float] = {}  # logical values (0..1 for triggers, else -1..1)
         self._held_buttons: Set[Key] = set()
-        # NEW: one-shot presses to apply next publish
+        # one-shot presses to apply on publish
         self._pending_one_shot_keys: Set[Key] = set()
 
         # Publisher
@@ -225,7 +239,16 @@ class FakeJoyPublisher(Node):
         self._deflected_axes[Key(plugin, function)] = float(value)
 
     # ---------- Internals ----------
+    def _active_config_cb(self, msg: String) -> None:
+        # Update manager-reported config and keep local active mode in sync
+        self._current_manager_config = msg.data or ""
+        self._active_mode = self._current_manager_config
+
     def _on_timer(self) -> None:
+        # If we haven't received the initial manager state yet, do nothing.
+        if self._current_manager_config is None:
+            return
+
         # Determine if a mode switch is required based on *current intents*
         intents: Set[Key] = set(self._held_buttons) | set(self._pending_one_shot_keys) | set(self._deflected_axes.keys())
         target_modes: Set[str] = set()
@@ -234,20 +257,21 @@ class FakeJoyPublisher(Node):
             m = self._find_mode_for_key(key)
             if m is None:
                 raise KeyError(f"{key} not found in any loaded mode")
-            if m != self._active_mode:
-                target_modes.add(m)
+            target_modes.add(m)
 
         if len(target_modes) > 1:
             # Impossible configuration: inputs span multiple non-active modes
             raise RuntimeError(f"Conflicting intents across multiple modes: {sorted(target_modes)}")
-        elif len(target_modes) == 1:
+
+        # If a switch is needed, publish a switch-only Joy and wait for manager confirmation
+        if len(target_modes) == 1 and self._current_manager_config != next(iter(target_modes)):
             target = next(iter(target_modes))
-            # Publish a *switch-only* Joy: only the meta button for that config is pressed
             if target not in self._config_to_button:
                 raise RuntimeError(f"No meta button mapped for target mode '{target}'")
+
             switch_btn = self._config_to_button[target]
 
-            # First message: switch-only
+            # Publish a *switch-only* Joy: only the meta button for that config is pressed
             msg_switch = Joy()
             msg_switch.header.stamp = self.get_clock().now().to_msg()
             msg_switch.axes = self._neutral_axes()
@@ -256,13 +280,12 @@ class FakeJoyPublisher(Node):
                 msg_switch.buttons[switch_btn] = 1
             self._pub.publish(msg_switch)
 
-            # Wait half the timer interval
-            time.sleep(0.5 / max(self._joy_rate_hz, 1.0))
+            # Do not apply current changes until confirmation from manager arrives.
+            return
 
-            # Assume manager switched; update local mode
-            self._active_mode = target
+        # No switch needed (manager already in correct mode) -> publish the actual Joy
+        self._active_mode = self._current_manager_config  # keep synced
 
-        # Now publish the *actual* Joy based on current active mode and intents
         axes = self._neutral_axes()
         buttons = [0] * BUTTON_COUNT
         mode = self._modes[self._active_mode]
@@ -304,18 +327,6 @@ class FakeJoyPublisher(Node):
         msg.axes = axes
         msg.buttons = buttons
         self._pub.publish(msg)
-
-    def _set_button(self, plugin: str, function: str, value: int, persistent: bool) -> None:
-        # UNUSED in the simplified flow but kept for API compatibility if called internally.
-        key = Key(plugin, function)
-        if value:
-            if persistent:
-                self._held_buttons.add(key)
-            else:
-                self._pending_one_shot_keys.add(key)
-        else:
-            self._held_buttons.discard(key)
-            self._pending_one_shot_keys.discard(key)
 
     def _parse_mode(self, name: str, cfg: dict, reserved_buttons: Set[int]) -> Mode:
         buttons = {}
@@ -360,25 +371,6 @@ class FakeJoyPublisher(Node):
                 return name
         return None
 
-    def _attempt_mode_switch(self, target_mode: Optional[str], reason: str) -> None:
-        # Kept for backward compatibility; not used in simplified switching.
-        if target_mode is None or target_mode == self._active_mode:
-            return
-        # Minimal safety check (not invoked in new flow)
-        missing: Set[Key] = set()
-        for key in self._held_buttons:
-            if not self._key_available_in_mode(target_mode, key):
-                missing.add(key)
-        for key in self._deflected_axes.keys():
-            if not self._key_available_in_mode(target_mode, key):
-                missing.add(key)
-        if missing:
-            details = ", ".join([f"{k.plugin}::{k.function}" for k in sorted(missing, key=lambda x: (x.plugin, x.function))])
-            raise RuntimeError(
-                f"Cannot switch mode to '{target_mode}' for {reason}: active inputs not present in target mode: {details}"
-            )
-        self._active_mode = target_mode
-
     # ----- Mapping & neutral helpers -----
     def _neutral_axes(self) -> list[float]:
         return list(AXIS_NEUTRALS)
@@ -401,11 +393,11 @@ class FakeJoyPublisher(Node):
 def main():
     rclpy.init()
     node = FakeJoyPublisher()
-    #node.deflect("hector_gamepad_manager_plugins::DrivePlugin", "drive", 0.5)
-    #node.deflect("hector_gamepad_manager_plugins::DrivePlugin", "steer", 0.1)
-    #node.deflect("hector_gamepad_manager_plugins::FlipperPlugin", "flipper_back_down", 1.0)
-    #node.hold("hector_gamepad_manager_plugins::FlipperPlugin", "flipper_front_up")
-    node.deflect("hector_gamepad_manager_plugins::ManipulationPlugin", "move_up_down", -0.5)
+    node.deflect("hector_gamepad_manager_plugins::DrivePlugin", "drive", 0.5)
+    node.deflect("hector_gamepad_manager_plugins::DrivePlugin", "steer", 0.1)
+    node.deflect("hector_gamepad_manager_plugins::FlipperPlugin", "flipper_back_down", 1.0)
+    node.hold("hector_gamepad_manager_plugins::FlipperPlugin", "flipper_front_up")
+    node.deflect("hector_gamepad_manager_plugins::ManipulationPlugin", "move_up_down", 0.5)
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
