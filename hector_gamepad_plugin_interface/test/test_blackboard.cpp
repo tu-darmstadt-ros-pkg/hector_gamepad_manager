@@ -206,6 +206,56 @@ TEST(Blackboard, ReferenceStability_AfterEmplaceAndMutation) {
   EXPECT_EQ(*bb.try_get<std::string>("name"), "bob!");
 }
 
+// Test that std::any decays types on storage
+TEST(BlackboardDecayTest, VerifiesTypeDecayBehavior) {
+  std::any storage;
+
+  // Store as const int
+  const int value = 42;
+  storage = value;
+
+  // Both int and const int retrieval should work
+  EXPECT_TRUE(storage.type() == typeid(int));  // stored as int, not const int
+  EXPECT_NO_THROW(std::any_cast<int>(storage));
+  EXPECT_NO_THROW(std::any_cast<const int>(storage));
+}
+
+TEST(Blackboard, AnyDecaysConstAndRefs) {
+  Blackboard bb;
+
+  // Insert with explicit const-qualified type and reference
+  const int ci = 7;
+  bb.set("k1", ci);                     // stored as int (decayed)
+  auto& ref = bb.emplace<const int>("k2", 42); // emplace<const int> → stored as int
+  (void)ref; // silence unused warning
+
+  // Both const and non-const queries succeed because stored type is int
+  auto* p1_nc = bb.try_get<int>("k1");
+  auto* p1_c  = bb.try_get<const int>("k1");
+  ASSERT_NE(p1_nc, nullptr);
+  ASSERT_NE(p1_c,  nullptr);
+  EXPECT_EQ(*p1_nc, 7);
+  EXPECT_EQ(*p1_c,  7);
+
+  auto* p2_nc = bb.try_get<int>("k2");
+  auto* p2_c  = bb.try_get<const int>("k2");
+  ASSERT_NE(p2_nc, nullptr);
+  ASSERT_NE(p2_c,  nullptr);
+  EXPECT_EQ(*p2_nc, 42);
+  EXPECT_EQ(*p2_c,  42);
+
+  // at<T>() works for both const and non-const T; non-const allows mutation
+  int& r1 = bb.at<int>("k1");
+  r1 = 9;
+  EXPECT_EQ(bb.at<int>("k1"), 9);
+  const int& cr1 = bb.at<const int>("k1");
+  EXPECT_EQ(cr1, 9);
+
+  // Type mismatch still throws as usual
+  EXPECT_THROW((void)bb.at<std::string>("k1"), std::bad_any_cast);
+}
+
+
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();
