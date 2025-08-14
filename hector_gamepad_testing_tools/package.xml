@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>fake_joy_publisher</name>
+  <name>hector_gamepad_testing_tools</name>
   <version>0.0.0</version>
   <description>A library that allows to request (function, plugin) tuples from the gamepad manager. Can be used in test frameworks to emulate joy inputs</description>
 
@@ -9,14 +9,15 @@
   <license>TODO</license>
   <author email="aljoscha.schmidt@tu-darmstadt.de">Aljoscha Schmidt</author>
 
+  <depend>ament_cmake</depend>
+  <depend>ament_cmake_python</depend>
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
 
-  <test_depend>ament_copyright</test_depend>
-  <test_depend>ament_flake8</test_depend>
-  <test_depend>ament_pep257</test_depend>
-  <test_depend>python3-pytest</test_depend>
+  <test_depend>ament_cmake_pytest</test_depend>
   <test_depend>hector_gamepad_manager</test_depend>
+  <test_depend>launch_testing_ament_cmake</test_depend>
+  <test_depend>python3-pytest</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>

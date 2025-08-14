@@ -18,7 +18,7 @@ from sensor_msgs.msg import Joy
 from ament_index_python.packages import get_package_share_directory
 
 # Import the Python class directly so we can drive it via API
-from fake_joy_publisher.fake_joy_publisher import FakeJoyPublisher
+from hector_gamepad_testing_tools.fake_joy_publisher import FakeJoyPublisher
 
 
 # ------------------------
