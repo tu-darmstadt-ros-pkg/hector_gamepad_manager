@@ -63,6 +63,16 @@ The hector_gamepad_manager can be launched with the following command:
 ros2 launch hector_gampepad_manager hector_gamepad_manager.launch.yaml
 ```
 
+## Blackboard
+
+Plugins can use the blackboard to exchange data with each other. The blackboard is a shared data structure that allows
+plugins to store and retrieve data. This is useful for sharing state or configuration between plugins without direct
+dependencies. For example, the DrivePlugin can store an inverted steering state in the blackboard, which can
+then be accessed by other plugins. For instance, the FlipperPlugin can check if the steering is inverted and switch the
+commands to the front and back flippers.
+
+---
+
 # Hector Gamepad Manager Plugins
 
 This package contains the following plugins for the hector_gamepad_manager package.
@@ -78,7 +88,6 @@ This plugin is used to drive the robot using a gamepad.
 - `steer`: Left and right steering of the robot. Default button: (Left joystick left/right)
 - `fast`: Fast driving mode. Default button: (A)
 - `slow`: Slow driving mode. Default button: (X)
-- `invert_steering`: Inverts Forward/Backward and Left/Right Steering: (Manufacturer Button)
 
 ## FlipperPlugin
 
@@ -91,23 +100,69 @@ This plugin is used to steer the robot flippers using a gamepad.
 - `back_flippers_up`: Rotate back flippers upwards (clockwise). Default button: (LB)
 - `back_flippers_down`: Rotate back flippers downwards (counterclockwise). Default button: (LT)
 
-
 ## Manipulation Plugin
 
 This plugin can be used to control the robots end-effector and gripper.
-Additionally, in the hold mode the robot can be driven while the end-effector remains at its current position in the world frame.
+Additionally, in the hold mode the robot can be driven while the end-effector remains at its current position in the
+world frame.
 
 ### Functions
+
 #### Axis
+
 - `move_left_right`: Move the end-effector left and right. Or move the robot base while the hold button is pressed.
 - `move_up_down`: Move the end-effector up and down. Or move the robot base while the hold button is pressed.
 - `move_forward`: Move the end-effector forward.
 - `move_backward`: Move the end-effector backward.
 - `rotate_pitch`: Rotate the end-effector around the pitch axis.
 - `rotate_yaw`: Rotate the end-effector around the yaw axis.
+
 #### Buttons
+
 - `rotate_roll_clockwise`: Rotate the end-effector clockwise around the roll axis.
 - `rotate_roll_counterclockwise`: Rotate the end-effector counterclockwise around the roll axis.
 - `open_gripper`: Open the gripper.
 - `close_gripper`: Close the gripper.
-- `hold_mode`: Toggle the hold mode. In hold mode the robot can be driven while the end-effector remains at its current position in the world frame.
+- `hold_mode`: Toggle the hold mode. In hold mode the robot can be driven while the end-effector remains at its current
+  position in the world frame.
+
+
+## BlackboardPlugin
+
+This plugin allows assigning buttons to directly manipulate variables stored in the shared **blackboard**.
+It supports toggling and holding boolean values as well as setting string values.
+
+### Functions
+
+#### Toggle
+
+* `toggle/<var_name>`
+  Toggles the boolean variable `<var_name>` in the blackboard. Initially, the variable is set to `false`.
+  Example: `toggle/inverted_steering` → flips between `true` and `false` each time the button is pressed.
+
+#### Hold
+
+* `hold/<var_name>`
+  Sets the boolean variable `<var_name>` in the blackboard to `true` while the button is pressed, and resets it to `false` when released.
+  Example: `hold/safety_mode` → `safety_mode = true` when held, `false` when released.
+
+#### Set String
+
+* `set/<var_name>/to/<value>`
+  Sets the string variable `<var_name>` in the blackboard to `<value>` when the button is pressed.
+  Example: `set/ui_message/to/arm:ready` → writes `"arm:ready"` to `ui_message`.
+
+
+
+## MoveItPlugin
+
+Executes MoveIt! commands to position the robot in predefined SRDF poses.
+
+* Poses must be specified as `<group_name>/<pose_name>` or `<group_name>/<pose_name>|<inverted_pose_name>`.
+
+  where:
+
+  * **group\_name** → Name of the MoveIt! planning group.
+  * **pose\_name** → Name of the pose defined in the SRDF file.
+  * **inverted\_pose\_name** → Optional name for an inverted pose, which is used if the `invert_steering` flag is set to
+    `true` in the blackboard.

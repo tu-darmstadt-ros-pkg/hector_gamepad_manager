@@ -31,7 +31,6 @@ private:
   void sendDriveCommand( double linear_speed, double angular_speed );
 
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr drive_command_publisher_;
-  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr inverted_steering_publisher;
   geometry_msgs::msg::TwistStamped drive_command_;
 
   hector::ParameterSubscription max_linear_speed_param_sub_;

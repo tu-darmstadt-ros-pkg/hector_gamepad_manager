@@ -1,13 +1,11 @@
 #ifndef HECTOR_GAMEPAD_MANAGER_GAMEPAD_FUNCTION_PLUGIN_HPP
 #define HECTOR_GAMEPAD_MANAGER_GAMEPAD_FUNCTION_PLUGIN_HPP
 
+#include "blackboard.hpp"
 #include <rclcpp/rclcpp.hpp>
 
 namespace hector_gamepad_plugin_interface
 {
-struct Blackboard {
-  std::unordered_map<std::string, bool> data_; // for now just bools
-};
 class GamepadFunctionPlugin
 {
 public:

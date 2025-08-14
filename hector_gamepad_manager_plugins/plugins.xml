@@ -12,4 +12,7 @@
     <class type="hector_gamepad_manager_plugins::MoveitPlugin" base_class_type="hector_gamepad_plugin_interface::GamepadFunctionPlugin">
         <description>Interface to moveit planners.</description>
     </class>
+    <class type="hector_gamepad_manager_plugins::BlackboardPlugin" base_class_type="hector_gamepad_plugin_interface::GamepadFunctionPlugin">
+        <description>Interface set blackboard variables.</description>
+    </class>
 </library>

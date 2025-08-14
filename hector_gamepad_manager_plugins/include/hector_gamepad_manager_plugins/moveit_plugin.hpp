@@ -46,7 +46,7 @@ private:
   double getNormalizedJointPosition( const std::string &name ) const;
 
   static std::string toGroupPoseName( const std::string &group_name, const std::string &pose_name );
-  static std::pair<std::string, std::string> fromGroupPoseName( const std::string &group_pose_name );
+  std::pair<std::string, std::string> fromGroupPoseName( const std::string &group_pose_name ) const;
 
   bool active_ = false;
   bool request_active_ = false;

@@ -11,6 +11,8 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
+
+# Header-only interface target
 add_library(${PROJECT_NAME} INTERFACE)
 
 target_include_directories(
@@ -29,6 +31,17 @@ install(
 
 install(DIRECTORY include/${PROJECT_NAME}/ DESTINATION include/${PROJECT_NAME})
 
-# ament_export_libraries(${PROJECT_NAME})
 ament_export_targets("export_${PROJECT_NAME}")
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  ament_add_gtest(test_blackboard test/test_blackboard.cpp)
+  if(TARGET test_blackboard)
+    target_link_libraries(test_blackboard ${PROJECT_NAME})
+    target_compile_features(test_blackboard PRIVATE cxx_std_17)
+    target_compile_options(test_blackboard PRIVATE -Wall -Wextra -Wpedantic)
+  endif()
+endif()
+
 ament_package()
