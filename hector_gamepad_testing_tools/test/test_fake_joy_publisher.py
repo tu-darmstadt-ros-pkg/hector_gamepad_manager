@@ -100,6 +100,7 @@ class Probe(Node):
 
     def _on_joy(self, msg: Joy):
         self.joy_msgs.append(msg)
+        self.get_logger().info(f"[Probe] Received Joy message: {msg}")
 
     # Wait helpers
     def wait_for_cfg(self, timeout=10.0):
@@ -135,16 +136,12 @@ class TestFakeJoyPublisher(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         rclpy.init()
-        # ocs namespace passed from generate_test_description via pytest fixture
-        # but in launch_testing, we access it via environment context in setUpModule
-        # so we rebuild it here consistently with generate_test_description
         cls.ocs_ns = "test_ocs"
 
         # Probe to observe /active_config and /joy
         cls.probe = Probe(cls.ocs_ns)
 
         # Instantiate the FakeJoyPublisher in-process (so we can call its Python API directly).
-        # It will auto-detect the manager, subscribe to active_config, and publish to <ocs_ns>/joy.
         cls.fake = FakeJoyPublisher(joy_rate_hz=40.0)
 
         # Wait for manager to publish initial active_config (latched)
@@ -161,9 +158,13 @@ class TestFakeJoyPublisher(unittest.TestCase):
         # reset state before each test
         if hasattr(self, "fake"):
             self.fake.clear_all()
-            # cancel timer so it doesn’t run during assertions
-            if self.fake._timer is not None:
-                self.fake._timer.cancel()
+            # cancel timer so it doesn’t run during assertions; tests that need it will re-enable
+            if getattr(self.fake, "_timer", None) is not None:
+                try:
+                    self.fake._timer.cancel()
+                except Exception:
+                    pass
+                self.fake._timer = None
 
     @classmethod
     def tearDownClass(cls):
@@ -171,12 +172,47 @@ class TestFakeJoyPublisher(unittest.TestCase):
         cls.probe.destroy_node()
         rclpy.shutdown()
 
+    # ------------------------
+    # Local helpers
+    # ------------------------
     def spin_some(self, duration=0.5):
         t0 = time.time()
         while time.time() - t0 < duration:
             rclpy.spin_once(self.probe, timeout_sec=0.02)
             rclpy.spin_once(self.fake, timeout_sec=0.02)
 
+    def _ensure_fake_timer(self):
+        """Ensure the FakeJoyPublisher has an active periodic timer."""
+        period = 1.0 / getattr(self.fake, "_joy_rate_hz", 40.0)
+        # Always recreate to avoid stale/cancelled timer state across tests
+        if getattr(self.fake, "_timer", None) is not None:
+            try:
+                self.fake._timer.cancel()
+            except Exception:
+                pass
+        self.fake._timer = self.fake.create_timer(period, self.fake._on_timer)
+
+    def _pump_until_cfg(
+        self, target_mode: str, timeout: float = 10.0, period: float = 0.03
+    ):
+        """
+        Act like the timer: publish frames and spin until manager reports target_mode.
+        Returns True if active_config becomes target_mode within timeout.
+        """
+        deadline = time.time() + timeout
+        while time.time() < deadline and not self.probe.wait_for_cfg_value(
+            target_mode, timeout=0.0
+        ):
+            # publish one frame of Joy and spin both executors
+            self.fake._on_timer()
+            rclpy.spin_once(self.fake, timeout_sec=0.0)
+            rclpy.spin_once(self.probe, timeout_sec=0.0)
+            time.sleep(period)
+        return self.probe.active_config == target_mode
+
+    # ------------------------
+    # Tests
+    # ------------------------
     def test_00_initial_handshake(self):
         """We should have the initial active_config before doing anything."""
         self.assertIsNotNone(self.probe.active_config, "No active_config received")
@@ -187,7 +223,6 @@ class TestFakeJoyPublisher(unittest.TestCase):
 
     def test_01_dynamic_methods_exist(self):
         """Dynamic helpers like drive(), press_flipper_back_down() should exist if present in configs."""
-        # These names are typical; skip gracefully if absent but assert presence of at least one axis helper.
         axis_ok = False
         try:
             getattr(self.fake, "drive")
@@ -203,19 +238,18 @@ class TestFakeJoyPublisher(unittest.TestCase):
             axis_ok, "No dynamic axis helper (e.g., drive/steer) found in configs"
         )
 
-        # Button helpers may or may not exist depending on your config; check presence of at least one common flipper function.
         try:
             getattr(self.fake, "press_flipper_back_down")
         except AttributeError:
-            # Not fatal; just log
             self.probe.get_logger().warn(
                 "press_flipper_back_down() not found—config may differ"
             )
 
     def test_02_trigger_mapping(self):
         """LT/RT mapping: logical [0..1] -> raw [1..-1] in Joy[axis 2 or 5] when functions map to those axes."""
-        # Try to find any axis function that maps to RT(5) or LT(2) in the active mode.
-        self.fake._timer.reset()  # activate the timer for the test
+        # Ensure periodic publishing during this test
+        self._ensure_fake_timer()
+
         mode = self.fake._modes[self.fake._active_mode]
         rt_key = None
         lt_key = None
@@ -227,7 +261,6 @@ class TestFakeJoyPublisher(unittest.TestCase):
 
         self.probe.drain_joy()
 
-        # Deflect whichever is available
         if rt_key:
             # logical 1.0 -> raw -1.0
             self.fake.deflect(rt_key.plugin, rt_key.function, 1.0)
@@ -245,16 +278,16 @@ class TestFakeJoyPublisher(unittest.TestCase):
             self.skipTest("No trigger-mapped function found on axes 2/5 in active mode")
 
     def test_03_mode_switch_sequence(self):
-        """Request an input in another mode -> see switch-only Joy first, then manager active_config change, then actual input."""
-        # Heuristic: try to find any function that lives in a mode different from current.
-        self.fake.log_intents()
+        """
+        Request an input in another mode -> see switch-only Joy first,
+        then manager active_config change, then actual input.
+        """
         current = self.fake._active_mode
         target_key = None
         target_mode = None
         for name, mode in self.fake._modes.items():
             if name == current:
                 continue
-            # prefer an axis for easy assertion
             if mode.axis_map:
                 target_key = next(iter(mode.axis_map.keys()))
                 target_mode = name
@@ -264,34 +297,33 @@ class TestFakeJoyPublisher(unittest.TestCase):
                 target_mode = name
                 break
 
-        if target_key is None:
+        if target_key is None or target_mode is None:
             self.skipTest("No secondary mode with functions to test switching")
 
-        # Ask for deflection/press in the other mode
+        # Prepare: clear any residual Joy frames
         self.probe.drain_joy()
 
+        # Ask for input in the other mode (queue intent)
         if target_key in self.fake._modes[target_mode].axis_map:
-            # Axis deflection queued
             self.fake.deflect(target_key.plugin, target_key.function, 0.5)
         else:
-            # One-shot press queued
             getattr(
                 self.fake, f"press_{_safe_name(target_key.function)}", lambda: None
             )()
 
-        # The FakeJoyPublisher will publish a switch-only message until active_config flips.
-        # Observe at least one Joy with ONLY the switch button set.
-        self.fake._on_timer()
+        # Observe at least one Joy with ONLY the switch button set (keep publishing while we wait)
         saw_switch_only = False
         switch_btn_idx = self.fake._config_to_button.get(target_mode, None)
         t0 = time.time()
         while time.time() - t0 < 5.0:
+            # actively publish and spin
+            self.fake._on_timer()
             self.spin_some(0.05)
             if not self.probe.joy_msgs:
                 continue
             last = self.probe.joy_msgs[-1]
             if switch_btn_idx is None:
-                break  # can't assert switch-only without mapping; skip
+                break  # can't assert switch-only without mapping; skip below
             if (
                 any(last.buttons)
                 and sum(1 for b in last.buttons if b == 1) == 1
@@ -309,8 +341,15 @@ class TestFakeJoyPublisher(unittest.TestCase):
             saw_switch_only, "Did not see a switch-only Joy before mode change"
         )
 
-        # Now wait for manager to confirm the mode switch
-        ok = self.probe.wait_for_cfg_value(target_mode, timeout=10.0)
+        # Keep publishing frames until the manager flips active_config
+        ok = self._pump_until_cfg(target_mode, timeout=12.0)
+        if not ok:
+            # Extra context if it fails in CI
+            self.fake.get_logger().info(
+                f"Switch attempt -> current:{current} target:{target_mode} "
+                f"mapping:{self.fake._config_to_button.get(target_mode)} "
+                f"manager_active:{self.probe.active_config}"
+            )
         self.assertTrue(ok, f"Manager did not switch to '{target_mode}'")
 
         # After confirmation, we should see the actual intended input on the following messages
@@ -327,7 +366,6 @@ class TestFakeJoyPublisher(unittest.TestCase):
 
     def test_04_conflicting_intents_raise(self):
         """Queue intents from different modes at once -> _on_timer should raise RuntimeError."""
-        # Find two distinct modes with at least one function each
         modes = list(self.fake._modes.keys())
         if len(modes) < 2:
             self.skipTest("Only one mode available; cannot test conflict")
@@ -368,7 +406,7 @@ class TestFakeJoyPublisher(unittest.TestCase):
             f"Testing conflict with keys: {k0} in mode {m0}, {k1} in mode {m1}"
         )
 
-        # Call _on_timer directly to capture the exception deterministically (rather than crashing the timer thread)
+        # Call _on_timer directly to capture the exception deterministically
         with self.assertRaises(RuntimeError):
             self.fake._on_timer()
 
@@ -379,6 +417,9 @@ class TestFakeJoyPublisher(unittest.TestCase):
 
     def test_05_one_shot_press_lasts_one_tick(self):
         """press_* should be high for one publish cycle only."""
+        # Ensure periodic publishing to observe two consecutive frames quickly
+        self._ensure_fake_timer()
+
         mode = self.fake._modes[self.fake._active_mode]
         if not mode.button_map:
             self.skipTest("No buttons in active mode to test one-shot press")

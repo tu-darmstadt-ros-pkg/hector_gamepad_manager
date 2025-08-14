@@ -479,6 +479,9 @@ class FakeJoyPublisher(Node):
             msg_switch.buttons = [0] * BUTTON_COUNT
             if 0 <= switch_btn < BUTTON_COUNT:
                 msg_switch.buttons[switch_btn] = 1
+            self.get_logger().info(
+                f"Switching to mode '{target}' via button {switch_btn} (active config: '{self._current_manager_config}')"
+            )
             self._pub.publish(msg_switch)
             return  # wait for active_config to change
 
@@ -532,6 +535,9 @@ class FakeJoyPublisher(Node):
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.axes = axes
         msg.buttons = buttons
+        self.get_logger().info(
+            f"Publishing Joy: mode='{self._active_mode}',  with buttons={buttons}, axes={axes}"
+        )
         self._pub.publish(msg)
 
     def _parse_mode(self, name: str, cfg: dict, reserved_buttons: Set[int]) -> Mode:
