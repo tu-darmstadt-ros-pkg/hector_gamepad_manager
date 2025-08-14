@@ -258,7 +258,7 @@ MoveitPlugin::fromGroupPoseName( const std::string &group_pose_name ) const
   // check if inverted pose exists
   if ( group_pose_name.substr( pos + 1 ).find( '|' ) != std::string::npos ) {
     // inverted pose exists
-    const bool inverted = blackboard_->value_or<bool>( "inverted_steering", false );
+    const bool inverted = blackboard_->value_or<bool>( "invert_steering", false );
     const auto inv_pose = group_pose_name.find_last_of( '|' );
     pose_name = inverted ? group_pose_name.substr( inv_pose + 1 )
                          : group_pose_name.substr( pos + 1, inv_pose - pos - 1 );

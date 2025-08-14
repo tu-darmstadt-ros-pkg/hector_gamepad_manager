@@ -1,0 +1,56 @@
+#pragma once
+
+#include <rclcpp/rclcpp.hpp>
+#include <string>
+
+#include <hector_gamepad_plugin_interface/gamepad_plugin_interface.hpp>
+
+namespace hector_gamepad_manager_plugins
+{
+
+/**
+ * BlackboardPlugin
+ *
+ * Button mappings support the following function strings:
+ *  - "toggle/<var>"
+ *  - "hold/<var>"
+ *  - "set/<var>/to/<value>"
+ *
+ * Behavior:
+ *  - toggle: invert the boolean value on press
+ *  - hold:   set true on press, set false on release
+ *  - set:    write <value> (string) on press
+ */
+class BlackboardPlugin : public hector_gamepad_plugin_interface::GamepadFunctionPlugin
+{
+public:
+  void initialize( const rclcpp::Node::SharedPtr &node ) override;
+  std::string getPluginName() override;
+
+  // Button interface
+  void handlePress( const std::string &function ) override;
+  void handleRelease( const std::string &function ) override;
+
+  // Axis interface (unused here)
+  void handleAxis( const std::string &function, const double value ) override { }
+
+  // Lifecycle-ish
+  void activate() override;
+  void deactivate() override;
+  void update() override { }
+
+private:
+  rclcpp::Node::SharedPtr node_;
+  bool active_{ false };
+
+  // Helpers
+  static bool startsWith( const std::string &s, const char *prefix );
+  static std::vector<std::string> split( const std::string &s, char delim );
+
+  void onToggle( const std::string &var ) const;
+  void onHoldPress( const std::string &var ) const;
+  void onHoldRelease( const std::string &var ) const;
+  void onSetString( const std::string &var, const std::string &value ) const;
+};
+
+} // namespace hector_gamepad_manager_plugins

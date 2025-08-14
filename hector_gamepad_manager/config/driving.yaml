@@ -65,8 +65,8 @@ buttons:
     function: ""
 
   8: # Button Guide (Manufacturer Button)
-    plugin: "hector_gamepad_manager_plugins::DrivePlugin"
-    function: "invert_steering"
+    plugin: "hector_gamepad_manager_plugins::BlackboardPlugin"
+    function: "toggle/invert_steering"
 
   9: # Left joystick press
     plugin: ""

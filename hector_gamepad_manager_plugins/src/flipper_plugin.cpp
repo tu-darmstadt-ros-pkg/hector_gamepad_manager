@@ -109,7 +109,7 @@ void FlipperPlugin::update()
     return;
 
   // check inverted steering
-  if ( blackboard_->value_or<bool>( "inverted_steering", false ) ) {
+  if ( blackboard_->value_or<bool>( "invert_steering", false ) ) {
     vel_commands_[3] = axis_vel_commands_[0] + button_vel_commands_[0]; // flipper_br_joint
     vel_commands_[2] = axis_vel_commands_[1] + button_vel_commands_[1]; // flipper_bl_joint
     vel_commands_[1] = axis_vel_commands_[2] + button_vel_commands_[2]; // flipper_fr_joint
