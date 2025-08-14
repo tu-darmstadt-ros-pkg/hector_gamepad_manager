@@ -29,15 +29,18 @@ AXIS_NEUTRALS[5] = 1.0  # RT neutral
 # Axes that behave like "button-style triggers" logically (0..1) but publish raw [1..-1]
 SPECIAL_TRIGGER_AXES = {2, 5}
 
+
 @dataclass(frozen=True)
 class Key:
     plugin: str
     function: str
 
+
 @dataclass
 class Mapping:
     button_idx: Optional[int] = None
     axis_idx: Optional[int] = None
+
 
 @dataclass
 class Mode:
@@ -51,15 +54,20 @@ def _pkg_config_path(pkg: str, name: str) -> str:
     filename = name if name.endswith(".yaml") else f"{name}.yaml"
     return f"{base}/config/{filename}"
 
+
 def _load_yaml(path: str) -> dict:
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
+
 def _safe_func_name(name: str) -> str:
     """Map a function string to a safe, lowercase method identifier."""
-    return re.sub(r'[^0-9a-zA-Z]+', '_', name).strip('_').lower()
+    return re.sub(r"[^0-9a-zA-Z]+", "_", name).strip("_").lower()
 
-def _request_params_sync(node: Node, target_node_fqn: str, names: Tuple[str, ...]) -> Dict[str, Optional[str]]:
+
+def _request_params_sync(
+    node: Node, target_node_fqn: str, names: Tuple[str, ...]
+) -> Dict[str, Optional[str]]:
     """
     Fetch parameter values from another node. Returns strings or None if not set/not string.
     """
@@ -83,9 +91,8 @@ def _request_params_sync(node: Node, target_node_fqn: str, names: Tuple[str, ...
             out[n] = None  # treat NOT_SET / wrong type as absent
     return out
 
-def _rank_manager_candidate(
-        my_ns: str, basename: str, name: str, ns: str
-) -> tuple:
+
+def _rank_manager_candidate(my_ns: str, basename: str, name: str, ns: str) -> tuple:
     """
     Higher tuple = better candidate. Preference:
     1) Same namespace
@@ -98,7 +105,8 @@ def _rank_manager_candidate(
     contains = int(basename in name)
     # extra suffix length if startswith, else length penalty
     extra_len = len(name) - len(basename) if starts else len(name)
-    return (same_ns, starts, contains, - (1000 - min(extra_len, 1000)))
+    return (same_ns, starts, contains, -(1000 - min(extra_len, 1000)))
+
 
 def _find_manager_fqn(node: Node, basename: str, timeout_sec: float = 5.0) -> str:
     """
@@ -113,7 +121,9 @@ def _find_manager_fqn(node: Node, basename: str, timeout_sec: float = 5.0) -> st
         ranked = []
         for name, ns in candidates:
             if basename in name:
-                ranked.append(( _rank_manager_candidate(my_ns, basename, name, ns), name, ns ))
+                ranked.append(
+                    (_rank_manager_candidate(my_ns, basename, name, ns), name, ns)
+                )
         if ranked:
             ranked.sort(reverse=True)
             _, name, ns = ranked[0]
@@ -121,14 +131,21 @@ def _find_manager_fqn(node: Node, basename: str, timeout_sec: float = 5.0) -> st
             return fqn
         time.sleep(0.1)
     # no match: provide diagnostics
-    all_nodes = ", ".join([f"{ns.rstrip('/')}/{name}".replace('//','/') for name, ns in node.get_node_names_and_namespaces()])
+    all_nodes = ", ".join(
+        [
+            f"{ns.rstrip('/')}/{name}".replace("//", "/")
+            for name, ns in node.get_node_names_and_namespaces()
+        ]
+    )
     raise RuntimeError(
         f"Could not find a node containing '{basename}' in its name. "
         f"Seen nodes: {all_nodes}"
     )
 
+
 def _keys_in_mode_axis(keys: Set["Key"], mode: "Mode") -> Set["Key"]:
     return {k for k in keys if k in mode.axis_map}
+
 
 def _keys_in_mode_button(keys: Set["Key"], mode: "Mode") -> Set["Key"]:
     return {k for k in keys if k in mode.button_map}
@@ -154,10 +171,12 @@ class FakeJoyPublisher(Node):
       - release_<button_func>()     -> release(plugin, func)
     """
 
-    def __init__(self,
-                 node_name: str = "fake_joy_publisher",
-                 manager_node_basename: str = "hector_gamepad_manager",
-                 joy_rate_hz: float = 50.0):
+    def __init__(
+        self,
+        node_name: str = "fake_joy_publisher",
+        manager_node_basename: str = "hector_gamepad_manager",
+        joy_rate_hz: float = 50.0,
+    ):
         super().__init__(node_name)
 
         self.declare_parameter("joy_rate_hz", float(joy_rate_hz))
@@ -167,10 +186,14 @@ class FakeJoyPublisher(Node):
         manager_fqn = _find_manager_fqn(self, manager_node_basename)
 
         # ---- Pull config_name & ocs_namespace from that node ----
-        params = _request_params_sync(self, manager_fqn, ("config_name", "ocs_namespace"))
+        params = _request_params_sync(
+            self, manager_fqn, ("config_name", "ocs_namespace")
+        )
         config_name = params.get("config_name") or "athena"
         ocs_ns = params.get("ocs_namespace") or "ocs"
-        self.get_logger().info(f"Using manager '{manager_fqn}' with config_name='{config_name}', ocs_namespace='{ocs_ns}'")
+        self.get_logger().info(
+            f"Using manager '{manager_fqn}' with config_name='{config_name}', ocs_namespace='{ocs_ns}'"
+        )
 
         # ---- Load meta-config & modes ----
         meta = _load_yaml(_pkg_config_path("hector_gamepad_manager", config_name))
@@ -192,16 +215,22 @@ class FakeJoyPublisher(Node):
         self._modes: Dict[str, Mode] = {}
         for mode_name, pkg in modes_to_load.items():
             cfg = _load_yaml(_pkg_config_path(pkg, mode_name))
-            self._modes[mode_name] = self._parse_mode(mode_name, cfg, self._config_switch_reserved_buttons)
+            self._modes[mode_name] = self._parse_mode(
+                mode_name, cfg, self._config_switch_reserved_buttons
+            )
 
         if self._default_mode_name not in self._modes:
             try:
-                cfg = _load_yaml(_pkg_config_path("hector_gamepad_manager", self._default_mode_name))
+                cfg = _load_yaml(
+                    _pkg_config_path("hector_gamepad_manager", self._default_mode_name)
+                )
                 self._modes[self._default_mode_name] = self._parse_mode(
                     self._default_mode_name, cfg, self._config_switch_reserved_buttons
                 )
             except Exception as e:
-                raise RuntimeError(f"Default mode '{self._default_mode_name}' not loadable: {e}")
+                raise RuntimeError(
+                    f"Default mode '{self._default_mode_name}' not loadable: {e}"
+                )
 
         # ---- Build reverse indices for dynamic methods ----
         self._axis_name_to_keys: Dict[str, Set[Key]] = {}
@@ -226,7 +255,9 @@ class FakeJoyPublisher(Node):
         # Physical Joy state and logical intents
         self._axes = self._neutral_axes()
         self._buttons = [0] * BUTTON_COUNT
-        self._deflected_axes: Dict[Key, float] = {}  # logical values (0..1 for triggers, else -1..1)
+        self._deflected_axes: Dict[Key, float] = (
+            {}
+        )  # logical values (0..1 for triggers, else -1..1)
         self._held_buttons: Set[Key] = set()
         # one-shot presses to apply on publish
         self._pending_one_shot_keys: Set[Key] = set()
@@ -269,7 +300,9 @@ class FakeJoyPublisher(Node):
 
     def log_intents(self) -> None:
         """Log current intents for debugging."""
-        self.get_logger().info(f"Intents: held={self._held_buttons}, one-shots={self._pending_one_shot_keys}, deflected={self._deflected_axes}")
+        self.get_logger().info(
+            f"Intents: held={self._held_buttons}, one-shots={self._pending_one_shot_keys}, deflected={self._deflected_axes}"
+        )
 
     # ---------- Dynamic method plumbing ----------
     def _reindex_functions(self) -> None:
@@ -300,15 +333,17 @@ class FakeJoyPublisher(Node):
         """
         # Button helpers with prefixes
         for prefix, caller in (
-                ("press_", self.press),
-                ("hold_", self.hold),
-                ("release_", self.release),
+            ("press_", self.press),
+            ("hold_", self.hold),
+            ("release_", self.release),
         ):
             if name.startswith(prefix):
-                fn_safe = name[len(prefix):].lower()
+                fn_safe = name[len(prefix) :].lower()
                 candidates = self._button_name_to_keys.get(fn_safe, set())
                 if not candidates:
-                    candidates = self._button_name_to_keys.get(_safe_func_name(fn_safe), set())
+                    candidates = self._button_name_to_keys.get(
+                        _safe_func_name(fn_safe), set()
+                    )
                 if not candidates:
                     raise AttributeError(f"No button function named '{fn_safe}' found")
 
@@ -367,10 +402,16 @@ class FakeJoyPublisher(Node):
             return
 
         # Determine if a mode switch is required based on *current intents*
-        intents: Set[Key] = set(self._held_buttons) | set(self._pending_one_shot_keys) | set(self._deflected_axes.keys())
+        intents: Set[Key] = (
+            set(self._held_buttons)
+            | set(self._pending_one_shot_keys)
+            | set(self._deflected_axes.keys())
+        )
         target_modes: Set[str] = set()
 
-        self.get_logger().info(f"on_timer: intents={intents}, held={self._held_buttons}, one-shots={self._pending_one_shot_keys}, deflected={self._deflected_axes}")
+        self.get_logger().info(
+            f"on_timer: intents={intents}, held={self._held_buttons}, one-shots={self._pending_one_shot_keys}, deflected={self._deflected_axes}"
+        )
         for key in intents:
             m = self._find_mode_for_key(key)
             self.get_logger().info(f"Key {key} found in mode {m} #44")
@@ -380,10 +421,14 @@ class FakeJoyPublisher(Node):
 
         if len(target_modes) > 1:
             # Impossible configuration: inputs span multiple non-active modes
-            raise RuntimeError(f"Conflicting intents across multiple modes: {sorted(target_modes)}")
+            raise RuntimeError(
+                f"Conflicting intents across multiple modes: {sorted(target_modes)}"
+            )
 
         # If a switch is needed, publish a switch-only Joy and wait for manager confirmation
-        if len(target_modes) == 1 and self._current_manager_config != next(iter(target_modes)):
+        if len(target_modes) == 1 and self._current_manager_config != next(
+            iter(target_modes)
+        ):
             target = next(iter(target_modes))
             if target not in self._config_to_button:
                 raise RuntimeError(f"No meta button mapped for target mode '{target}'")
@@ -415,29 +460,42 @@ class FakeJoyPublisher(Node):
                 buttons[mode.button_map[key]] = 1
             else:
                 # held key not in this mode -> impossible combo
-                raise RuntimeError(f"Held button {key} not available in active mode '{self._active_mode}'")
+                raise RuntimeError(
+                    f"Held button {key} not available in active mode '{self._active_mode}'"
+                )
 
         # Apply one-shot presses
         for key in list(self._pending_one_shot_keys):
             if key in mode.button_map:
                 buttons[mode.button_map[key]] = 1
+                self.get_logger().info(
+                    f"One-shot press for {key} in mode '{self._active_mode}'"
+                )
             else:
-                raise RuntimeError(f"Pressed button {key} not available in active mode '{self._active_mode}'")
+                raise RuntimeError(
+                    f"Pressed button {key} not available in active mode '{self._active_mode}'"
+                )
         # Clear one-shots after publishing
         self._pending_one_shot_keys.clear()
 
         # Apply axes (with logical->raw mapping, and validation by axis index)
         for key, logical in list(self._deflected_axes.items()):
             if key not in mode.axis_map:
-                raise RuntimeError(f"Axis {key} not available in active mode '{self._active_mode}'")
+                raise RuntimeError(
+                    f"Axis {key} not available in active mode '{self._active_mode}'"
+                )
             idx = mode.axis_map[key]
             # Validate ranges now that we know the axis index
             if idx in SPECIAL_TRIGGER_AXES:
                 if not (0.0 <= logical <= 1.0):
-                    raise ValueError(f"LT/RT logical value must be in [0, 1], got {logical}")
+                    raise ValueError(
+                        f"LT/RT logical value must be in [0, 1], got {logical}"
+                    )
             else:
                 if not (-1.0 <= logical <= 1.0):
-                    raise ValueError(f"Axis logical value must be in [-1, 1], got {logical}")
+                    raise ValueError(
+                        f"Axis logical value must be in [-1, 1], got {logical}"
+                    )
             axes[idx] = self._logical_to_raw(idx, logical)
 
         # Publish final message
@@ -445,6 +503,9 @@ class FakeJoyPublisher(Node):
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.axes = axes
         msg.buttons = buttons
+        self.get_logger().info(
+            f"Publishing Joy: mode='{self._active_mode}', axes={axes}, buttons={buttons}"
+        )
         self._pub.publish(msg)
 
     def _parse_mode(self, name: str, cfg: dict, reserved_buttons: Set[int]) -> Mode:
@@ -478,7 +539,9 @@ class FakeJoyPublisher(Node):
         m = self._find_mode_for_key(key)
         if m is None:
             raise KeyError(f"{key} not found in any loaded mode")
-        raise KeyError(f"{key} exists in mode '{m}' but not in active mode '{self._active_mode}'")
+        raise KeyError(
+            f"{key} exists in mode '{m}' but not in active mode '{self._active_mode}'"
+        )
 
     def _key_available_in_mode(self, mode_name: str, key: Key) -> bool:
         mode = self._modes[mode_name]
@@ -517,7 +580,7 @@ def main():
     # node.press_flipper_back_down()
     node.hold_flipper_back_up()
     # node.release_flipper_back_down()
-    #node.deflect("hector_gamepad_manager_plugins::ManipulationPlugin", "move_up_down", 0.5)
+    # node.deflect("hector_gamepad_manager_plugins::ManipulationPlugin", "move_up_down", 0.5)
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
@@ -525,6 +588,7 @@ def main():
     finally:
         node.destroy_node()
         rclpy.shutdown()
+
 
 if __name__ == "__main__":
     main()
