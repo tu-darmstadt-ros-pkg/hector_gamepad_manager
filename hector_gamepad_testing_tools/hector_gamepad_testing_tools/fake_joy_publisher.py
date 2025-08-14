@@ -269,11 +269,8 @@ class FakeJoyPublisher(Node):
         self._pending_one_shot_keys: Set[Key] = set()
 
         # Publisher
-        qos = QoSProfile(depth=1)
-        qos.history = HistoryPolicy.KEEP_LAST
-        qos.reliability = ReliabilityPolicy.BEST_EFFORT
         topic = f"{ocs_ns.strip('/')}/joy"
-        self._pub = self.create_publisher(Joy, topic, qos)
+        self._pub = self.create_publisher(Joy, topic, 10)
         self.get_logger().info(f"Publishing Joy on '{topic}' at {self._joy_rate_hz} Hz")
 
         # Timer (can be stopped/started via public API)
