@@ -90,9 +90,7 @@ class Probe(Node):
         self.sub_cfg = self.create_subscription(
             String, f"{ocs_ns}/active_config", self._on_cfg, qos_latched
         )
-        self.sub_joy = self.create_subscription(
-            Joy, f"{ocs_ns}/joy", self._on_joy, qos_best
-        )
+        self.sub_joy = self.create_subscription(Joy, f"{ocs_ns}/joy", self._on_joy, 10)
 
     def _on_cfg(self, msg: String):
         self.active_config = msg.data
