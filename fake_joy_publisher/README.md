@@ -1,114 +1,118 @@
 # Fake Joy Publisher
 
-The **Fake Joy Publisher** is a ROS 2 utility node that emulates a physical gamepad for use with the [`hector_gamepad_manager`](https://github.com/TODO).
-It publishes synthetic [`sensor_msgs/msg/Joy`](https://docs.ros2.org/latest/api/sensor_msgs/msg/Joy.html) messages on the same topic a real gamepad would, allowing automated tests, scripted input sequences, or teleoperation without real hardware.
+The `fake_joy_publisher` is a ROS 2 node and Python library that emulates a gamepad.
+It publishes `sensor_msgs/msg/Joy` messages as if they came from a real joystick and integrates with the `hector_gamepad_manager`.
+
+This is primarily intended for:
+
+* **Automated testing** of gamepad-based control.
+* **Reproducibility** in CI pipelines (tests always get the same joystick state).
 
 ---
 
 ## Features
 
-* **Automatic integration with `hector_gamepad_manager`**
+* Publishes `sensor_msgs/msg/Joy` messages at a configurable rate.
+* Discovers the running `hector_gamepad_manager` node automatically (even with random suffixes).
+* Loads the same plugin/mode configs as the manager, so function names map to the right axes/buttons.
+* Supports **logical inputs** (high-level functions) instead of hard-coding button indices.
+* Automatically **switches modes** if a requested input belongs to another config.
+* Provides **dynamic methods** for convenience:
 
-    * Finds the manager node by name (even with random suffixes in launch).
-    * Retrieves `config_name` and `ocs_namespace` parameters automatically.
-    * Loads meta-config and per-mode config YAML files.
-
-* **Mode awareness & switching**
-
-    * Understands multiple gamepad configurations ("modes").
-    * Detects when an input belongs to a different mode and issues the correct **meta button press** to request a mode change.
-    * Waits for the `active_config` confirmation from the manager before sending the intended inputs.
-
-* **Axis and button remapping**
-
-    * Handles special LT/RT trigger axes (2 & 5) that report `1.0` neutral → `-1.0` fully pressed, and remaps them to a clean `[0.0 .. 1.0]` logical range.
-    * Other axes remain in standard `[-1.0 .. 1.0]` range.
-
-* **Dynamic function helpers**
-
-    * Automatically generates methods from the loaded config:
-
-        * **Axis functions:**
-          Call `node.<function_name>(value)` to deflect an axis.
-          Example: `node.drive(0.5)`
-        * **Button functions:**
-
-            * `press_<function_name>()` → one-shot press
-            * `hold_<function_name>()` → hold button until released
-            * `release_<function_name>()` → release held button
-              Example:
-
-              ```python
-              node.press_flipper_back_up()
-              node.hold_flipper_back_up()
-              node.release_flipper_back_up()
-              ```
-
-* **Safe input mapping**
-
-    * Validates that held/pressed/deflected inputs exist in the current active mode.
-    * Prevents impossible combinations across multiple modes.
+    * `node.drive(0.5)` → deflect joystick axis bound to `drive`.
+    * `node.press_flipper_back_up()` → one-shot button press.
+    * `node.hold_flipper_back_up()` / `node.release_flipper_back_up()` → sustained button state.
+* Flexible **timer control API**: run continuously or tick manually.
 
 ---
 
-## Topics
+## Public API
 
-| Direction | Topic                           | Type                  | Description                                      |
-| --------- | ------------------------------- | --------------------- | ------------------------------------------------ |
-| **Pub**   | `<ocs_namespace>/joy`           | `sensor_msgs/msg/Joy` | Emulated joystick output                         |
-| **Sub**   | `<ocs_namespace>/active_config` | `std_msgs/msg/String` | Reports current active mode from gamepad manager |
-
----
-
-## Parameters
-
-| Name          | Type   | Default | Description                                                                               |
-| ------------- | ------ | ------- | ----------------------------------------------------------------------------------------- |
-| `joy_rate_hz` | double | `50.0`  | Publish rate for Joy messages                                                             |
-| *(internal)*  | —      | —       | `config_name` and `ocs_namespace` are fetched from the gamepad manager node automatically |
-
----
-
-
-### Controlling from code
+### Input methods
 
 ```python
-from fake_joy_publisher.fake_joy_publisher import FakeJoyPublisher
+node.press(plugin, function)            # one-shot button press (applied for one tick)
+node.hold(plugin, function)             # hold button down
+node.release(plugin, function)          # release held/pressed button
+node.deflect(plugin, function, value)   # axis deflection
+node.clear_all()                        # reset all inputs
+```
+
+* For **LT / RT** triggers (axes 2 and 5): values are in **\[0, 1]** (0 = neutral, 1 = fully pressed).
+* For other axes: values are in **\[-1, 1]**.
+
+### Timer control methods
+
+```python
+node.start_publishing(rate_hz=None)   # (re)start periodic publishing, optionally change rate
+node.stop_publishing()                # stop timer (no periodic publishing)
+node.is_publishing() -> bool          # check if timer is running
+node.set_publish_rate(100.0)          # change publish rate (Hz), restart if needed
+node.publish_once()                   # publish a single Joy message (manual tick)
+node.tick()                           # alias of publish_once()
+```
+
+### Dynamic helpers
+
+Function names from the configs are mapped automatically:
+
+```python
+node.drive(0.5)               # axis deflection
+node.press_flipper_back_up()
+node.hold_flipper_back_up()
+node.release_flipper_back_up()
+```
+
+---
+
+## Usage
+
+
+### Python API (manual control)
+
+```python
 import rclpy
+from fake_joy_publisher.fake_joy_publisher import FakeJoyPublisher
 
 rclpy.init()
-node = FakeJoyPublisher()
+node = FakeJoyPublisher(joy_rate_hz=40.0)
 
-# Axis control
-node.drive(0.5)  # 50% forward
+# stop timer to make behavior deterministic
+node.stop_publishing()
 
-# Button presses
-node.press_flipper_back_down()
-node.hold_flipper_back_down()
-node.release_flipper_back_down()
+# queue inputs
+node.drive(0.5)                     # axis deflection
+node.press_flipper_back_up()      # one-shot button
+
+# publish once
+node.publish_once()
+
+# resume periodic publishing if needed
+node.start_publishing()
 
 rclpy.spin(node)
 ```
 
 ---
 
-## Example: Trigger Axis Mapping
+## Testing
 
-* **Raw hardware values:**
-  LT/RT = `1.0` (neutral) → `-1.0` (fully pressed)
-* **Logical range in Fake Joy Publisher:**
-  LT/RT = `0.0` (neutral) → `1.0` (fully pressed)
+The package includes a full **test suite** (`test_fake_joy_publisher.py`) that demonstrates usage patterns:
 
-Example:
+* Switching modes by pressing config buttons.
+* One-shot presses lasting exactly one tick.
+* Sustained holds across ticks.
+* Axis deflections for both normal axes and LT/RT triggers.
+* Manual ticking (`publish_once`) for deterministic assertions.
 
-```python
-node.lt_trigger(0.0)  # neutral
-node.lt_trigger(1.0)  # fully pressed
-```
+💡 The tests are a **good reference** for writing your own scripts with the fake publisher.
 
 ---
 
-## When to use
+## Notes
 
-* Automated regression tests for gamepad-controlled robots.
+* Requires `hector_gamepad_manager` to be running with a valid config (YAML).
+* Waits for the manager to publish its active config before publishing inputs.
+* Default publish rate: 50 Hz.
+
 

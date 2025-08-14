@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Tuple, Optional, Set, List, Callable
+from typing import Dict, Tuple, Optional, Set
 import time
 import re
 
@@ -115,7 +115,6 @@ def _find_manager_fqn(node: Node, basename: str, timeout_sec: float = 5.0) -> st
     """
     deadline = time.time() + timeout_sec
     my_ns = node.get_namespace()
-    best = None
     while time.time() < deadline:
         candidates = node.get_node_names_and_namespaces()
         ranked = []
@@ -163,6 +162,13 @@ class FakeJoyPublisher(Node):
       deflect(plugin, function, value)
         - For LT/RT (axes 2,5): value in [0,1]  (0 = neutral, 1 = fully pressed)
         - For others:           value in [-1,1]
+
+    Timer control:
+      start_publishing(rate_hz: float | None = None)
+      stop_publishing()
+      is_publishing() -> bool
+      set_publish_rate(rate_hz: float)
+      publish_once() / tick()
 
     Dynamic helpers (added via __getattr__):
       - <axis_func>(value)          -> deflect(plugin, func, value)
@@ -270,16 +276,15 @@ class FakeJoyPublisher(Node):
         self._pub = self.create_publisher(Joy, topic, qos)
         self.get_logger().info(f"Publishing Joy on '{topic}' at {self._joy_rate_hz} Hz")
 
-        period = 1.0 / max(self._joy_rate_hz, 1.0)
-        self._timer = self.create_timer(period, self._on_timer)
+        # Timer (can be stopped/started via public API)
+        self._timer: Optional[rclpy.timer.Timer] = None
+        self._create_timer()  # start running by default
 
-    # ---------- Public API ----------
+    # ---------- Public API (Inputs) ----------
     def press(self, plugin: str, function: str) -> None:
-        # Record a one-shot press; mapping will occur in the timer publish.
         self._pending_one_shot_keys.add(Key(plugin, function))
 
     def hold(self, plugin: str, function: str) -> None:
-        # Record a persistent press; mapping will occur in the timer publish.
         self._held_buttons.add(Key(plugin, function))
 
     def release(self, plugin: str, function: str) -> None:
@@ -288,28 +293,75 @@ class FakeJoyPublisher(Node):
         self._pending_one_shot_keys.discard(key)
 
     def deflect(self, plugin: str, function: str, value: float) -> None:
-        # Store logical intent; mapping/validation occurs in timer publish.
         self._deflected_axes[Key(plugin, function)] = float(value)
 
-    def clear_all(self):
-        """Clear all held buttons and deflected axes."""
+    def clear_all(self) -> None:
+        """Clear all held buttons and deflected axes and reset physical state."""
         self._held_buttons.clear()
         self._deflected_axes.clear()
         self._pending_one_shot_keys.clear()
         self._reset_physical_state()
 
     def log_intents(self) -> None:
-        """Log current intents for debugging."""
         self.get_logger().info(
             f"Intents: held={self._held_buttons}, one-shots={self._pending_one_shot_keys}, deflected={self._deflected_axes}"
         )
 
+    # ---------- Public API (Timer control) ----------
+    def start_publishing(self, rate_hz: Optional[float] = None) -> None:
+        """(Re)start periodic publishing. Optionally change the publish rate."""
+        if rate_hz is not None:
+            self.set_publish_rate(rate_hz)
+            return  # set_publish_rate restarts if running
+        if self._timer is None:
+            self._create_timer()
+        else:
+            # If timer exists but was canceled, recreate to be safe
+            try:
+                self._timer.reset()
+            except Exception:
+                self._create_timer()
+
+    def stop_publishing(self) -> None:
+        """Stop periodic publishing (the node remains usable via publish_once())."""
+        if self._timer is not None:
+            try:
+                self._timer.cancel()
+            except Exception:
+                pass
+
+    def is_publishing(self) -> bool:
+        """Return True if the periodic publisher timer is active."""
+        return self._timer is not None and self._timer.is_canceled() is False
+
+    def set_publish_rate(self, rate_hz: float) -> None:
+        """Change publish rate. If currently publishing, restart the timer with the new rate."""
+        rate_hz = float(rate_hz)
+        if rate_hz <= 0.0:
+            raise ValueError("rate_hz must be > 0")
+        self._joy_rate_hz = rate_hz
+        # Recreate timer with new period if running
+        was_running = self.is_publishing()
+        if self._timer is not None:
+            try:
+                self._timer.cancel()
+            except Exception:
+                pass
+            self._timer = None
+        if was_running:
+            self._create_timer()
+
+    def publish_once(self) -> None:
+        """Publish a single Joy message by running one scheduling tick."""
+        self._on_timer()
+
+    # Short alias
+    tick = publish_once
+
     # ---------- Dynamic method plumbing ----------
     def _reindex_functions(self) -> None:
-        """Build reverse indices from normalized function name -> Keys."""
         axis_index: Dict[str, Set[Key]] = {}
         button_index: Dict[str, Set[Key]] = {}
-
         for mode in self._modes.values():
             for key in mode.axis_map.keys():
                 s = _safe_func_name(key.function)
@@ -317,20 +369,10 @@ class FakeJoyPublisher(Node):
             for key in mode.button_map.keys():
                 s = _safe_func_name(key.function)
                 button_index.setdefault(s, set()).add(key)
-
         self._axis_name_to_keys = axis_index
         self._button_name_to_keys = button_index
 
     def __getattr__(self, name: str):
-        """
-        Dynamic helpers:
-          - <axis_func>(value)          -> deflect(plugin, func, value)
-          - press_<button_func>()       -> press(plugin, func)
-          - hold_<button_func>()        -> hold(plugin, func)
-          - release_<button_func>()     -> release(plugin, func)
-        Resolution prefers functions present in the current active mode
-        when ambiguous; otherwise raises AttributeError with details.
-        """
         # Button helpers with prefixes
         for prefix, caller in (
             ("press_", self.press),
@@ -339,14 +381,11 @@ class FakeJoyPublisher(Node):
         ):
             if name.startswith(prefix):
                 fn_safe = name[len(prefix) :].lower()
-                candidates = self._button_name_to_keys.get(fn_safe, set())
-                if not candidates:
-                    candidates = self._button_name_to_keys.get(
-                        _safe_func_name(fn_safe), set()
-                    )
+                candidates = self._button_name_to_keys.get(
+                    fn_safe, set()
+                ) or self._button_name_to_keys.get(_safe_func_name(fn_safe), set())
                 if not candidates:
                     raise AttributeError(f"No button function named '{fn_safe}' found")
-
                 mode = self._modes.get(self._active_mode)
                 if mode:
                     in_mode = _keys_in_mode_button(candidates, mode)
@@ -365,7 +404,6 @@ class FakeJoyPublisher(Node):
                     f"Ambiguous button '{fn_safe}' across modes: "
                     f"{[f'{k.plugin}::{k.function}' for k in sorted(candidates, key=lambda x:(x.plugin,x.function))]}"
                 )
-
         # Axis helper (no prefix) -> deflect(value)
         fn_safe = _safe_func_name(name)
         candidates = self._axis_name_to_keys.get(fn_safe, set())
@@ -391,8 +429,13 @@ class FakeJoyPublisher(Node):
         )
 
     # ---------- Internals ----------
+    def _create_timer(self) -> None:
+        """Create (or recreate) the internal rclpy Timer using the current rate."""
+        period = 1.0 / max(self._joy_rate_hz, 1e-6)
+        # rclpy Timer can’t be restarted after cancel reliably; recreate cleanly
+        self._timer = self.create_timer(period, self._on_timer)
+
     def _active_config_cb(self, msg: String) -> None:
-        # Update manager-reported config and keep local active mode in sync
         self._current_manager_config = msg.data or ""
         self._active_mode = self._current_manager_config
 
@@ -409,23 +452,19 @@ class FakeJoyPublisher(Node):
         )
         target_modes: Set[str] = set()
 
-        self.get_logger().info(
-            f"on_timer: intents={intents}, held={self._held_buttons}, one-shots={self._pending_one_shot_keys}, deflected={self._deflected_axes}"
-        )
         for key in intents:
             m = self._find_mode_for_key(key)
-            self.get_logger().info(f"Key {key} found in mode {m} #44")
             if m is None:
                 raise KeyError(f"{key} not found in any loaded mode")
             target_modes.add(m)
 
         if len(target_modes) > 1:
-            # Impossible configuration: inputs span multiple non-active modes
+            # Inputs span multiple modes -> impossible configuration
             raise RuntimeError(
                 f"Conflicting intents across multiple modes: {sorted(target_modes)}"
             )
 
-        # If a switch is needed, publish a switch-only Joy and wait for manager confirmation
+        # If a switch is needed, publish a switch-only Joy and wait for confirmation
         if len(target_modes) == 1 and self._current_manager_config != next(
             iter(target_modes)
         ):
@@ -434,8 +473,6 @@ class FakeJoyPublisher(Node):
                 raise RuntimeError(f"No meta button mapped for target mode '{target}'")
 
             switch_btn = self._config_to_button[target]
-
-            # Publish a *switch-only* Joy: only the meta button for that config is pressed
             msg_switch = Joy()
             msg_switch.header.stamp = self.get_clock().now().to_msg()
             msg_switch.axes = self._neutral_axes()
@@ -443,11 +480,9 @@ class FakeJoyPublisher(Node):
             if 0 <= switch_btn < BUTTON_COUNT:
                 msg_switch.buttons[switch_btn] = 1
             self._pub.publish(msg_switch)
+            return  # wait for active_config to change
 
-            # Do not apply current changes until confirmation from manager arrives.
-            return
-
-        # No switch needed (manager already in correct mode) -> publish the actual Joy
+        # No switch needed -> publish actual Joy
         self._active_mode = self._current_manager_config  # keep synced
 
         axes = self._neutral_axes()
@@ -459,7 +494,6 @@ class FakeJoyPublisher(Node):
             if key in mode.button_map:
                 buttons[mode.button_map[key]] = 1
             else:
-                # held key not in this mode -> impossible combo
                 raise RuntimeError(
                     f"Held button {key} not available in active mode '{self._active_mode}'"
                 )
@@ -468,24 +502,19 @@ class FakeJoyPublisher(Node):
         for key in list(self._pending_one_shot_keys):
             if key in mode.button_map:
                 buttons[mode.button_map[key]] = 1
-                self.get_logger().info(
-                    f"One-shot press for {key} in mode '{self._active_mode}'"
-                )
             else:
                 raise RuntimeError(
                     f"Pressed button {key} not available in active mode '{self._active_mode}'"
                 )
-        # Clear one-shots after publishing
         self._pending_one_shot_keys.clear()
 
-        # Apply axes (with logical->raw mapping, and validation by axis index)
+        # Apply axes
         for key, logical in list(self._deflected_axes.items()):
             if key not in mode.axis_map:
                 raise RuntimeError(
                     f"Axis {key} not available in active mode '{self._active_mode}'"
                 )
             idx = mode.axis_map[key]
-            # Validate ranges now that we know the axis index
             if idx in SPECIAL_TRIGGER_AXES:
                 if not (0.0 <= logical <= 1.0):
                     raise ValueError(
@@ -503,15 +532,11 @@ class FakeJoyPublisher(Node):
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.axes = axes
         msg.buttons = buttons
-        self.get_logger().info(
-            f"Publishing Joy: mode='{self._active_mode}', axes={axes}, buttons={buttons}"
-        )
         self._pub.publish(msg)
 
     def _parse_mode(self, name: str, cfg: dict, reserved_buttons: Set[int]) -> Mode:
         buttons = {}
         axes = {}
-
         for k, v in (cfg.get("buttons") or {}).items():
             idx = int(k)
             if idx in reserved_buttons:
@@ -520,14 +545,12 @@ class FakeJoyPublisher(Node):
             func = (v or {}).get("function", "") or ""
             if plugin and func:
                 buttons[Key(plugin, func)] = idx
-
         for k, v in (cfg.get("axes") or {}).items():
             idx = int(k)
             plugin = (v or {}).get("plugin", "") or ""
             func = (v or {}).get("function", "") or ""
             if plugin and func:
                 axes[Key(plugin, func)] = idx
-
         return Mode(name=name, button_map=buttons, axis_map=axes)
 
     def _get_mapping_for_key(self, key: Key) -> Mapping:
@@ -575,12 +598,12 @@ class FakeJoyPublisher(Node):
 def main():
     rclpy.init()
     node = FakeJoyPublisher()
-    # dynamic examples (work after initial active_config is received)
-    node.drive(0.5)
-    # node.press_flipper_back_down()
-    node.hold_flipper_back_up()
-    # node.release_flipper_back_down()
-    # node.deflect("hector_gamepad_manager_plugins::ManipulationPlugin", "move_up_down", 0.5)
+    # Example usage of the new API:
+    node.stop_publishing()  # switch to manual mode
+    node.drive(0.5)  # queue an intent
+    node.steer(-0.3)  # queue another intent
+    node.publish_once()  # publish one tick manually
+    node.start_publishing()  # resume periodic publishing at the configured rate
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
