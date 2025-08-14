@@ -88,7 +88,6 @@ This plugin is used to drive the robot using a gamepad.
 - `steer`: Left and right steering of the robot. Default button: (Left joystick left/right)
 - `fast`: Fast driving mode. Default button: (A)
 - `slow`: Slow driving mode. Default button: (X)
-- `invert_steering`: Inverts Forward/Backward and Left/Right Steering: (Manufacturer Button)
 
 ## FlipperPlugin
 
@@ -126,6 +125,32 @@ world frame.
 - `close_gripper`: Close the gripper.
 - `hold_mode`: Toggle the hold mode. In hold mode the robot can be driven while the end-effector remains at its current
   position in the world frame.
+
+
+## BlackboardPlugin
+
+This plugin allows assigning buttons to directly manipulate variables stored in the shared **blackboard**.
+It supports toggling and holding boolean values as well as setting string values.
+
+### Functions
+
+#### Toggle
+
+* `toggle/<var_name>`
+  Toggles the boolean variable `<var_name>` in the blackboard. Initially, the variable is set to `false`.
+  Example: `toggle/inverted_steering` → flips between `true` and `false` each time the button is pressed.
+
+#### Hold
+
+* `hold/<var_name>`
+  Sets the boolean variable `<var_name>` in the blackboard to `true` while the button is pressed, and resets it to `false` when released.
+  Example: `hold/safety_mode` → `safety_mode = true` when held, `false` when released.
+
+#### Set String
+
+* `set/<var_name>/to/<value>`
+  Sets the string variable `<var_name>` in the blackboard to `<value>` when the button is pressed.
+  Example: `set/ui_message/to/arm:ready` → writes `"arm:ready"` to `ui_message`.
 
 
 

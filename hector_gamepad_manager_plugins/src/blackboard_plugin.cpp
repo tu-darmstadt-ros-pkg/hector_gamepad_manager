@@ -12,7 +12,7 @@ void BlackboardPlugin::initialize( const rclcpp::Node::SharedPtr &node )
 {
   node_ = node;
   // Nothing to declare; we act purely on blackboard keys.
-  RCLCPP_INFO( node_->get_logger(), "[blackboard_plugin] initialized" );
+  RCLCPP_DEBUG( node_->get_logger(), "[blackboard_plugin] initialized" );
 }
 
 std::string BlackboardPlugin::getPluginName()
@@ -24,13 +24,13 @@ std::string BlackboardPlugin::getPluginName()
 void BlackboardPlugin::activate()
 {
   active_ = true;
-  RCLCPP_INFO( node_->get_logger(), "[blackboard_plugin] activated" );
+  RCLCPP_DEBUG( node_->get_logger(), "[blackboard_plugin] activated" );
 }
 
 void BlackboardPlugin::deactivate()
 {
   active_ = false;
-  RCLCPP_INFO( node_->get_logger(), "[blackboard_plugin] deactivated" );
+  RCLCPP_DEBUG( node_->get_logger(), "[blackboard_plugin] deactivated" );
 }
 
 bool BlackboardPlugin::startsWith( const std::string &s, const char *prefix )
@@ -136,29 +136,30 @@ void BlackboardPlugin::onToggle( const std::string &var ) const
   // Fetch or create bool with default false, then invert
   bool &ref = blackboard_->get_or_emplace<bool>( var, false );
   ref = !ref;
-  RCLCPP_INFO( node_->get_logger(), "[blackboard_plugin] toggle %s -> %s", var.c_str(),
-               ref ? "true" : "false" );
+  RCLCPP_DEBUG( node_->get_logger(), "[blackboard_plugin] toggle %s -> %s", var.c_str(),
+                ref ? "true" : "false" );
 }
 
 void BlackboardPlugin::onHoldPress( const std::string &var ) const
 {
   bool &ref = blackboard_->get_or_emplace<bool>( var, false );
   ref = true;
-  RCLCPP_INFO( node_->get_logger(), "[blackboard_plugin] hold %s -> true", var.c_str() );
+  RCLCPP_DEBUG( node_->get_logger(), "[blackboard_plugin] hold %s -> true", var.c_str() );
 }
 
 void BlackboardPlugin::onHoldRelease( const std::string &var ) const
 {
   bool &ref = blackboard_->get_or_emplace<bool>( var, false );
   ref = false;
-  RCLCPP_INFO( node_->get_logger(), "[blackboard_plugin] hold %s -> false", var.c_str() );
+  RCLCPP_DEBUG( node_->get_logger(), "[blackboard_plugin] hold %s -> false", var.c_str() );
 }
 
 void BlackboardPlugin::onSetString( const std::string &var, const std::string &value ) const
 {
   auto &ref = blackboard_->get_or_emplace<std::string>( var, std::string{} );
   ref = value;
-  RCLCPP_INFO( node_->get_logger(), "[blackboard_plugin] set %s -> '%s'", var.c_str(), value.c_str() );
+  RCLCPP_DEBUG( node_->get_logger(), "[blackboard_plugin] set %s -> '%s'", var.c_str(),
+                value.c_str() );
 }
 
 } // namespace hector_gamepad_manager_plugins
