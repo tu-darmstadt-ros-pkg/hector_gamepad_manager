@@ -280,6 +280,7 @@ class FakeJoyPublisher(Node):
 
     # ---------- Public API (Inputs) ----------
     def press(self, plugin: str, function: str) -> None:
+        self.get_logger().info(f"Pressing button {plugin}::{function}")
         self._pending_one_shot_keys.add(Key(plugin, function))
 
     def hold(self, plugin: str, function: str) -> None:
@@ -451,7 +452,7 @@ class FakeJoyPublisher(Node):
         target_modes: Set[str] = set()
 
         for key in intents:
-            m = self._find_mode_for_key(key)
+            m = self._find_mode_for_key(key, self._current_manager_config)
             if m is None:
                 raise KeyError(f"{key} not found in any loaded mode")
             target_modes.add(m)
@@ -564,24 +565,13 @@ class FakeJoyPublisher(Node):
         )
         return Mode(name=name, button_map=buttons, axis_map=axes)
 
-    def _get_mapping_for_key(self, key: Key) -> Mapping:
-        mode = self._modes[self._active_mode]
-        if key in mode.button_map:
-            return Mapping(button_idx=mode.button_map[key], axis_idx=None)
-        if key in mode.axis_map:
-            return Mapping(button_idx=None, axis_idx=mode.axis_map[key])
-        m = self._find_mode_for_key(key)
-        if m is None:
-            raise KeyError(f"{key} not found in any loaded mode")
-        raise KeyError(
-            f"{key} exists in mode '{m}' but not in active mode '{self._active_mode}'"
-        )
-
-    def _key_available_in_mode(self, mode_name: str, key: Key) -> bool:
-        mode = self._modes[mode_name]
-        return key in mode.button_map or key in mode.axis_map
-
-    def _find_mode_for_key(self, key: Key) -> Optional[str]:
+    def _find_mode_for_key(self, key: Key, active_mode: str) -> Optional[str]:
+        # preferred: active mode first, then all modes
+        if (
+            key in self._modes[active_mode].button_map
+            or key in self._modes[active_mode].axis_map
+        ):
+            return active_mode
         for name, mode in self._modes.items():
             if key in mode.button_map or key in mode.axis_map:
                 return name

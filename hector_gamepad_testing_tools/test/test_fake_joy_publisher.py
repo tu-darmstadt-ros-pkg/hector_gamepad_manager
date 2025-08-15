@@ -18,7 +18,10 @@ from sensor_msgs.msg import Joy
 from ament_index_python.packages import get_package_share_directory
 
 # Import the Python class directly so we can drive it via API
-from hector_gamepad_testing_tools.fake_joy_publisher import FakeJoyPublisher
+from hector_gamepad_testing_tools.fake_joy_publisher import (
+    FakeJoyPublisher,
+    _safe_func_name,
+)
 
 
 # ------------------------
@@ -234,16 +237,14 @@ class TestFakeJoyPublisher(unittest.TestCase):
 
         # ---------- Buttons: press (one-shot), hold, release ----------
         for key, idx in mode.button_map.items():
-            safe = _safe_name(key.function)
+            safe = _safe_func_name(key.function)
             # --- One-shot press ---
             self.fake.clear_all()
             self.probe.drain_joy()
 
             press_dyn = getattr(self.fake, f"press_{safe}", None)
-            if callable(press_dyn):
-                press_dyn()
-            else:
-                self.fake.press(key.plugin, key.function)
+            self.assertTrue(callable(press_dyn))
+            press_dyn()
 
             self.fake._on_timer()
             self.assertTrue(
@@ -268,10 +269,8 @@ class TestFakeJoyPublisher(unittest.TestCase):
             self.probe.drain_joy()
 
             hold_dyn = getattr(self.fake, f"hold_{safe}", None)
-            if callable(hold_dyn):
-                hold_dyn()
-            else:
-                self.fake.hold(key.plugin, key.function)
+            self.assertTrue(callable(hold_dyn))
+            hold_dyn()
 
             # two frames while held
             self.fake._on_timer()
@@ -291,10 +290,8 @@ class TestFakeJoyPublisher(unittest.TestCase):
             )
 
             release_dyn = getattr(self.fake, f"release_{safe}", None)
-            if callable(release_dyn):
-                release_dyn()
-            else:
-                self.fake.release(key.plugin, key.function)
+            self.assertTrue(callable(release_dyn))
+            release_dyn()
 
             self.fake._on_timer()
             self.assertTrue(
@@ -305,7 +302,7 @@ class TestFakeJoyPublisher(unittest.TestCase):
 
         # ---------- Axes: deflect(0.5) then reset to baseline ----------
         for key, idx in mode.axis_map.items():
-            safe = _safe_name(key.function)
+            safe = _safe_func_name(key.function)
 
             # Get baseline axis value with no intents
             self.fake.clear_all()
@@ -318,10 +315,8 @@ class TestFakeJoyPublisher(unittest.TestCase):
 
             # Deflect to 0.5 using dynamic helper if present, else generic API
             axis_dyn = getattr(self.fake, safe, None)  # e.g., drive()
-            if callable(axis_dyn):
-                axis_dyn(0.5)
-            else:
-                self.fake.deflect(key.plugin, key.function, 0.5)
+            self.assertTrue(callable(axis_dyn))
+            axis_dyn(0.5)
 
             self.fake._on_timer()
             self.assertTrue(
@@ -336,10 +331,7 @@ class TestFakeJoyPublisher(unittest.TestCase):
             )
 
             # Reset to 0.0 (should return to baseline; triggers may map 0.0 -> raw +1.0 baseline)
-            if callable(axis_dyn):
-                axis_dyn(0.0)
-            else:
-                self.fake.deflect(key.plugin, key.function, 0.0)
+            axis_dyn(0.0)
 
             self.fake._on_timer()
             self.assertTrue(
@@ -416,7 +408,7 @@ class TestFakeJoyPublisher(unittest.TestCase):
             self.fake.deflect(target_key.plugin, target_key.function, 0.5)
         else:
             getattr(
-                self.fake, f"press_{_safe_name(target_key.function)}", lambda: None
+                self.fake, f"press_{_safe_func_name(target_key.function)}", lambda: None
             )()
 
         # Observe at least one Joy with ONLY the switch button set (keep publishing while we wait)
@@ -549,13 +541,6 @@ class TestFakeJoyPublisher(unittest.TestCase):
         self.assertTrue(self.probe.wait_for_joy_msgs(2, 1.0))
         second = self.probe.joy_msgs[-1]
         self.assertEqual(second.buttons[idx], 0)
-
-
-# Small helper for optional dynamic invocation in tests
-def _safe_name(s: str) -> str:
-    import re
-
-    return re.sub(r"[^0-9a-zA-Z]+", "_", s).strip("_").lower()
 
 
 @launch_testing.post_shutdown_test()
