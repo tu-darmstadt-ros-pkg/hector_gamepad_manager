@@ -219,28 +219,138 @@ class TestFakeJoyPublisher(unittest.TestCase):
         )
         self.assertEqual(self.probe.active_config, self.fake._current_manager_config)
 
-    def test_01_dynamic_methods_exist(self):
-        """Dynamic helpers like drive(), press_flipper_back_down() should exist if present in configs."""
-        axis_ok = False
-        try:
-            getattr(self.fake, "drive")
-            axis_ok = True
-        except AttributeError:
-            pass
-        try:
-            getattr(self.fake, "steer")
-            axis_ok = True
-        except AttributeError:
-            pass
-        self.assertTrue(
-            axis_ok, "No dynamic axis helper (e.g., drive/steer) found in configs"
-        )
+    def test_01_config_driven_buttons_and_axes(self):
+        """
+        Enumerate all functions from the ACTIVE config :
+        - For every mapped BUTTON: press (one-shot), hold, release.
+        - For every mapped AXIS: deflect to 0.5 and then reset to baseline.
+        """
+        active_mode = self.fake._active_mode
+        mode = self.fake._modes[active_mode]
 
-        try:
-            getattr(self.fake, "press_flipper_back_down")
-        except AttributeError:
-            self.probe.get_logger().warn(
-                "press_flipper_back_down() not found—config may differ"
+        # make sure the mode has buttons and axes
+        self.assertTrue(len(mode.button_map) > 0)
+        self.assertTrue(len(mode.axis_map) > 0)
+
+        # ---------- Buttons: press (one-shot), hold, release ----------
+        for key, idx in mode.button_map.items():
+            safe = _safe_name(key.function)
+            # --- One-shot press ---
+            self.fake.clear_all()
+            self.probe.drain_joy()
+
+            press_dyn = getattr(self.fake, f"press_{safe}", None)
+            if callable(press_dyn):
+                press_dyn()
+            else:
+                self.fake.press(key.plugin, key.function)
+
+            self.fake._on_timer()
+            self.assertTrue(
+                self.probe.wait_for_joy_msgs(1, 1.5), f"{key} press: no Joy"
+            )
+            last = self.probe.joy_msgs[-1]
+            self.assertEqual(
+                last.buttons[idx], 1, f"{key} press should be high on index {idx}"
+            )
+
+            self.fake._on_timer()
+            self.assertTrue(
+                self.probe.wait_for_joy_msgs(2, 1.0), f"{key} press: no 2nd Joy"
+            )
+            last = self.probe.joy_msgs[-1]
+            self.assertEqual(
+                last.buttons[idx], 0, f"{key} press should clear after one tick"
+            )
+
+            # --- Hold then Release ---
+            self.fake.clear_all()
+            self.probe.drain_joy()
+
+            hold_dyn = getattr(self.fake, f"hold_{safe}", None)
+            if callable(hold_dyn):
+                hold_dyn()
+            else:
+                self.fake.hold(key.plugin, key.function)
+
+            # two frames while held
+            self.fake._on_timer()
+            self.assertTrue(self.probe.wait_for_joy_msgs(1, 1.5), f"{key} hold: no Joy")
+            last = self.probe.joy_msgs[-1]
+            self.assertEqual(
+                last.buttons[idx], 1, f"{key} should be held on first frame"
+            )
+
+            self.fake._on_timer()
+            self.assertTrue(
+                self.probe.wait_for_joy_msgs(2, 1.5), f"{key} hold: no second Joy"
+            )
+            last = self.probe.joy_msgs[-1]
+            self.assertEqual(
+                last.buttons[idx], 1, f"{key} should still be held on second frame"
+            )
+
+            release_dyn = getattr(self.fake, f"release_{safe}", None)
+            if callable(release_dyn):
+                release_dyn()
+            else:
+                self.fake.release(key.plugin, key.function)
+
+            self.fake._on_timer()
+            self.assertTrue(
+                self.probe.wait_for_joy_msgs(3, 1.5), f"{key} release: no Joy"
+            )
+            last = self.probe.joy_msgs[-1]
+            self.assertEqual(last.buttons[idx], 0, f"{key} should be released")
+
+        # ---------- Axes: deflect(0.5) then reset to baseline ----------
+        for key, idx in mode.axis_map.items():
+            safe = _safe_name(key.function)
+
+            # Get baseline axis value with no intents
+            self.fake.clear_all()
+            self.probe.drain_joy()
+            self.fake._on_timer()
+            self.assertTrue(
+                self.probe.wait_for_joy_msgs(1, 1.5), f"{key} axis baseline: no Joy"
+            )
+            baseline = self.probe.joy_msgs[-1].axes[idx]
+
+            # Deflect to 0.5 using dynamic helper if present, else generic API
+            axis_dyn = getattr(self.fake, safe, None)  # e.g., drive()
+            if callable(axis_dyn):
+                axis_dyn(0.5)
+            else:
+                self.fake.deflect(key.plugin, key.function, 0.5)
+
+            self.fake._on_timer()
+            self.assertTrue(
+                self.probe.wait_for_joy_msgs(2, 1.5), f"{key} axis deflect: no Joy"
+            )
+            after = self.probe.joy_msgs[-1].axes[idx]
+            self.assertNotAlmostEqual(
+                after,
+                baseline,
+                places=3,
+                msg=f"{key} deflect should change axis[{idx}]",
+            )
+
+            # Reset to 0.0 (should return to baseline; triggers may map 0.0 -> raw +1.0 baseline)
+            if callable(axis_dyn):
+                axis_dyn(0.0)
+            else:
+                self.fake.deflect(key.plugin, key.function, 0.0)
+
+            self.fake._on_timer()
+            self.assertTrue(
+                self.probe.wait_for_joy_msgs(3, 1.5), f"{key} axis reset: no Joy"
+            )
+            ret = self.probe.joy_msgs[-1].axes[idx]
+            self.assertAlmostEqual(
+                ret,
+                baseline,
+                places=3,
+                msg=f"{key} axis[{idx}] should return to baseline",
             )
 
     def test_02_trigger_mapping(self):

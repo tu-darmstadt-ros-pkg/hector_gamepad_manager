@@ -19,8 +19,9 @@ from ament_index_python.packages import get_package_share_directory
 # =========================
 # Axis layout (Joy message)
 # =========================
+# axis and button mapping see config files: e.g. driving.yaml
 AXIS_COUNT = 8
-BUTTON_COUNT = 11
+BUTTON_COUNT = 25
 
 AXIS_NEUTRALS = [0.0] * AXIS_COUNT
 AXIS_NEUTRALS[2] = 1.0  # LT neutral
@@ -501,6 +502,9 @@ class FakeJoyPublisher(Node):
         # Apply one-shot presses
         for key in list(self._pending_one_shot_keys):
             if key in mode.button_map:
+                self.get_logger().info(
+                    f"Pressing button {key} in mode '{self._active_mode} [button index: {mode.button_map[key]} vs. button len {len(mode.button_map)} ]"
+                )
                 buttons[mode.button_map[key]] = 1
             else:
                 raise RuntimeError(
@@ -554,6 +558,10 @@ class FakeJoyPublisher(Node):
             func = (v or {}).get("function", "") or ""
             if plugin and func:
                 axes[Key(plugin, func)] = idx
+        self.get_logger().info(
+            f"Loaded mode '{name}' with {len(buttons)} buttons and {len(axes)} axes"
+            f"\nButtons:{yaml.dump(buttons)}, \nAxes:{yaml.dump(axes)}"
+        )
         return Mode(name=name, button_map=buttons, axis_map=axes)
 
     def _get_mapping_for_key(self, key: Key) -> Mapping:
