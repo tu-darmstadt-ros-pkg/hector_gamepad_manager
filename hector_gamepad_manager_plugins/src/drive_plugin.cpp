@@ -36,9 +36,7 @@ void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node )
       node_->create_publisher<geometry_msgs::msg::TwistStamped>( "cmd_vel", 1 );
 }
 
-std::string DrivePlugin::getPluginName() { return "drive_plugin"; }
-
-void DrivePlugin::handleAxis( const std::string &function, const double value )
+void DrivePlugin::handleAxis( const std::string &function, const std::string &id, const double value )
 {
   if ( function == "drive" ) {
     drive_value_ = value;
@@ -47,7 +45,7 @@ void DrivePlugin::handleAxis( const std::string &function, const double value )
   }
 }
 
-void DrivePlugin::handlePress( const std::string &function )
+void DrivePlugin::handlePress( const std::string &function, const std::string &id )
 {
   if ( function == "fast" ) {
     fast_mode_active_ = true;
@@ -56,7 +54,7 @@ void DrivePlugin::handlePress( const std::string &function )
   }
 }
 
-void DrivePlugin::handleRelease( const std::string &function )
+void DrivePlugin::handleRelease( const std::string &function, const std::string &id )
 {
   if ( function == "fast" ) {
     fast_mode_active_ = false;

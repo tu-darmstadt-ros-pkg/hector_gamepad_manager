@@ -73,8 +73,8 @@ bool HectorGamepadManager::loadConfig( const std::string &pkg_name, const std::s
     // Add empty mappings for the filename
     configs_[file_name] = GamepadConfig();
 
-    if ( !initMappings( config, "buttons", configs_[file_name].button_mappings ) ||
-         !initMappings( config, "axes", configs_[file_name].axis_mappings ) ) {
+    if ( !initMappings( config, "buttons", file_name, configs_[file_name].button_mappings ) ||
+         !initMappings( config, "axes", file_name, configs_[file_name].axis_mappings ) ) {
       return false;
     }
 
@@ -104,14 +104,19 @@ bool HectorGamepadManager::switchConfig( const std::string &config_name )
 }
 
 bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::string &type,
+                                         const std::string &config_name,
                                          std::unordered_map<int, FunctionMapping> &mappings )
 {
   if ( config[type] ) {
     for ( const auto &entry : config[type] ) {
       int id = entry.first.as<int>();
-      YAML::Node mapping = entry.second;
+      const YAML::Node mapping = entry.second;
       auto plugin_name = mapping["plugin"].as<std::string>();
       auto function = mapping["function"].as<std::string>();
+      const std::string function_id = config_name + "_" + std::to_string( id );
+      blackboard_->set_from_yaml( mapping["args"], plugin_name + std::string( "_" ) + function_id );
+      RCLCPP_WARN( ocs_ns_node_->get_logger(), "Mapping %s for %s with id %d -> function_id %s",
+                   function.c_str(), type.c_str(), id, function_id.c_str() );
 
       if ( !plugin_name.empty() && !function.empty() ) {
 
@@ -120,7 +125,7 @@ bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::st
           try {
             std::shared_ptr<GamepadFunctionPlugin> plugin =
                 plugin_loader_.createSharedInstance( plugin_name );
-            plugin->initializePlugin( robot_ns_node_, blackboard_ );
+            plugin->initializePlugin( robot_ns_node_, plugin_name, blackboard_ );
             plugins_[plugin_name] = plugin;
             RCLCPP_INFO( ocs_ns_node_->get_logger(), "Loaded plugin: %s", plugin_name.c_str() );
           } catch ( const std::exception &e ) {
@@ -163,14 +168,16 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
   for ( const auto &button_mapping : configs_[active_config_].button_mappings ) {
     const bool pressed = inputs.buttons[button_mapping.first];
     const auto &action = button_mapping.second;
-    button_mapping.second.plugin->handleButton( action.function_name, pressed );
+    const std::string id = active_config_ + "_" + std::to_string( button_mapping.first );
+    button_mapping.second.plugin->handleButton( action.function_name, id, pressed );
   }
 
   // Handle axes
   for ( const auto &axis_mapping : configs_[active_config_].axis_mappings ) {
     const float value = inputs.axes[axis_mapping.first];
     const auto &action = axis_mapping.second;
-    axis_mapping.second.plugin->handleAxis( action.function_name, value );
+    const std::string id = active_config_ + "_" + std::to_string( axis_mapping.first );
+    axis_mapping.second.plugin->handleAxis( action.function_name, id, value );
   }
 
   // Update all active plugins

@@ -11,7 +11,8 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
-
+find_package(rclcpp REQUIRED)
+find_package(yaml-cpp REQUIRED)
 # Header-only interface target
 add_library(${PROJECT_NAME} INTERFACE)
 
@@ -19,6 +20,7 @@ target_include_directories(
   ${PROJECT_NAME}
   INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
             "$<INSTALL_INTERFACE:include>")
+target_link_libraries(${PROJECT_NAME} INTERFACE yaml-cpp)
 
 install(
   TARGETS ${PROJECT_NAME}
@@ -42,6 +44,14 @@ if(BUILD_TESTING)
     target_compile_features(test_blackboard PRIVATE cxx_std_17)
     target_compile_options(test_blackboard PRIVATE -Wall -Wextra -Wpedantic)
   endif()
+  ament_add_gtest(test_blackboard_yaml test/test_blackboard_yaml.cpp)
+  if(TARGET test_blackboard_yaml)
+    target_link_libraries(test_blackboard_yaml ${PROJECT_NAME})
+    target_compile_features(test_blackboard_yaml PRIVATE cxx_std_17)
+    target_compile_options(test_blackboard_yaml PRIVATE -Wall -Wextra
+                                                        -Wpedantic)
+  endif()
 endif()
 
+ament_export_dependencies(yaml-cpp)
 ament_package()

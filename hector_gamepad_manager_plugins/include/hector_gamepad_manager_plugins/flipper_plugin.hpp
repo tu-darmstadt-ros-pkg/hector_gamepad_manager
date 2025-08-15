@@ -14,13 +14,11 @@ class FlipperPlugin : public hector_gamepad_plugin_interface::GamepadFunctionPlu
 public:
   void initialize( const rclcpp::Node::SharedPtr &node ) override;
 
-  std::string getPluginName() override;
+  void handlePress( const std::string &function, const std::string &id ) override;
 
-  void handlePress( const std::string &function ) override;
+  void handleRelease( const std::string &function, const std::string &id ) override;
 
-  void handleRelease( const std::string &function ) override;
-
-  void handleAxis( const std::string &function, const double value ) override;
+  void handleAxis( const std::string &function, const std::string &id, const double value ) override;
 
   void update() override;
 

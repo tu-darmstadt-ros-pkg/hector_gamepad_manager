@@ -20,10 +20,8 @@ class MoveitPlugin final : public hector_gamepad_plugin_interface::GamepadFuncti
 public:
   void initialize( const rclcpp::Node::SharedPtr &node ) override;
 
-  std::string getPluginName() override;
-
-  void handlePress( const std::string &function ) override;
-  void handleRelease( const std::string &function ) override;
+  void handlePress( const std::string &function, const std::string &id ) override;
+  void handleRelease( const std::string &function, const std::string &id ) override;
 
   void update() override;
 
@@ -46,8 +44,8 @@ private:
   double getNormalizedJointPosition( const std::string &name ) const;
 
   static std::string toGroupPoseName( const std::string &group_name, const std::string &pose_name );
-  std::pair<std::string, std::string> fromGroupPoseName( const std::string &group_pose_name ) const;
-
+  std::pair<std::string, std::string> functionIdToGroupGroupAndPose( const std::string &function,
+                                                                     const std::string &id ) const;
   bool active_ = false;
   bool request_active_ = false;
   double joint_tolerance_ = 0.05;

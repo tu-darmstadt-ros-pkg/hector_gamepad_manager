@@ -15,12 +15,6 @@ void BlackboardPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   RCLCPP_DEBUG( node_->get_logger(), "[blackboard_plugin] initialized" );
 }
 
-std::string BlackboardPlugin::getPluginName()
-{
-  // Plugin name used for parameter namespaces if needed in the future
-  return "blackboard_plugin";
-}
-
 void BlackboardPlugin::activate()
 {
   active_ = true;
@@ -33,79 +27,23 @@ void BlackboardPlugin::deactivate()
   RCLCPP_DEBUG( node_->get_logger(), "[blackboard_plugin] deactivated" );
 }
 
-bool BlackboardPlugin::startsWith( const std::string &s, const char *prefix )
-{
-  const auto n = std::char_traits<char>::length( prefix );
-  return s.size() >= n && std::equal( prefix, prefix + n, s.begin() );
-}
-
-std::vector<std::string> BlackboardPlugin::split( const std::string &s, char delim )
-{
-  std::vector<std::string> out;
-  std::string cur;
-  for ( char c : s ) {
-    if ( c == delim ) {
-      out.emplace_back( std::move( cur ) );
-      cur.clear();
-    } else {
-      cur.push_back( c );
-    }
-  }
-  out.emplace_back( std::move( cur ) );
-  return out;
-}
-
-void BlackboardPlugin::handlePress( const std::string &function )
+void BlackboardPlugin::handlePress( const std::string &function, const std::string &id )
 {
   if ( !active_ )
     return;
 
-  // Supported patterns:
-  //  "toggle/<var>"
-  //  "hold/<var>"
-  //  "set/<var>/to/<value>"
-  if ( startsWith( function, "toggle/" ) ) {
-    const std::string var = function.substr( std::strlen( "toggle/" ) );
-    if ( var.empty() ) {
-      RCLCPP_WARN( node_->get_logger(), "[blackboard_plugin] toggle: empty variable name" );
-      return;
-    }
-    onToggle( var );
+  if ( function == "toggle" ) {
+    const std::string &name = getConfigValueOr<std::string>( id, "name" );
+    onToggle( name );
     return;
-  }
-
-  if ( startsWith( function, "hold/" ) ) {
-    const std::string var = function.substr( std::strlen( "hold/" ) );
-    if ( var.empty() ) {
-      RCLCPP_WARN( node_->get_logger(), "[blackboard_plugin] hold: empty variable name" );
-      return;
-    }
-    onHoldPress( var );
+  } else if ( function == "hold" ) {
+    const std::string &name = getConfigValueOr<std::string>( id, "name" );
+    onHoldPress( name );
     return;
-  }
-
-  if ( startsWith( function, "set/" ) ) {
-    // Expect exactly: set/<var>/to/<value>
-    // We allow <value> to contain further '/' (then the split size > 4). Join back everything after "to".
-    const auto parts = split( function, '/' ); // e.g. ["set","my_var","to","hello_world"]
-    if ( parts.size() >= 4 && parts[0] == "set" && parts[2] == "to" ) {
-      const std::string &var = parts[1];
-      if ( var.empty() ) {
-        RCLCPP_WARN( node_->get_logger(), "[blackboard_plugin] set: empty variable name" );
-        return;
-      }
-      // Re-join everything after index 2 as value to allow slashes
-      std::string value = parts[3];
-      for ( size_t i = 4; i < parts.size(); ++i ) {
-        value.push_back( '/' );
-        value += parts[i];
-      }
-      onSetString( var, value );
-      return;
-    }
-    RCLCPP_WARN( node_->get_logger(),
-                 "[blackboard_plugin] set: expected 'set/<var>/to/<value>', got '%s'",
-                 function.c_str() );
+  } else if ( function == "set" ) {
+    const std::string &to = getConfigValueOr<std::string>( id, "set" );
+    const std::string &name = getConfigValueOr<std::string>( id, "name" );
+    onSetString( name, to );
     return;
   }
 
@@ -113,19 +51,15 @@ void BlackboardPlugin::handlePress( const std::string &function )
                function.c_str() );
 }
 
-void BlackboardPlugin::handleRelease( const std::string &function )
+void BlackboardPlugin::handleRelease( const std::string &function, const std::string &id )
 {
   if ( !active_ )
     return;
 
   // Only "hold/<var>" reacts on release → set false
-  if ( startsWith( function, "hold/" ) ) {
-    const std::string var = function.substr( std::strlen( "hold/" ) );
-    if ( var.empty() ) {
-      RCLCPP_WARN( node_->get_logger(), "[blackboard_plugin] hold (release): empty variable name" );
-      return;
-    }
-    onHoldRelease( var );
+  if ( function == "hold" ) {
+    const auto name = getConfigValueOr<std::string>( id, "name" );
+    onHoldRelease( name );
     return;
   }
   // toggle/* and set/* are no-ops on release
