@@ -49,9 +49,7 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   active_ = true;
 }
 
-std::string FlipperPlugin::getPluginName() { return "flipper_plugin"; }
-
-void FlipperPlugin::handlePress( const std::string &function )
+void FlipperPlugin::handlePress( const std::string &function, const std::string &id )
 {
   // Activate respective individual mode only if other is inactive
   if ( function == "individual_front_flipper_control_mode" ) {
@@ -70,7 +68,7 @@ void FlipperPlugin::handlePress( const std::string &function )
     handleBasicControlInput( 1, true, function );
 }
 
-void FlipperPlugin::handleRelease( const std::string &function )
+void FlipperPlugin::handleRelease( const std::string &function, const std::string &id )
 {
   // Activate respective individual mode only if other is inactive
   if ( function == "individual_front_flipper_control_mode" ) {
@@ -95,7 +93,8 @@ void FlipperPlugin::handleRelease( const std::string &function )
     handleBasicControlInput( 0, true, function );
 }
 
-void FlipperPlugin::handleAxis( const std::string &function, const double value )
+void FlipperPlugin::handleAxis( const std::string &function, const std::string &id,
+                                const double value )
 {
   if ( individual_front_flipper_mode_ || individual_back_flipper_mode_ )
     handleIndividualFlipperControlInput( -1 * value, false, function );
