@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Tuple, Optional, Set
+from typing import Dict, Tuple, Optional, Set, FrozenSet
 import time
 import re
 
@@ -16,19 +16,32 @@ from std_msgs.msg import String
 import yaml
 from ament_index_python.packages import get_package_share_directory
 
-# =========================
-# Axis layout (Joy message)
-# =========================
-# axis and button mapping see config files: e.g. driving.yaml
-AXIS_COUNT = 8
-BUTTON_COUNT = 25
 
-AXIS_NEUTRALS = [0.0] * AXIS_COUNT
-AXIS_NEUTRALS[2] = 1.0  # LT neutral
-AXIS_NEUTRALS[5] = 1.0  # RT neutral
+@dataclass(frozen=True)
+class JoyLayout:
+    axis_count: int
+    button_count: int
+    neutrals: Tuple[float, ...]
+    trigger_axes: FrozenSet[int]
 
-# Axes that behave like "button-style triggers" logically (0..1) but publish raw [1..-1]
-SPECIAL_TRIGGER_AXES = {2, 5}
+    def neutral_axes(self) -> list[float]:
+        return list(self.neutrals)
+
+    def logical_to_raw(self, idx: int, val: float) -> float:
+        # apply range clamping -> [-1, 1] for all axes
+        val = max(-1.0, min(1.0, val))
+        return (1.0 - 2.0 * val) if idx in self.trigger_axes else val
+
+    @classmethod
+    def xbox_default(cls) -> "JoyLayout":
+        axis_count = 8
+        neutrals = tuple(1.0 if i in (2, 5) else 0.0 for i in range(axis_count))
+        return cls(
+            axis_count=axis_count,
+            button_count=25,
+            neutrals=neutrals,
+            trigger_axes=frozenset({2, 5}),
+        )
 
 
 @dataclass(frozen=True)
@@ -183,9 +196,10 @@ class FakeJoyPublisher(Node):
         node_name: str = "fake_joy_publisher",
         manager_node_basename: str = "hector_gamepad_manager",
         joy_rate_hz: float = 50.0,
+        layout: Optional[JoyLayout] = None,
     ):
         super().__init__(node_name)
-
+        self.layout = layout or JoyLayout.xbox_default()
         self.declare_parameter("joy_rate_hz", float(joy_rate_hz))
         self._joy_rate_hz = float(self.get_parameter("joy_rate_hz").value)
 
@@ -260,8 +274,8 @@ class FakeJoyPublisher(Node):
         self._active_mode: str = self._default_mode_name
 
         # Physical Joy state and logical intents
-        self._axes = self._neutral_axes()
-        self._buttons = [0] * BUTTON_COUNT
+        self._axes = self.layout.neutral_axes()
+        self._buttons = [0] * self.layout.button_count
         self._deflected_axes: Dict[Key, float] = (
             {}
         )  # logical values (0..1 for triggers, else -1..1)
@@ -474,9 +488,9 @@ class FakeJoyPublisher(Node):
             switch_btn = self._config_to_button[target]
             msg_switch = Joy()
             msg_switch.header.stamp = self.get_clock().now().to_msg()
-            msg_switch.axes = self._neutral_axes()
-            msg_switch.buttons = [0] * BUTTON_COUNT
-            if 0 <= switch_btn < BUTTON_COUNT:
+            msg_switch.axes = self.layout.neutral_axes()
+            msg_switch.buttons = [0] * self.layout.button_count
+            if 0 <= switch_btn < self.layout.button_count:
                 msg_switch.buttons[switch_btn] = 1
             self.get_logger().info(
                 f"Switching to mode '{target}' via button {switch_btn} (active config: '{self._current_manager_config}')"
@@ -487,8 +501,8 @@ class FakeJoyPublisher(Node):
         # No switch needed -> publish actual Joy
         self._active_mode = self._current_manager_config  # keep synced
 
-        axes = self._neutral_axes()
-        buttons = [0] * BUTTON_COUNT
+        axes = self.layout.neutral_axes()
+        buttons = [0] * self.layout.button_count
         mode = self._modes[self._active_mode]
 
         # Apply held buttons
@@ -520,17 +534,7 @@ class FakeJoyPublisher(Node):
                     f"Axis {key} not available in active mode '{self._active_mode}'"
                 )
             idx = mode.axis_map[key]
-            if idx in SPECIAL_TRIGGER_AXES:
-                if not (0.0 <= logical <= 1.0):
-                    raise ValueError(
-                        f"LT/RT logical value must be in [0, 1], got {logical}"
-                    )
-            else:
-                if not (-1.0 <= logical <= 1.0):
-                    raise ValueError(
-                        f"Axis logical value must be in [-1, 1], got {logical}"
-                    )
-            axes[idx] = self._logical_to_raw(idx, logical)
+            axes[idx] = self.layout.logical_to_raw(idx, logical)
 
         # Publish final message
         msg = Joy()
@@ -577,23 +581,9 @@ class FakeJoyPublisher(Node):
                 return name
         return None
 
-    # ----- Mapping & neutral helpers -----
-    def _neutral_axes(self) -> list[float]:
-        return list(AXIS_NEUTRALS)
-
     def _reset_physical_state(self) -> None:
-        self._axes = self._neutral_axes()
-        self._buttons = [0] * BUTTON_COUNT
-
-    def _logical_to_raw(self, axis_idx: int, value: float) -> float:
-        """
-        Convert a logical axis value to raw Joy space.
-        - LT/RT (2,5): logical [0..1] -> raw [1..-1] via raw = 1 - 2*value
-        - others:      logical [-1..1] passthrough
-        """
-        if axis_idx in SPECIAL_TRIGGER_AXES:
-            return 1.0 - 2.0 * value
-        return value
+        self._axes = self.layout.neutral_axes()
+        self._buttons = [0] * self.layout.button_count
 
 
 def main():

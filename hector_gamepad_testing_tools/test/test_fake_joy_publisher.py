@@ -157,15 +157,14 @@ class TestFakeJoyPublisher(unittest.TestCase):
 
     def setUp(self):
         # reset state before each test
-        if hasattr(self, "fake"):
-            self.fake.clear_all()
-            # cancel timer so it doesn’t run during assertions; tests that need it will re-enable
-            if getattr(self.fake, "_timer", None) is not None:
-                try:
-                    self.fake._timer.cancel()
-                except Exception:
-                    pass
-                self.fake._timer = None
+        self.fake.clear_all()
+        # cancel timer so it doesn’t run during assertions; tests that need it will re-enable
+        if getattr(self.fake, "_timer", None) is not None:
+            try:
+                self.fake._timer.cancel()
+            except Exception:
+                pass
+            self.fake._timer = None
 
     @classmethod
     def tearDownClass(cls):
