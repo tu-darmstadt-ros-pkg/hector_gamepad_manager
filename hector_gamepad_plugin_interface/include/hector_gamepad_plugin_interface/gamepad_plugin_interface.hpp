@@ -15,10 +15,10 @@ public:
   virtual ~GamepadFunctionPlugin() = default;
 
   void initializePlugin( const rclcpp::Node::SharedPtr &node, const std::string &plugin_id,
-                         std::shared_ptr<Blackboard> blackborad )
+                         std::shared_ptr<Blackboard> blackboard )
   {
     node_ = node;
-    blackboard_ = blackborad;
+    blackboard_ = blackboard;
     setPluginId( plugin_id );
     initialize( node );
   }
