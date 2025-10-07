@@ -1,13 +1,15 @@
 #ifndef BLACKBOARD_HPP
 #define BLACKBOARD_HPP
 
+#include "yaml_helper.hpp" // For YAML::convert<T>::decode
 #include <any>
+#include <iostream>
 #include <string>
 #include <string_view>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
-
+#include <yaml-cpp/yaml.h>
 namespace hector_gamepad_plugin_interface
 {
 
@@ -140,6 +142,149 @@ public:
 
   /// True if there are no entries.
   bool empty() const noexcept { return data_.empty(); }
+
+  /**
+   * Set multiple values from a YAML node recursively.
+   * valid types of the items of the node are bool, int, double, string and list of these.
+   * Recursively traverses the node and sets keys with their values.
+   * - Scalar nodes are set as bool|int|double|string.
+   * - Sequence nodes are set as lists of bool|int|double|string.
+   * - Map nodes are traversed recursively, prefixing keys with the map's tag.
+   * -> sequences of mixed types (e.g., [1, "a"]) will be stored as lists of strings.
+   */
+
+  bool set_from_yaml( const YAML::Node &node, const std::string &prefix )
+  {
+    if ( !node )
+      return false;
+
+    bool ok = true;
+
+    if ( node.IsMap() ) {
+      for ( const auto &kv : node ) {
+        const auto key = kv.first.as<std::string>();
+        const YAML::Node &val = kv.second;
+        const std::string child = prefix.empty() ? key : ( prefix + "/" + key );
+
+        if ( val.IsMap() ) {
+          ok &= set_from_yaml( val, child );
+        } else if ( val.IsSequence() ) {
+          ok &= set_list_from_yaml( val, child );
+        } else if ( val.IsScalar() ) {
+          if ( auto b = is_bool( val ) ) {
+            set( child, *b );
+          } else if ( auto i = is_int( val ) ) {
+            set( child, *i );
+          } else if ( auto d = is_double( val ) ) {
+            set( child, *d );
+          } else if ( auto s = is_string( val ) ) {
+            set( child, *s );
+          } else {
+            ok = false; // unknown scalar form
+          }
+        } else if ( val.IsNull() ) {
+          // silently ignore nulls (policy choice)
+        } else {
+          ok = false;
+        }
+      }
+      return ok;
+    }
+
+    if ( node.IsSequence() ) {
+      // Store the whole sequence at 'prefix'
+      return set_list_from_yaml( node, prefix );
+    }
+
+    if ( node.IsScalar() ) {
+      if ( prefix.empty() )
+        return false; // nowhere to put it
+      if ( auto b = is_bool( node ) ) {
+        set( prefix, *b );
+      } else if ( auto i = is_int( node ) ) {
+        set( prefix, *i );
+      } else if ( auto d = is_double( node ) ) {
+        set( prefix, *d );
+      } else if ( auto s = is_string( node ) ) {
+        set( prefix, *s );
+      } else {
+        return false;
+      }
+      return true;
+    }
+
+    if ( node.IsNull() ) {
+      // ignore
+      return true;
+    }
+
+    return false;
+  }
+
+  bool set_list_from_yaml( const YAML::Node &list, const std::string &key )
+  {
+    if ( !list.IsSequence() )
+      return false;
+
+    // Policy: empty sequence → store empty vector<string>
+    if ( list.size() == 0 ) {
+      set( key, std::vector<std::string>{} );
+      return true;
+    }
+
+    // Reject nested maps/sequences and detect homogeneous scalar type.
+    bool all_bool = true;
+    bool all_int = true;
+    bool all_double = true;
+    bool all_string = true;
+
+    for ( const auto &item : list ) {
+      if ( item.IsMap() || item.IsSequence() ) {
+        return false; // you said: maps in sequences are not allowed
+      }
+      if ( !is_bool( item ) )
+        all_bool = false;
+      if ( !is_int( item ) )
+        all_int = false;
+      if ( !is_double( item ) )
+        all_double = false;
+      if ( !is_string( item ) )
+        all_string = false;
+    }
+
+    // Prefer int over double when both possible.
+    if ( all_bool ) {
+      std::vector<bool> v;
+      v.reserve( list.size() );
+      for ( const auto &item : list ) v.push_back( *is_bool( item ) );
+      set( key, v );
+      return true;
+    }
+    if ( all_int ) {
+      std::vector<int64_t> v;
+      v.reserve( list.size() );
+      for ( const auto &item : list ) v.push_back( *is_int( item ) );
+      set( key, v );
+      return true;
+    }
+    if ( all_double ) {
+      std::vector<double> v;
+      v.reserve( list.size() );
+      for ( const auto &item : list ) v.push_back( *is_double( item ) );
+      set( key, v );
+      return true;
+    }
+    if ( all_string ) {
+      std::vector<std::string> v;
+      v.reserve( list.size() );
+      for ( const auto &item : list ) v.push_back( *is_string( item ) );
+      set( key, v );
+      return true;
+    }
+
+    // Mixed scalar types -> not allowed
+    return false;
+  }
 
 private:
   std::unordered_map<std::string, std::any> data_;

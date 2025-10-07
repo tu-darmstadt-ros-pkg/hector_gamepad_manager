@@ -56,9 +56,7 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   controller_helper_.initialize( node, plugin_namespace );
 }
 
-std::string ManipulationPlugin::getPluginName() { return "manipulation_plugin"; }
-
-void ManipulationPlugin::handlePress( const std::string &function )
+void ManipulationPlugin::handlePress( const std::string &function, const std::string &id )
 {
   if ( function == "hold_mode" ) {
     hold_mode_change_requested_ = true;
@@ -74,7 +72,7 @@ void ManipulationPlugin::handlePress( const std::string &function )
   }
 }
 
-void ManipulationPlugin::handleRelease( const std::string &function )
+void ManipulationPlugin::handleRelease( const std::string &function, const std::string &id )
 {
   if ( function == "hold_mode" ) {
     hold_mode_change_requested_ = true;
@@ -90,7 +88,8 @@ void ManipulationPlugin::handleRelease( const std::string &function )
   }
 }
 
-void ManipulationPlugin::handleAxis( const std::string &function, const double value )
+void ManipulationPlugin::handleAxis( const std::string &function, const std::string &id,
+                                     const double value )
 {
   if ( function == "move_left_right" ) {
     move_left_right_ = value;

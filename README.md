@@ -1,15 +1,19 @@
-# Hector Game Pad Manager
+# Hector Gamepad Manager
 
-This pkg receives sensor_msgs::Joy messages. Plugins can be loaded that react to this messages. For example the drive
-message waits for joystick movements and sends cmd_vel commands to the robot.
+The `hector_gamepad_manager` package receives `sensor_msgs::Joy` messages and dispatches them to **plugins** that react
+to gamepad input.
+For example, the `DrivePlugin` reacts to joystick movements and sends `cmd_vel` commands to the robot.
+
+---
 
 ## Configuration
 
-The system allows defining multiple configurations for different capabilities, such as **driving** and **manipulation**.
-A **meta configuration file** maps gamepad buttons to specific configuration files.
+The system supports multiple **configurations** for different capabilities, such as **driving**, **manipulation**, or *
+*flipper control**.
+A **meta-configuration file** maps gamepad buttons to these configurations.
 
-When a mapped button is pressed, the manager switches to the corresponding configuration. **Note:** Buttons assigned for
-switching between configurations are ignored in the individual configuration files themselves.
+When a mapped button is pressed, the manager switches to the corresponding configuration.
+⚠️ Buttons used for switching configurations are ignored in the individual configs themselves.
 
 ### Example: Meta Configuration File
 
@@ -24,9 +28,13 @@ buttons:
     config: "manipulation"
 ```
 
+---
+
 ### Individual Configuration Files
 
-Each configuration file defines the mapping between **buttons/axes** and **plugin functionalities**.
+Each configuration file maps **buttons/axes** to **plugin functions**.
+Functions can now include **parameters** via the `args` field. These parameters are stored in the shared **blackboard**
+and are uniquely namespaced, so you can reuse the same function in different or even within the same config.
 
 #### Example: Driving Configuration
 
@@ -46,14 +54,20 @@ buttons:
     function: "fast"
 
   1: # Button B
-    plugin: ""
-    function: ""  # No assigned function
+    plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
+    function: "go_to_pose"
+    args:
+      group: "arm_group"
+      pose: "folded"
 ```
 
-## JoyCallback
+---
 
-When a Joy message is received all plugins in the active config file are called with the corresponding axis/button
-values. The plugins can then react to the input and send commands to the robot.
+## Joy Callback
+
+When a `sensor_msgs::Joy` message arrives, all plugins in the active configuration are invoked with the corresponding
+button/axis values.
+Plugins can then react to input and send commands to the robot.
 
 ## Launch
 
@@ -126,7 +140,6 @@ world frame.
 - `hold_mode`: Toggle the hold mode. In hold mode the robot can be driven while the end-effector remains at its current
   position in the world frame.
 
-
 ## BlackboardPlugin
 
 This plugin allows assigning buttons to directly manipulate variables stored in the shared **blackboard**.
@@ -134,35 +147,44 @@ It supports toggling and holding boolean values as well as setting string values
 
 ### Functions
 
-#### Toggle
+#### Buttons
 
-* `toggle/<var_name>`
-  Toggles the boolean variable `<var_name>` in the blackboard. Initially, the variable is set to `false`.
-  Example: `toggle/inverted_steering` → flips between `true` and `false` each time the button is pressed.
-
-#### Hold
-
-* `hold/<var_name>`
-  Sets the boolean variable `<var_name>` in the blackboard to `true` while the button is pressed, and resets it to `false` when released.
-  Example: `hold/safety_mode` → `safety_mode = true` when held, `false` when released.
-
-#### Set String
-
-* `set/<var_name>/to/<value>`
-  Sets the string variable `<var_name>` in the blackboard to `<value>` when the button is pressed.
-  Example: `set/ui_message/to/arm:ready` → writes `"arm:ready"` to `ui_message`.
-
-
+* `toggle`: Toggles a boolean variable in the blackboard.
+    - `args`:
+        - `name`: The name of the variable to toggle.
+    - Example: `toggle` with name inverted_steering → toggles the `inverted_steering` variable between `true` and
+      `false`.
+* `hold`: Sets a boolean variable in the blackboard to `true` while the button is pressed, and resets it to `false`
+  when released.
+    - `args`:
+        - `name`: The name of the variable to hold.
+    - Example: `hold` with name safety_mode → sets `safety_mode = true` when held, and resets it to `false` when
+      released.
+* `set`: Sets a string variable in the blackboard to a specific value when the button is pressed.
+    - `args`:
+        - `name`: The name of the variable to set.
+        - `to`: The value to set the variable to.
+          Example:
+       ```bash
+      plugin: "hector_gamepad_manager_plugins::BlackboardPlugin"
+      function: "set"
+      args:
+        name: "robot_mode"
+        to: "manipulation"
+       ```
+      Sets the `robot_mode` variable in the blackboard to `manipulation` when the button is pressed.
 
 ## MoveItPlugin
 
 Executes MoveIt! commands to position the robot in predefined SRDF poses.
 
-* Poses must be specified as `<group_name>/<pose_name>` or `<group_name>/<pose_name>|<inverted_pose_name>`.
+### Functions
 
-  where:
+### Buttons
 
-  * **group\_name** → Name of the MoveIt! planning group.
-  * **pose\_name** → Name of the pose defined in the SRDF file.
-  * **inverted\_pose\_name** → Optional name for an inverted pose, which is used if the `invert_steering` flag is set to
-    `true` in the blackboard.
+- `go_to_pose`: Moves the robot to a predefined pose.
+    - `args`:
+        - `group`: The MoveIt! group to control (e.g., "arm_group").
+        - `pose`: The name of the pose to move to (e.g., "folded").
+        - `inverted_pose`: Optional, if set the robot will move to the inverted pose if `inverted_steering` from the
+          blackboard is `true`.

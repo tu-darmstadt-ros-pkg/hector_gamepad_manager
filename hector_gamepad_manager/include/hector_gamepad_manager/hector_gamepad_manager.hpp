@@ -119,6 +119,7 @@ private:
    * @return True if the mappings were initialized successfully, false otherwise.
    */
   bool initMappings( const YAML::Node &config, const std::string &type,
+                     const std::string &config_name,
                      std::unordered_map<int, FunctionMapping> &mappings );
 
   /**

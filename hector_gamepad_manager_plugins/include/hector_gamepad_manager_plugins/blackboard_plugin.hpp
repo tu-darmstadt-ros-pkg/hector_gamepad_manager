@@ -25,14 +25,15 @@ class BlackboardPlugin : public hector_gamepad_plugin_interface::GamepadFunction
 {
 public:
   void initialize( const rclcpp::Node::SharedPtr &node ) override;
-  std::string getPluginName() override;
 
   // Button interface
-  void handlePress( const std::string &function ) override;
-  void handleRelease( const std::string &function ) override;
+  void handlePress( const std::string &function, const std::string &id ) override;
+  void handleRelease( const std::string &function, const std::string &id ) override;
 
   // Axis interface (unused here)
-  void handleAxis( const std::string &function, const double value ) override { }
+  void handleAxis( const std::string &function, const std::string &id, const double value ) override
+  {
+  }
 
   // Lifecycle-ish
   void activate() override;
@@ -42,10 +43,6 @@ public:
 private:
   rclcpp::Node::SharedPtr node_;
   bool active_{ false };
-
-  // Helpers
-  static bool startsWith( const std::string &s, const char *prefix );
-  static std::vector<std::string> split( const std::string &s, char delim );
 
   void onToggle( const std::string &var ) const;
   void onHoldPress( const std::string &var ) const;

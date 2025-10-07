@@ -55,9 +55,7 @@ void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node )
       [this]( const sensor_msgs::msg::JointState::SharedPtr msg ) { joint_state_ = *msg; } );
 }
 
-std::string MoveitPlugin::getPluginName() { return "moveit_plugin"; }
-
-void MoveitPlugin::handlePress( const std::string &function )
+void MoveitPlugin::handlePress( const std::string &function, const std::string &id )
 {
   if ( !active_ )
     return;
@@ -69,26 +67,28 @@ void MoveitPlugin::handlePress( const std::string &function )
     RCLCPP_WARN( node_->get_logger(), "Moveit action still active. Ignoring new request." );
     return;
   }
-  auto [group_name, pose_name] = fromGroupPoseName( function );
-  const std::string function_repl = toGroupPoseName( group_name, pose_name );
-  if ( named_poses_.count( function_repl ) > 0 ) {
-    controller_helper_.switchControllers( start_controllers_ );
-    const auto [group, pose] = fromGroupPoseName( function_repl );
-    RCLCPP_WARN( node_->get_logger(), "Start Moveit Planning & Execution [%s]",
-                 function_repl.c_str() );
-    request_active_ = true;
-    sendNamedPoseGoal( group, pose );
-  } else {
-    RCLCPP_WARN( node_->get_logger(), "No pose named %s found", function_repl.c_str() );
+  if ( function == "go_to_pose" ) {
+    auto [group, pose] = functionIdToGroupGroupAndPose( function, id );
+    if ( named_poses_.count( toGroupPoseName( group, pose ) ) > 0 ) {
+      controller_helper_.switchControllers( start_controllers_ );
+      RCLCPP_WARN( node_->get_logger(),
+                   "Start Moveit Planning & Execution of pose [%s] in group [%s]", pose.c_str(),
+                   group.c_str() );
+      request_active_ = true;
+      sendNamedPoseGoal( group, pose );
+    } else {
+      RCLCPP_WARN( node_->get_logger(), "No pose named %s found in group %s", pose.c_str(),
+                   group.c_str() );
+    }
   }
 }
 
-void MoveitPlugin::handleRelease( const std::string &function )
+void MoveitPlugin::handleRelease( const std::string &function, const std::string &id )
 {
   if ( !active_ )
     return;
-  // function is <group_name>_<pose_name>
-  if ( named_poses_.count( function ) > 0 ) {
+  auto [group, pose] = functionIdToGroupGroupAndPose( function, id );
+  if ( named_poses_.count( toGroupPoseName( group, pose ) ) > 0 ) {
     cancelGoal(); // cancels all current goals
   }
 }
@@ -245,25 +245,14 @@ std::string MoveitPlugin::toGroupPoseName( const std::string &group_name,
 }
 
 std::pair<std::string, std::string>
-MoveitPlugin::fromGroupPoseName( const std::string &group_pose_name ) const
+MoveitPlugin::functionIdToGroupGroupAndPose( const std::string &function, const std::string &id ) const
 {
-  // function is <group_name>/<pose_name>|<pose_name_inverted> (e.g. "arm/front|back")
-  // inverted pose is optional
-  const auto pos = group_pose_name.find_last_of( '/' );
-  if ( pos == std::string::npos ) {
-    return { "", "" };
-  }
-  std::string group_name = group_pose_name.substr( 0, pos );
-  std::string pose_name = group_pose_name.substr( pos + 1 );
-  // check if inverted pose exists
-  if ( group_pose_name.substr( pos + 1 ).find( '|' ) != std::string::npos ) {
-    // inverted pose exists
-    const bool inverted = blackboard_->value_or<bool>( "invert_steering", false );
-    const auto inv_pose = group_pose_name.find_last_of( '|' );
-    pose_name = inverted ? group_pose_name.substr( inv_pose + 1 )
-                         : group_pose_name.substr( pos + 1, inv_pose - pos - 1 );
-  }
-  return { group_name, pose_name };
+  const auto &group = getConfigValueOr<std::string>( id, "group", "" );
+  const auto &normal_pose = getConfigValueOr<std::string>( id, "pose", "" );
+  const auto &inverted_pose = getConfigValueOr<std::string>( id, "inverted_pose", "" );
+  const auto &inverted_steering = blackboard_->value_or<bool>( "inverted_steering", false );
+  const auto &pose = inverted_steering ? inverted_pose : normal_pose;
+  return { group, pose };
 }
 
 } // namespace hector_gamepad_manager_plugins
