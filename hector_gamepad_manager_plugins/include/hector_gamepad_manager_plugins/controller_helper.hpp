@@ -1,8 +1,7 @@
 #ifndef HECTOR_GAMEPAD_MANAGER_PLUGINS_CONTROLLER_HELPER_HPP
 #define HECTOR_GAMEPAD_MANAGER_PLUGINS_CONTROLLER_HELPER_HPP
 
-#include "controller_manager_msgs/srv/list_controllers.hpp"
-#include "controller_manager_msgs/srv/switch_controller.hpp"
+#include "controller_manager_msgs/msg/controller_manager_activity.hpp"
 #include <controller_orchestrator/controller_orchestrator.hpp>
 #include <rclcpp/rclcpp.hpp>
 
@@ -20,9 +19,9 @@ public:
   void switchControllers( const std::vector<std::string> &start_controllers ) const;
 
 private:
-  rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedPtr switch_controller_client_;
-  rclcpp::Client<controller_manager_msgs::srv::ListControllers>::SharedPtr list_controllers_client_;
+  rclcpp::Subscription<controller_manager_msgs::msg::ControllerManagerActivity>::SharedPtr ctrl_subscription_;
 
+  std::vector<std::string> active_controllers_;
   rclcpp::Node::SharedPtr node_;
   std::string plugin_name_;
   std::shared_ptr<controller_orchestrator::ControllerOrchestrator> controller_orchestrator_;

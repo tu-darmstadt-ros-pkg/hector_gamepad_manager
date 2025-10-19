@@ -10,13 +10,37 @@ void ControllerHelper::initialize( const rclcpp::Node::SharedPtr &node,
 
   node_ = node;
   plugin_name_ = plugin_name;
+  const auto robot_ns = node_->get_parameter( "robot_namespace" ).as_string();
   controller_orchestrator_ = std::make_shared<controller_orchestrator::ControllerOrchestrator>(
-      node_, "/" + node_->get_parameter( "robot_namespace" ).as_string() + "/controller_manager" );
+      node_, "/" + robot_ns + "/controller_manager" );
+  // keep track of active controllers
+  ctrl_subscription_ =
+      node_->create_subscription<controller_manager_msgs::msg::ControllerManagerActivity>(
+          "/" + robot_ns + "/controller_manager/activity", 1,
+          [this]( const controller_manager_msgs::msg::ControllerManagerActivity::SharedPtr msg ) {
+            active_controllers_.clear();
+            for ( const auto &controller : msg->controllers ) {
+              if ( controller.state.label == "active" ) {
+                active_controllers_.push_back( controller.name );
+              }
+            }
+          } );
 }
 
 void ControllerHelper::switchControllers( const std::vector<std::string> &start_controllers ) const
 {
   if ( start_controllers.empty() )
+    return;
+  // check if already active
+  bool all_active = true;
+  for ( const auto &ctrl : start_controllers ) {
+    if ( std::find( active_controllers_.begin(), active_controllers_.end(), ctrl ) ==
+         active_controllers_.end() ) {
+      all_active = false;
+      break;
+    }
+  }
+  if ( all_active )
     return;
   controller_orchestrator_->smartSwitchControllerAsync(
       start_controllers, [this]( bool success, const std::string &message ) {
