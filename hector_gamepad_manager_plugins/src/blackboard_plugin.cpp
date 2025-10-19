@@ -35,8 +35,8 @@ void BlackboardPlugin::handlePress( const std::string &function, const std::stri
   if ( function == "toggle" ) {
     const std::string &name = getConfigValueOr<std::string>( id, "name" );
     const std::string &topic = getConfigValueOr<std::string>( id, "topic", "" );
-    const bool default_value = getConfigValueOr<bool>( id, "default", false );
-    onToggle( name, topic, default_value );
+    const bool initial_value = getConfigValueOr<bool>( id, "initial", false );
+    onToggle( name, topic, initial_value );
     return;
   } else if ( function == "hold" ) {
     const std::string &name = getConfigValueOr<std::string>( id, "name" );
@@ -67,10 +67,10 @@ void BlackboardPlugin::handleRelease( const std::string &function, const std::st
   // toggle/* and set/* are no-ops on release
 }
 
-void BlackboardPlugin::onToggle( const std::string &var, const std::string &topic, bool default_value )
+void BlackboardPlugin::onToggle( const std::string &var, const std::string &topic, bool initial_value )
 {
   // Fetch or create bool with default false, then invert
-  bool &ref = blackboard_->get_or_emplace<bool>( var, default_value );
+  bool &ref = blackboard_->get_or_emplace<bool>( var, initial_value );
   ref = !ref;
   if ( !topic.empty() ) {
     if ( toggle_publisher_.find( topic ) == toggle_publisher_.end() ) {

@@ -41,7 +41,7 @@ public:
   void update() override { }
 
 private:
-  void onToggle( const std::string &var, const std::string &topic, bool default_value );
+  void onToggle( const std::string &var, const std::string &topic, bool initial_value );
   void onHoldPress( const std::string &var ) const;
   void onHoldRelease( const std::string &var ) const;
   void onSetString( const std::string &var, const std::string &value ) const;

@@ -79,7 +79,7 @@ buttons:
     function: "toggle"
     args:
       name: "software_e_stop"
-      default: "false"
+      initial: "false"
       topic: "soft_e_stop"
 
   # -------------------- All the axes can also be used as buttons if specified here --------------------
