@@ -34,7 +34,9 @@ void BlackboardPlugin::handlePress( const std::string &function, const std::stri
 
   if ( function == "toggle" ) {
     const std::string &name = getConfigValueOr<std::string>( id, "name" );
-    onToggle( name );
+    const std::string &topic = getConfigValueOr<std::string>( id, "topic", "" );
+    const bool initial_value = getConfigValueOr<bool>( id, "initial", false );
+    onToggle( name, topic, initial_value );
     return;
   } else if ( function == "hold" ) {
     const std::string &name = getConfigValueOr<std::string>( id, "name" );
@@ -65,11 +67,20 @@ void BlackboardPlugin::handleRelease( const std::string &function, const std::st
   // toggle/* and set/* are no-ops on release
 }
 
-void BlackboardPlugin::onToggle( const std::string &var ) const
+void BlackboardPlugin::onToggle( const std::string &var, const std::string &topic, bool initial_value )
 {
   // Fetch or create bool with default false, then invert
-  bool &ref = blackboard_->get_or_emplace<bool>( var, false );
+  bool &ref = blackboard_->get_or_emplace<bool>( var, initial_value );
   ref = !ref;
+  if ( !topic.empty() ) {
+    if ( toggle_publisher_.find( topic ) == toggle_publisher_.end() ) {
+      const auto qos = rclcpp::QoS( rclcpp::KeepLast( 10 ) ).transient_local().reliable();
+      toggle_publisher_[topic] = node_->create_publisher<std_msgs::msg::Bool>( topic, qos );
+    }
+    auto msg = std_msgs::msg::Bool();
+    msg.data = ref;
+    toggle_publisher_[topic]->publish( msg );
+  }
   RCLCPP_DEBUG( node_->get_logger(), "[blackboard_plugin] toggle %s -> %s", var.c_str(),
                 ref ? "true" : "false" );
 }

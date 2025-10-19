@@ -75,8 +75,12 @@ buttons:
     function: ""
 
   10: # Right joystick press
-    plugin: ""
-    function: ""
+    plugin: "hector_gamepad_manager_plugins::BlackboardPlugin"
+    function: "toggle"
+    args:
+      name: "software_e_stop"
+      initial: "false"
+      topic: "soft_e_stop"
 
   # -------------------- All the axes can also be used as buttons if specified here --------------------
   11: # Left joystick left
