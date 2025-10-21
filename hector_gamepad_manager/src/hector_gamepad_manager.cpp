@@ -49,7 +49,7 @@ bool HectorGamepadManager::loadConfigSwitchesConfig( const std::string &file_nam
       if ( config_name.empty() || pkg_name.empty() )
         continue; // skip empty mappings
 
-      RCLCPP_INFO( ocs_ns_node_->get_logger(), "Loading config file %s", config_name.c_str() );
+      RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Loading config file %s", config_name.c_str() );
       if ( !loadConfig( pkg_name, config_name ) ) {
         RCLCPP_ERROR( ocs_ns_node_->get_logger(), "Failed to load config file %s",
                       config_name.c_str() );
@@ -115,8 +115,6 @@ bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::st
       auto function = mapping["function"].as<std::string>();
       const std::string function_id = config_name + "_" + std::to_string( id );
       blackboard_->set_from_yaml( mapping["args"], plugin_name + std::string( "_" ) + function_id );
-      RCLCPP_WARN( ocs_ns_node_->get_logger(), "Mapping %s for %s with id %d -> function_id %s",
-                   function.c_str(), type.c_str(), id, function_id.c_str() );
 
       if ( !plugin_name.empty() && !function.empty() ) {
 
@@ -127,7 +125,7 @@ bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::st
                 plugin_loader_.createSharedInstance( plugin_name );
             plugin->initializePlugin( robot_ns_node_, plugin_name, blackboard_ );
             plugins_[plugin_name] = plugin;
-            RCLCPP_INFO( ocs_ns_node_->get_logger(), "Loaded plugin: %s", plugin_name.c_str() );
+            RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Loaded plugin: %s", plugin_name.c_str() );
           } catch ( const std::exception &e ) {
             RCLCPP_ERROR( ocs_ns_node_->get_logger(), "Failed to load plugin %s: %s",
                           plugin_name.c_str(), e.what() );
@@ -196,8 +194,8 @@ void HectorGamepadManager::activatePlugins( const std::string &config_name )
   for ( const auto &button_mapping : configs_[config_name].button_mappings ) {
     if ( !button_mapping.second.plugin->isActive() ) {
       button_mapping.second.plugin->activate();
-      RCLCPP_INFO( ocs_ns_node_->get_logger(), "Activated plugin: %s",
-                   button_mapping.second.plugin->getPluginName().c_str() );
+      RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Activated plugin: %s",
+                    button_mapping.second.plugin->getPluginName().c_str() );
       active_plugins_.push_back( button_mapping.second.plugin );
     }
   }
@@ -205,8 +203,8 @@ void HectorGamepadManager::activatePlugins( const std::string &config_name )
   for ( const auto &axis_mapping : configs_[config_name].axis_mappings ) {
     if ( !axis_mapping.second.plugin->isActive() ) {
       axis_mapping.second.plugin->activate();
-      RCLCPP_INFO( ocs_ns_node_->get_logger(), "Activated plugin: %s",
-                   axis_mapping.second.plugin->getPluginName().c_str() );
+      RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Activated plugin: %s",
+                    axis_mapping.second.plugin->getPluginName().c_str() );
       active_plugins_.push_back( axis_mapping.second.plugin );
     }
   }
@@ -217,7 +215,7 @@ void HectorGamepadManager::deactivatePlugins()
   for ( const auto &plugin : plugins_ ) {
     if ( plugin.second->isActive() ) {
       plugin.second->deactivate();
-      RCLCPP_INFO( ocs_ns_node_->get_logger(), "Deactivated plugin: %s", plugin.first.c_str() );
+      RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Deactivated plugin: %s", plugin.first.c_str() );
     }
   }
   active_plugins_.clear();
