@@ -3,8 +3,8 @@
         drive_plugin:
             slow_factor: 0.5
             fast_factor: 1.5
-            max_angular_speed: 1.0
-            max_linear_speed: 1.0
+            max_angular_speed: 0.5
+            max_linear_speed: 0.5
         flipper_plugin:
             flipper_back_factor: 1.0
             flipper_front_factor: 1.0
