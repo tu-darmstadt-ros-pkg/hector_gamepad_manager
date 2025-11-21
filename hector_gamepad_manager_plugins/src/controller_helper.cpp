@@ -14,9 +14,12 @@ void ControllerHelper::initialize( const rclcpp::Node::SharedPtr &node,
   controller_orchestrator_ = std::make_shared<controller_orchestrator::ControllerOrchestrator>(
       node_, "/" + robot_ns + "/controller_manager" );
   // keep track of active controllers
+  auto qos = rclcpp::QoS( 1 );
+  qos.reliability( RMW_QOS_POLICY_RELIABILITY_RELIABLE );
+  qos.durability( RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL );
   ctrl_subscription_ =
       node_->create_subscription<controller_manager_msgs::msg::ControllerManagerActivity>(
-          "/" + robot_ns + "/controller_manager/activity", 1,
+          "/" + robot_ns + "/controller_manager/activity", qos,
           [this]( const controller_manager_msgs::msg::ControllerManagerActivity::SharedPtr msg ) {
             active_controllers_.clear();
             for ( const auto &controller : msg->controllers ) {
