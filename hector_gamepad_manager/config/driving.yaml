@@ -80,7 +80,7 @@ buttons:
     args:
       name: "software_e_stop"
       initial: "false"
-      topic: "soft_e_stop"
+      topic: "gamepad_e_stop"
 
   # -------------------- All the axes can also be used as buttons if specified here --------------------
   11: # Left joystick left
