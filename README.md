@@ -206,11 +206,6 @@ falls below a configured threshold. The vibration can be muted temporarily via a
 - `battery_topic` (string): Topic to subscribe to. Default: `battery_status`.
 - `cell_voltage_fields` (string list): Field paths (e.g., `["cell_voltages_battery1_mv", "cell_voltages_battery2_mv"]`)
   containing cell voltage arrays (or arrays of arrays) to evaluate.
-- `low_cell_threshold_mv` (double): Cell voltage threshold (mV) to trigger vibration. Default: `3300.0`.
+- `low_cell_threshold` (double): Cell voltage threshold to trigger vibration. Default: `3500.0`.
 - `vibration_intensity` (double): Rumble intensity in `[0.0, 1.0]`. Default: `0.8`.
 - `mute_duration_sec` (double): How long the mute lasts after pressing `mute`. Default: `300.0` seconds (5 minutes).
-
-### Notes
-
-- Cells with value `0` or `NaN` are ignored when evaluating low voltage.
-- Map `function: "mute"` to any button in your config (e.g., left stick press) to silence vibration temporarily.

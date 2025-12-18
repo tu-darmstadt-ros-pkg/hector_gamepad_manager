@@ -31,6 +31,6 @@
             cell_voltage_fields:
                 - "cell_voltages_battery1_mv"
                 - "cell_voltages_battery2_mv"
-            low_cell_threshold_mv: 3300.0
+            low_cell_threshold: 3300.0
             vibration_intensity: 0.8
             mute_duration_sec: 300.0

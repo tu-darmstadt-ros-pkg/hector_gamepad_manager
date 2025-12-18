@@ -25,9 +25,8 @@
             start_controllers: ["arm_trajectory_controller", "gripper_trajectory_controller", "flipper_trajectory_controller"]
         battery_monitor_plugin:
             cell_voltage_fields:
-                - voltage_battery1_mv
                 - "cell_voltages_battery1_mv"
                 - "cell_voltages_battery2_mv"
-            low_cell_threshold_mv: 3500.0
+            low_cell_threshold: 3500.0
             vibration_intensity: 0.8
             mute_duration_sec: 300.0

@@ -40,7 +40,7 @@ private:
   hector::ParameterSubscription vibration_intensity_param_;
   hector::ParameterSubscription mute_duration_param_;
 
-  double low_cell_threshold_mv_{ 3300.0 };
+  double low_cell_threshold_{ 3300.0 };
   double vibration_intensity_{ 0.8 };
   double mute_duration_sec_{ 300.0 }; // default to 5 minutes
 

@@ -62,7 +62,7 @@ void BatteryMonitorPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   using Opts = hector::ParameterOptions<double>;
 
   low_cell_threshold_param_ = hector::createReconfigurableParameter(
-      node, ns + ".low_cell_threshold_mv", std::ref( low_cell_threshold_mv_ ), "Low-cell threshold",
+      node, ns + ".low_cell_threshold", std::ref( low_cell_threshold_ ), "Low-cell threshold",
       Opts().onValidate( []( auto v ) { return v > 0.0; } ) );
 
   vibration_intensity_param_ = hector::createReconfigurableParameter(
@@ -165,7 +165,7 @@ void BatteryMonitorPlugin::onBatteryMessage( const ros_babel_fish::CompoundMessa
 
   low_voltage_detected_ = false;
   auto check_val = [&]( double v ) {
-    if ( !low_voltage_detected_ && v > 0.0 && !std::isnan( v ) && v < low_cell_threshold_mv_ ) {
+    if ( !low_voltage_detected_ && v > 0.0 && !std::isnan( v ) && v < low_cell_threshold_ ) {
       low_voltage_detected_ = true;
     }
   };
@@ -175,9 +175,6 @@ void BatteryMonitorPlugin::onBatteryMessage( const ros_babel_fish::CompoundMessa
     if ( low_voltage_detected_ )
       break;
   }
-  RCLCPP_INFO_THROTTLE( node_->get_logger(), *node_->get_clock(), 5000,
-                        "[BatteryMonitor] Low voltage detected: %s",
-                        low_voltage_detected_ ? "TRUE" : "FALSE" );
 }
 
 bool BatteryMonitorPlugin::isMuted() const
