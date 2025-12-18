@@ -55,20 +55,21 @@ void BatteryMonitorPlugin::initialize( const rclcpp::Node::SharedPtr &node )
       hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value > 0.0; } ) );
 
-  node_->declare_parameters<std::string>( plugin_namespace,
-                                          { { "battery_topic", "battery_status" } } );
   node_->declare_parameters<std::vector<std::string>>(
       plugin_namespace,
       { { "cell_voltage_fields", { "cell_voltages_battery1_mv", "cell_voltages_battery2_mv" } } } );
 
-  const auto battery_topic = node_->get_parameter( plugin_namespace + ".battery_topic" ).as_string();
   cell_voltage_fields_ =
       node_->get_parameter( plugin_namespace + ".cell_voltage_fields" ).as_string_array();
 
   fish_ = ros_babel_fish::BabelFish::make_shared();
+  const std::string node_namespace = node_->get_effective_namespace();
   battery_subscription_ = fish_->create_subscription(
-      *node_, "/athena/battery", 10,
+      *node_, node_namespace + "/battery", 10,
       [this]( const ros_babel_fish::CompoundMessage::SharedPtr msg ) { onBatteryMessage( msg ); } );
+
+  RCLCPP_INFO( node_->get_logger(), "[BatteryMonitor] Initialized. Listening on '%s'",
+               battery_subscription_->get_topic_name() );
 }
 
 void BatteryMonitorPlugin::activate()
@@ -94,11 +95,11 @@ void BatteryMonitorPlugin::handlePress( const std::string &function, const std::
     const auto now = node_->now();
     if ( isMuted() ) {
       muted_until_ = rclcpp::Time( 0, 0, node_->get_clock()->get_clock_type() );
-      RCLCPP_INFO( node_->get_logger(), "[battery_monitor_plugin] Unmuted vibration feedback" );
+      RCLCPP_INFO( node_->get_logger(), "[BatteryMonitor] Unmuted vibration feedback" );
     } else {
       muted_until_ = now + rclcpp::Duration::from_seconds( mute_duration_sec_ );
       RCLCPP_INFO( node_->get_logger(),
-                   "[battery_monitor_plugin] Muted vibration until %.2f (sec from epoch)",
+                   "[BatteryMonitor] Muted vibration until %.2f (sec from epoch)",
                    muted_until_.seconds() );
     }
   }
@@ -120,148 +121,100 @@ double BatteryMonitorPlugin::getVibrationFeedback()
 
 void BatteryMonitorPlugin::onBatteryMessage( const ros_babel_fish::CompoundMessage::SharedPtr &msg )
 {
-  if ( !active_ )
+  if ( !active_ || !msg )
     return;
-
-  if ( !msg ) {
-    RCLCPP_WARN( node_->get_logger(), "[battery_monitor_plugin] Received null battery message" );
-    return;
-  }
 
   std::vector<double> values;
   bool any_field_found = false;
+
   for ( const auto &path : cell_voltage_fields_ ) {
     if ( collectFieldValues( *msg, path, values ) ) {
       any_field_found = true;
-    } else {
-      RCLCPP_WARN_THROTTLE( node_->get_logger(), *node_->get_clock(), 5000,
-                            "[battery_monitor_plugin] Field '%s' not found in battery message",
-                            path.c_str() );
     }
   }
 
-  if ( !any_field_found ) {
-    low_voltage_detected_ = false;
+  if ( !any_field_found )
     return;
-  }
 
   low_voltage_detected_ = false;
-  std::stringstream ss;
   for ( const auto value : values ) {
-    ss << value << ", ";
-    if ( value == 0.0 || std::isnan( value ) )
-      continue;
-    if ( value < low_cell_threshold_mv_ ) {
+    if ( value > 0.0 && !std::isnan( value ) && value < low_cell_threshold_mv_ ) {
       low_voltage_detected_ = true;
       break;
     }
   }
-  RCLCPP_INFO( node_->get_logger(),
-               "[battery_monitor_plugin] Cell voltages: [%s], low voltage detected: %s",
-               ss.str().c_str(), low_voltage_detected_ ? "true" : "false" );
+  RCLCPP_INFO( node_->get_logger(), "[BatteryMonitor] Low voltage detected: %s",
+               low_voltage_detected_ ? "true" : "false" );
 }
 
 bool BatteryMonitorPlugin::collectFieldValues( const ros_babel_fish::CompoundMessage &root,
                                                const std::string &path, std::vector<double> &out ) const
 {
   const auto tokens = splitPath( path );
-  if ( tokens.empty() ) {
+  if ( tokens.empty() )
     return false;
-  }
 
   const ros_babel_fish::Message *current = &root;
 
-  // 1. Traverse to the target field
+  // 1. Traverse
   for ( const auto &token : tokens ) {
     if ( current->type() != ros_babel_fish::MessageTypes::Compound ) {
       return false;
     }
 
     const auto &compound = current->as<ros_babel_fish::CompoundMessage>();
-
-    // Safety check: ensure field exists to avoid exception
     if ( !compound.containsKey( token ) ) {
       return false;
     }
 
-    const ros_babel_fish::Message &member = compound[token];
-    current = &member;
+    current = &compound[token];
   }
 
-  // 2. Handle Array Types (Fixed, Bounded, or Dynamic)
+  // 2. Array Case
   if ( current->type() == ros_babel_fish::MessageTypes::Array ) {
     const auto &array_msg = current->as<ros_babel_fish::ArrayMessageBase>();
 
-    // Helper to extract data from ANY array type (Fixed, Bounded, or Dynamic)
-    const auto push_array_as_double = [&]( auto tag ) {
-      using T = decltype( tag );
-
-      // Inner helper to actually loop and push values
-      auto copy_values = [&]( const auto &typed_array ) {
+    const auto extract_typed_array = [&]( auto type_tag ) {
+      using T = decltype( type_tag );
+      auto copy_elements = [&]( const auto &typed_array ) {
         out.reserve( out.size() + typed_array.size() );
         for ( size_t i = 0; i < typed_array.size(); ++i ) {
           out.push_back( static_cast<double>( typed_array[i] ) );
         }
       };
 
-      // Check which specific array class implements this message
       if ( array_msg.isFixedSize() ) {
-        // Cast to Fixed Size Array: ArrayMessage_<T, Bounded=false, Fixed=true>
-        copy_values( array_msg.as<ros_babel_fish::ArrayMessage_<T, false, true>>() );
+        copy_elements( array_msg.as<ros_babel_fish::ArrayMessage_<T, false, true>>() );
       } else if ( array_msg.isBounded() ) {
-        // Cast to Bounded Array: ArrayMessage_<T, Bounded=true, Fixed=false>
-        copy_values( array_msg.as<ros_babel_fish::ArrayMessage_<T, true, false>>() );
+        copy_elements( array_msg.as<ros_babel_fish::ArrayMessage_<T, true, false>>() );
       } else {
-        // Cast to Dynamic Array: ArrayMessage_<T, Bounded=false, Fixed=false>
-        copy_values( array_msg.as<ros_babel_fish::ArrayMessage_<T, false, false>>() );
+        copy_elements( array_msg.as<ros_babel_fish::ArrayMessage_<T, false, false>>() );
       }
     };
-
+    // clang-format off
     switch ( array_msg.elementType() ) {
-    case ros_babel_fish::MessageTypes::Int8:
-      push_array_as_double( int8_t{} );
-      break;
-    case ros_babel_fish::MessageTypes::UInt8:
-      push_array_as_double( uint8_t{} );
-      break;
-    case ros_babel_fish::MessageTypes::Int16:
-      push_array_as_double( int16_t{} );
-      break;
-    case ros_babel_fish::MessageTypes::UInt16:
-      push_array_as_double( uint16_t{} );
-      break;
-    case ros_babel_fish::MessageTypes::Int32:
-      push_array_as_double( int32_t{} );
-      break;
-    case ros_babel_fish::MessageTypes::UInt32:
-      push_array_as_double( uint32_t{} );
-      break;
-    case ros_babel_fish::MessageTypes::Int64:
-      push_array_as_double( int64_t{} );
-      break;
-    case ros_babel_fish::MessageTypes::UInt64:
-      push_array_as_double( uint64_t{} );
-      break;
-    case ros_babel_fish::MessageTypes::Float:
-      push_array_as_double( float{} );
-      break;
-    case ros_babel_fish::MessageTypes::Double:
-      push_array_as_double( double{} );
-      break;
-    default:
-      RCLCPP_WARN( node_->get_logger(), "Field '%s' is an array of non-numeric type", path.c_str() );
-      return false;
+      case ros_babel_fish::MessageTypes::Int8:   extract_typed_array( int8_t{} ); break;
+      case ros_babel_fish::MessageTypes::UInt8:  extract_typed_array( uint8_t{} ); break;
+      case ros_babel_fish::MessageTypes::Int16:  extract_typed_array( int16_t{} ); break;
+      case ros_babel_fish::MessageTypes::UInt16: extract_typed_array( uint16_t{} ); break;
+      case ros_babel_fish::MessageTypes::Int32:  extract_typed_array( int32_t{} ); break;
+      case ros_babel_fish::MessageTypes::UInt32: extract_typed_array( uint32_t{} ); break;
+      case ros_babel_fish::MessageTypes::Int64:  extract_typed_array( int64_t{} ); break;
+      case ros_babel_fish::MessageTypes::UInt64: extract_typed_array( uint64_t{} ); break;
+      case ros_babel_fish::MessageTypes::Float:  extract_typed_array( float{} ); break;
+      case ros_babel_fish::MessageTypes::Double: extract_typed_array( double{} ); break;
+      default: return false;
     }
+    // clang-format on
     return true;
   }
 
-  // 3. Handle Scalar Case (Single number)
+  // 3. Scalar Case
   if ( current->type() != ros_babel_fish::MessageTypes::Compound ) {
     try {
       out.push_back( current->value<double>() );
       return true;
     } catch ( ... ) {
-      // Ignore non-numeric scalars (strings, etc.)
     }
   }
 
