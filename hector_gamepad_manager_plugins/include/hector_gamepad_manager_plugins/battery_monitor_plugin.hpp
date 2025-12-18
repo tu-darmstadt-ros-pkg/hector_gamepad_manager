@@ -9,6 +9,7 @@
 
 namespace hector_gamepad_manager_plugins
 {
+
 class BatteryMonitorPlugin : public hector_gamepad_plugin_interface::GamepadFunctionPlugin
 {
 public:
@@ -27,8 +28,6 @@ public:
 
 private:
   void onBatteryMessage( const ros_babel_fish::CompoundMessage::SharedPtr &msg );
-  bool collectFieldValues( const ros_babel_fish::CompoundMessage &root, const std::string &path,
-                           std::vector<double> &out ) const;
   bool isMuted() const;
 
   rclcpp::Node::SharedPtr node_;
