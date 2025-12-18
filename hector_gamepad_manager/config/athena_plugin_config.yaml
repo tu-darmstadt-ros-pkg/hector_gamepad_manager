@@ -23,3 +23,8 @@
             twist_controller_name: "moveit_twist_controller"
         moveit_plugin:
             start_controllers: ["arm_trajectory_controller", "gripper_trajectory_controller", "flipper_trajectory_controller"]
+        battery_monitor_plugin:
+            battery_topic: "battery_status"
+            low_cell_threshold_mv: 3500.0
+            vibration_intensity: 0.8
+            mute_duration_sec: 300.0

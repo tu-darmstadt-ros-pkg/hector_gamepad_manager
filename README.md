@@ -191,3 +191,24 @@ Executes MoveIt! commands to position the robot in predefined SRDF poses.
         - `pose`: The name of the pose to move to (e.g., "folded").
         - `inverted_pose`: Optional, if set the robot will move to the inverted pose if `inverted_steering` from the
           blackboard is `true`.
+
+## BatteryMonitorPlugin
+
+Monitors cell voltages from `athena_firmware_interface_msgs/msg/BatteryStatus` and vibrates the gamepad when any cell
+falls below a configured threshold. The vibration can be muted temporarily via a button.
+
+### Functions
+
+- `mute` (button): Mutes vibration feedback for the configured duration.
+
+### Parameters
+
+- `battery_topic` (string): Topic to subscribe to. Default: `battery_status`.
+- `low_cell_threshold_mv` (double): Cell voltage threshold (mV) to trigger vibration. Default: `3300.0`.
+- `vibration_intensity` (double): Rumble intensity in `[0.0, 1.0]`. Default: `0.8`.
+- `mute_duration_sec` (double): How long the mute lasts after pressing `mute`. Default: `300.0` seconds (5 minutes).
+
+### Notes
+
+- Cells with value `0` or `NaN` are ignored when evaluating low voltage.
+- Map `function: "mute"` to any button in your config (e.g., left stick press) to silence vibration temporarily.

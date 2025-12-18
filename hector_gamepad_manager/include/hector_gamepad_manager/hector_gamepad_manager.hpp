@@ -6,6 +6,7 @@
 #include <pluginlib/class_loader.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joy.hpp>
+#include <sensor_msgs/msg/joy_feedback.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <yaml-cpp/yaml.h>
 
@@ -45,6 +46,7 @@ private:
   rclcpp::Node::SharedPtr ocs_ns_node_;
 
   rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_subscription_;
+  rclcpp::Publisher<sensor_msgs::msg::JoyFeedback>::SharedPtr joy_feedback_publisher_;
 
   // Publish active configuration -> visualization in user interface
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr active_config_publisher_;

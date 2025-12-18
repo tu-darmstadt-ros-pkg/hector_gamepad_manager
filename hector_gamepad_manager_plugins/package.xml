@@ -11,6 +11,7 @@
   <buildtool_depend>ros2_control_cmake</buildtool_depend>
 
   <depend>ament_cmake_gen_version_h</depend>
+  <depend>athena_firmware_interface_msgs</depend>
   <depend>controller_manager_msgs</depend>
   <depend>controller_orchestrator</depend>
   <depend>geometry_msgs</depend>

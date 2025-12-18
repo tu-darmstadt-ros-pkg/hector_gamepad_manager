@@ -33,6 +33,8 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
 
     joy_subscription_ = ocs_ns_node_->create_subscription<sensor_msgs::msg::Joy>(
         "joy", 1, std::bind( &HectorGamepadManager::joyCallback, this, std::placeholders::_1 ) );
+    joy_feedback_publisher_ =
+        ocs_ns_node_->create_publisher<sensor_msgs::msg::JoyFeedback>( "joy/set_feedback", 1 );
   }
 }
 
@@ -180,6 +182,19 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
 
   // Update all active plugins
   for ( const auto &plugin : active_plugins_ ) { plugin->update(); }
+
+  // collect vibration feedback
+  double intensity = 0.0;
+  for ( const auto &plugin : active_plugins_ ) {
+    intensity = std::max( intensity, plugin->getVibrationFeedback() );
+  }
+  if ( intensity > 0.0 ) {
+    sensor_msgs::msg::JoyFeedback feedback;
+    feedback.type = sensor_msgs::msg::JoyFeedback::TYPE_RUMBLE;
+    feedback.id = 0; // all motors
+    feedback.intensity = intensity;
+    joy_feedback_publisher_->publish( feedback );
+  }
 }
 
 void HectorGamepadManager::activatePlugins( const std::string &config_name )

@@ -97,6 +97,21 @@ public:
     (void)id;
   }
 
+  /**
+   * @brief Get vibration feedback value for the gamepad.
+   *
+   * @return Vibration feedback value (0.0 to 1.0).
+   */
+  virtual double getVibrationFeedback() { return 0.0; }
+
+  /**
+   *
+   * @tparam T template type of data to retrieve
+   * @param id config id
+   * @param param name of the parameter
+   * @param default_value default value to return if parameter is not found
+   * @return found parameter value or default value
+   */
   template<typename T>
   T getConfigValueOr( const std::string &id, const std::string &param,
                       const T &default_value = T() ) const
