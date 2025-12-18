@@ -58,7 +58,7 @@ void checkPath( const ros_babel_fish::CompoundMessage &root, const std::string &
 void BatteryMonitorPlugin::initialize( const rclcpp::Node::SharedPtr &node )
 {
   node_ = node;
-  const auto ns = getPluginName();
+  auto ns = getPluginName();
   using Opts = hector::ParameterOptions<double>;
 
   low_cell_threshold_param_ = hector::createReconfigurableParameter(
@@ -80,12 +80,50 @@ void BatteryMonitorPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   cell_voltage_fields_ = node_->get_parameter( ns + ".cell_voltage_fields" ).as_string_array();
 
   fish_ = ros_babel_fish::BabelFish::make_shared();
-  battery_subscription_ = fish_->create_subscription(
-      *node_, node_->get_effective_namespace() + "/battery", 10,
-      [this]( const ros_babel_fish::CompoundMessage::SharedPtr msg ) { onBatteryMessage( msg ); } );
 
-  RCLCPP_INFO( node_->get_logger(), "[BatteryMonitor] Listening on '%s'",
-               battery_subscription_->get_topic_name() );
+  // Create a timer to check for the topic existence
+  // This prevents blocking the main thread during initialization.
+  subscription_timer_ =
+      node_->create_wall_timer( std::chrono::seconds( 1 ), [this]() { trySubscribe(); } );
+  trySubscribe();
+}
+
+void BatteryMonitorPlugin::trySubscribe()
+{
+  if ( battery_subscription_ ) {
+    // Already subscribed, stop the timer
+    if ( subscription_timer_ ) {
+      subscription_timer_->cancel();
+      subscription_timer_.reset();
+    }
+    return;
+  }
+  std::string topic_name = node_->get_effective_namespace();
+  topic_name += "/battery";
+
+  // Check if topic exists in the ROS graph
+  const auto topics = node_->get_topic_names_and_types();
+  const auto it = topics.find( topic_name );
+
+  if ( it != topics.end() ) {
+    RCLCPP_INFO( node_->get_logger(), "[BatteryMonitor] Found topic '%s'. Subscribing.",
+                 topic_name.c_str() );
+
+    // Create the subscription now that we know the topic (and implicitly the type) exists
+    battery_subscription_ = fish_->create_subscription(
+        *node_, topic_name, 10, [this]( const ros_babel_fish::CompoundMessage::SharedPtr msg ) {
+          onBatteryMessage( msg );
+        } );
+
+    // Clean up timer
+    if ( subscription_timer_ ) {
+      subscription_timer_->cancel();
+      subscription_timer_.reset();
+    }
+  } else {
+    RCLCPP_INFO_THROTTLE( node_->get_logger(), *node_->get_clock(), 5000,
+                          "[BatteryMonitor] Waiting for topic '%s'...", topic_name.c_str() );
+  }
 }
 
 void BatteryMonitorPlugin::activate()
@@ -137,8 +175,9 @@ void BatteryMonitorPlugin::onBatteryMessage( const ros_babel_fish::CompoundMessa
     if ( low_voltage_detected_ )
       break;
   }
-  RCLCPP_INFO( node_->get_logger(), "[BatteryMonitor] Low voltage detected: %s",
-               low_voltage_detected_ ? "TRUE" : "FALSE" );
+  RCLCPP_INFO_THROTTLE( node_->get_logger(), *node_->get_clock(), 5000,
+                        "[BatteryMonitor] Low voltage detected: %s",
+                        low_voltage_detected_ ? "TRUE" : "FALSE" );
 }
 
 bool BatteryMonitorPlugin::isMuted() const

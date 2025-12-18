@@ -27,12 +27,14 @@ public:
   double getVibrationFeedback() override;
 
 private:
+  void trySubscribe();
   void onBatteryMessage( const ros_babel_fish::CompoundMessage::SharedPtr &msg );
   bool isMuted() const;
 
   rclcpp::Node::SharedPtr node_;
   ros_babel_fish::BabelFish::SharedPtr fish_;
   ros_babel_fish::BabelFishSubscription::SharedPtr battery_subscription_;
+  rclcpp::TimerBase::SharedPtr subscription_timer_;
 
   hector::ParameterSubscription low_cell_threshold_param_;
   hector::ParameterSubscription vibration_intensity_param_;
