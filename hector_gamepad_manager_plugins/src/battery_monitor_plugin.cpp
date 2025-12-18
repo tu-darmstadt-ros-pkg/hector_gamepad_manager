@@ -4,6 +4,7 @@
 #include <ros_babel_fish/messages/array_message.hpp>
 #include <ros_babel_fish/method_invoke_helpers.hpp>
 #include <sstream>
+#include <type_traits>
 
 namespace hector_gamepad_manager_plugins
 {
@@ -11,9 +12,9 @@ namespace hector_gamepad_manager_plugins
 namespace
 {
 // Helper: Traverses the message path and calls 'visitor' on every numeric value found.
-// Handles Scalars and Arrays (Fixed, Bounded, Dynamic) transparently.
 template<typename Visitor>
-void checkPath( const ros_babel_fish::CompoundMessage &root, const std::string &path, Visitor visitor )
+void checkPath( const ros_babel_fish::CompoundMessage &root, const std::string &path,
+                Visitor check_func )
 {
   const ros_babel_fish::Message *curr = &root;
   std::stringstream ss( path );
@@ -31,46 +32,23 @@ void checkPath( const ros_babel_fish::CompoundMessage &root, const std::string &
 
   // 2. Handle Arrays
   if ( curr->type() == ros_babel_fish::MessageTypes::Array ) {
-    const auto &arr = curr->as<ros_babel_fish::ArrayMessageBase>();
+    auto &arr_base = curr->as<ros_babel_fish::ArrayMessageBase>();
 
-    // Generic lambda to cast to specific array type and iterate
-    auto process = [&]( auto type_tag ) {
-      using T = decltype( type_tag );
-      auto iterate = [&]( const auto &typed_arr ) {
-        for ( size_t i = 0; i < typed_arr.size(); ++i )
-          visitor( static_cast<double>( typed_arr[i] ) );
-      };
-
-      if ( arr.isFixedSize() )
-        iterate( arr.as<ros_babel_fish::ArrayMessage_<T, false, true>>() );
-      else if ( arr.isBounded() )
-        iterate( arr.as<ros_babel_fish::ArrayMessage_<T, true, false>>() );
-      else
-        iterate( arr.as<ros_babel_fish::ArrayMessage_<T, false, false>>() );
-    };
-    // clang-format off
-    using namespace ros_babel_fish;
-    switch ( arr.elementType() ) {
-      case MessageTypes::Int8:   process( int8_t{} ); break;
-      case MessageTypes::UInt8:  process( uint8_t{} ); break;
-      case MessageTypes::Int16:  process( int16_t{} ); break;
-      case MessageTypes::UInt16: process( uint16_t{} ); break;
-      case MessageTypes::Int32:  process( int32_t{} ); break;
-      case MessageTypes::UInt32: process( uint32_t{} ); break;
-      case MessageTypes::Int64:  process( int64_t{} ); break;
-      case MessageTypes::UInt64: process( uint64_t{} ); break;
-      case MessageTypes::Float:  process( float{} ); break;
-      case MessageTypes::Double: process( double{} ); break;
-      default: break; // Ignore non-numeric arrays
-    }
-    // clang-format on
+    ros_babel_fish::invoke_for_array_message( arr_base, [&]( const auto &typed_arr ) {
+      using ValType = std::decay_t<decltype( typed_arr[0] )>;
+      if constexpr ( std::is_arithmetic_v<ValType> ) {
+        for ( size_t i = 0; i < typed_arr.size(); ++i ) {
+          check_func( static_cast<double>( typed_arr[i] ) );
+        }
+      }
+    } );
     return;
   }
 
   // 3. Handle Scalars
   if ( curr->type() != ros_babel_fish::MessageTypes::Compound ) {
     try {
-      visitor( curr->value<double>() );
+      check_func( curr->value<double>() );
     } catch ( ... ) {
     }
   }
@@ -80,7 +58,7 @@ void checkPath( const ros_babel_fish::CompoundMessage &root, const std::string &
 void BatteryMonitorPlugin::initialize( const rclcpp::Node::SharedPtr &node )
 {
   node_ = node;
-  auto ns = getPluginName();
+  const auto ns = getPluginName();
   using Opts = hector::ParameterOptions<double>;
 
   low_cell_threshold_param_ = hector::createReconfigurableParameter(
@@ -157,7 +135,7 @@ void BatteryMonitorPlugin::onBatteryMessage( const ros_babel_fish::CompoundMessa
   for ( const auto &path : cell_voltage_fields_ ) {
     checkPath( *msg, path, check_val );
     if ( low_voltage_detected_ )
-      break; // Stop early if low cell found
+      break;
   }
   RCLCPP_INFO( node_->get_logger(), "[BatteryMonitor] Low voltage detected: %s",
                low_voltage_detected_ ? "TRUE" : "FALSE" );
