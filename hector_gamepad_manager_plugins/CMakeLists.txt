@@ -13,7 +13,6 @@ find_package(ament_cmake_gen_version_h REQUIRED)
 
 # Define a list of dependencies in alphabetical order
 set(DEPENDENCIES
-    athena_firmware_interface_msgs
     controller_manager_msgs
     controller_orchestrator
     geometry_msgs
@@ -21,6 +20,7 @@ set(DEPENDENCIES
     hector_ros2_utils
     moveit_msgs
     pluginlib
+    ros_babel_fish
     rcl_interfaces
     rclcpp
     rclcpp_action
@@ -31,7 +31,7 @@ set(DEPENDENCIES
 foreach(dependency IN LISTS DEPENDENCIES)
   find_package(${dependency} REQUIRED)
 endforeach()
-
+find_package(backward_ros REQUIRED)
 set(HEADERS
     include/hector_gamepad_manager_plugins/controller_helper.hpp
     include/hector_gamepad_manager_plugins/drive_plugin.hpp

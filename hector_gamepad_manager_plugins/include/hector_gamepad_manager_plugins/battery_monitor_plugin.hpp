@@ -1,11 +1,11 @@
 #pragma once
 
-#include <array>
 #include <rclcpp/rclcpp.hpp>
 
-#include <athena_firmware_interface_msgs/msg/battery_status.hpp>
 #include <hector_gamepad_plugin_interface/gamepad_plugin_interface.hpp>
 #include <hector_ros2_utils/parameters/reconfigurable_parameter.hpp>
+#include <ros_babel_fish/babel_fish.hpp>
+#include <vector>
 
 namespace hector_gamepad_manager_plugins
 {
@@ -26,12 +26,14 @@ public:
   double getVibrationFeedback() override;
 
 private:
-  void onBatteryStatus( const athena_firmware_interface_msgs::msg::BatteryStatus &msg );
-  bool hasLowCell( const std::array<uint16_t, 8> &cells ) const;
+  void onBatteryMessage( const ros_babel_fish::CompoundMessage::SharedPtr &msg );
+  bool collectFieldValues( const ros_babel_fish::CompoundMessage &root, const std::string &path,
+                           std::vector<double> &out ) const;
   bool isMuted() const;
 
   rclcpp::Node::SharedPtr node_;
-  rclcpp::Subscription<athena_firmware_interface_msgs::msg::BatteryStatus>::SharedPtr battery_subscription_;
+  ros_babel_fish::BabelFish::SharedPtr fish_;
+  ros_babel_fish::BabelFishSubscription::SharedPtr battery_subscription_;
 
   hector::ParameterSubscription low_cell_threshold_param_;
   hector::ParameterSubscription vibration_intensity_param_;
@@ -40,6 +42,8 @@ private:
   double low_cell_threshold_mv_{ 3300.0 };
   double vibration_intensity_{ 0.8 };
   double mute_duration_sec_{ 300.0 }; // default to 5 minutes
+
+  std::vector<std::string> cell_voltage_fields_;
 
   bool low_voltage_detected_{ false };
   rclcpp::Time muted_until_{ 0, 0, RCL_ROS_TIME };

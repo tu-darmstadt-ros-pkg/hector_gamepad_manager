@@ -194,7 +194,7 @@ Executes MoveIt! commands to position the robot in predefined SRDF poses.
 
 ## BatteryMonitorPlugin
 
-Monitors cell voltages from `athena_firmware_interface_msgs/msg/BatteryStatus` and vibrates the gamepad when any cell
+Monitors cell voltages (any battery message type via `ros_babel_fish`) and vibrates the gamepad when any cell
 falls below a configured threshold. The vibration can be muted temporarily via a button.
 
 ### Functions
@@ -204,6 +204,8 @@ falls below a configured threshold. The vibration can be muted temporarily via a
 ### Parameters
 
 - `battery_topic` (string): Topic to subscribe to. Default: `battery_status`.
+- `cell_voltage_fields` (string list): Field paths (e.g., `["cell_voltages_battery1_mv", "cell_voltages_battery2_mv"]`)
+  containing cell voltage arrays (or arrays of arrays) to evaluate.
 - `low_cell_threshold_mv` (double): Cell voltage threshold (mV) to trigger vibration. Default: `3300.0`.
 - `vibration_intensity` (double): Rumble intensity in `[0.0, 1.0]`. Default: `0.8`.
 - `mute_duration_sec` (double): How long the mute lasts after pressing `mute`. Default: `300.0` seconds (5 minutes).

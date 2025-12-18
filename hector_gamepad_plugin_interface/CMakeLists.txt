@@ -13,6 +13,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(yaml-cpp REQUIRED)
+find_package(backward_ros REQUIRED)
 # Header-only interface target
 add_library(${PROJECT_NAME} INTERFACE)
 
