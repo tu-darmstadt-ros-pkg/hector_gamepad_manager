@@ -14,7 +14,8 @@ namespace
 // Helper: Traverses the message path and calls 'visitor' on every numeric value found.
 template<typename Visitor>
 void checkPath( const ros_babel_fish::CompoundMessage &root, const std::string &path,
-                Visitor check_func )
+                Visitor check_func, const rclcpp::Logger &logger,
+                const rclcpp::Clock::SharedPtr &clock )
 {
   const ros_babel_fish::Message *curr = &root;
   std::stringstream ss( path );
@@ -25,8 +26,11 @@ void checkPath( const ros_babel_fish::CompoundMessage &root, const std::string &
     if ( curr->type() != ros_babel_fish::MessageTypes::Compound )
       return;
     const auto &c = curr->as<ros_babel_fish::CompoundMessage>();
-    if ( !c.containsKey( token ) )
+    if ( !c.containsKey( token ) ) {
+      RCLCPP_INFO_THROTTLE( logger, *clock, 3000,
+                            "[BatteryMonitor] Path '%s' does not exist in message", path.c_str() );
       return;
+    }
     curr = &c[token];
   }
 
@@ -40,6 +44,10 @@ void checkPath( const ros_babel_fish::CompoundMessage &root, const std::string &
         for ( size_t i = 0; i < typed_arr.size(); ++i ) {
           check_func( static_cast<double>( typed_arr[i] ) );
         }
+      } else {
+        RCLCPP_INFO_THROTTLE( logger, *clock, 3000,
+                              "[BatteryMonitor] Unsupported array element type in path '%s'",
+                              path.c_str() );
       }
     } );
     return;
@@ -50,6 +58,9 @@ void checkPath( const ros_babel_fish::CompoundMessage &root, const std::string &
     try {
       check_func( curr->value<double>() );
     } catch ( ... ) {
+      RCLCPP_INFO_THROTTLE( logger, *clock, 3000,
+                            "[BatteryMonitor] Unsupported array element type in path '%s'",
+                            path.c_str() );
     }
   }
 }
@@ -73,6 +84,13 @@ void BatteryMonitorPlugin::initialize( const rclcpp::Node::SharedPtr &node )
       node, ns + ".mute_duration_sec", std::ref( mute_duration_sec_ ), "Mute duration",
       Opts().onValidate( []( auto v ) { return v > 0.0; } ) );
 
+  ignore_nan_voltage_param_ = hector::createReconfigurableParameter(
+      node, ns + ".ignore_nan_voltage", std::ref( ignore_nan_voltage_ ), "Ignore NaN cell voltages" );
+
+  ignore_zero_voltage_param_ = hector::createReconfigurableParameter(
+      node, ns + ".ignore_zero_voltage", std::ref( ignore_zero_voltage_ ),
+      "Ignore zero cell voltages" );
+
   node_->declare_parameters<std::vector<std::string>>(
       ns,
       { { "cell_voltage_fields", { "cell_voltages_battery1_mv", "cell_voltages_battery2_mv" } } } );
@@ -90,14 +108,6 @@ void BatteryMonitorPlugin::initialize( const rclcpp::Node::SharedPtr &node )
 
 void BatteryMonitorPlugin::trySubscribe()
 {
-  if ( battery_subscription_ ) {
-    // Already subscribed, stop the timer
-    if ( subscription_timer_ ) {
-      subscription_timer_->cancel();
-      subscription_timer_.reset();
-    }
-    return;
-  }
   std::string topic_name = node_->get_effective_namespace();
   topic_name += "/battery";
 
@@ -164,14 +174,18 @@ void BatteryMonitorPlugin::onBatteryMessage( const ros_babel_fish::CompoundMessa
     return;
 
   low_voltage_detected_ = false;
-  auto check_val = [&]( double v ) {
-    if ( !low_voltage_detected_ && v > 0.0 && !std::isnan( v ) && v < low_cell_threshold_ ) {
+  auto check_val = [&]( const double v ) {
+    if ( ignore_nan_voltage_ && std::isnan( v ) )
+      return;
+    if ( ignore_zero_voltage_ && v == 0.0 )
+      return;
+    if ( v < low_cell_threshold_ ) {
       low_voltage_detected_ = true;
     }
   };
 
   for ( const auto &path : cell_voltage_fields_ ) {
-    checkPath( *msg, path, check_val );
+    checkPath( *msg, path, check_val, node_->get_logger(), node_->get_clock() );
     if ( low_voltage_detected_ )
       break;
   }

@@ -39,10 +39,14 @@ private:
   hector::ParameterSubscription low_cell_threshold_param_;
   hector::ParameterSubscription vibration_intensity_param_;
   hector::ParameterSubscription mute_duration_param_;
+  hector::ParameterSubscription ignore_zero_voltage_param_;
+  hector::ParameterSubscription ignore_nan_voltage_param_;
 
   double low_cell_threshold_{ 3300.0 };
   double vibration_intensity_{ 0.8 };
   double mute_duration_sec_{ 300.0 }; // default to 5 minutes
+  bool ignore_zero_voltage_{ true };
+  bool ignore_nan_voltage_{ true };
 
   std::vector<std::string> cell_voltage_fields_;
 
