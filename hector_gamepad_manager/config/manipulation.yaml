@@ -71,8 +71,8 @@ buttons:
       name: "invert_steering"
 
   9: # Left joystick press
-    plugin: ""
-    function: ""
+    plugin: "hector_gamepad_manager_plugins::BatteryMonitorPlugin"
+    function: "mute"
 
   10: # Right joystick press
     plugin: "hector_gamepad_manager_plugins::BlackboardPlugin"

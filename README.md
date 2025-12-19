@@ -191,3 +191,23 @@ Executes MoveIt! commands to position the robot in predefined SRDF poses.
         - `pose`: The name of the pose to move to (e.g., "folded").
         - `inverted_pose`: Optional, if set the robot will move to the inverted pose if `inverted_steering` from the
           blackboard is `true`.
+
+## BatteryMonitorPlugin
+
+Monitors cell voltages (any battery message type via `ros_babel_fish`) and vibrates the gamepad when any cell
+falls below a configured threshold. The vibration can be muted temporarily via a button.
+
+### Functions
+
+- `mute` (button): Mutes vibration feedback for the configured duration.
+
+### Parameters
+
+- `battery_topic` (string): Topic to subscribe to. Default: `battery_status`.
+- `cell_voltage_fields` (string list): Field paths (e.g., `["cell_voltages_battery1_mv", "cell_voltages_battery2_mv"]`)
+  containing cell voltage values or arrays to evaluate.
+- `low_cell_threshold` (double): Cell voltage threshold to trigger vibration. Default: `3500.0`.
+- `vibration_intensity` (double): Rumble intensity in `[0.0, 1.0]`. Default: `0.8`.
+- `mute_duration_sec` (double): How long the mute lasts after pressing `mute`. Default: `300.0` seconds (5 minutes).
+- `ignore_zero_voltage` (bool): If `true`, zero voltage readings are ignored (useful for unpopulated cells). Default: `true`.
+- `ignore_nan_voltage` (bool): If `true`, NaN voltage readings are ignored. Default: `true`.

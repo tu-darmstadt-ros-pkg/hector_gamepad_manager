@@ -11,6 +11,7 @@
   <buildtool_depend>ros2_control_cmake</buildtool_depend>
 
   <depend>ament_cmake_gen_version_h</depend>
+  <depend>backward_ros</depend>
   <depend>controller_manager_msgs</depend>
   <depend>controller_orchestrator</depend>
   <depend>geometry_msgs</depend>
@@ -21,6 +22,7 @@
   <depend>rcl_interfaces</depend>
   <depend>rclcpp</depend>
   <depend>rclcpp_action</depend>
+  <depend>ros_babel_fish</depend>
   <depend>sensor_msgs</depend>
   <depend>srdfdom</depend>
   <depend>std_srvs</depend>

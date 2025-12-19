@@ -15,4 +15,7 @@
     <class type="hector_gamepad_manager_plugins::BlackboardPlugin" base_class_type="hector_gamepad_plugin_interface::GamepadFunctionPlugin">
         <description>Interface set blackboard variables.</description>
     </class>
+    <class type="hector_gamepad_manager_plugins::BatteryMonitorPlugin" base_class_type="hector_gamepad_plugin_interface::GamepadFunctionPlugin">
+        <description>Vibrates the gamepad when a cell voltage drops below a configured threshold.</description>
+    </class>
 </library>
