@@ -209,3 +209,5 @@ falls below a configured threshold. The vibration can be muted temporarily via a
 - `low_cell_threshold` (double): Cell voltage threshold to trigger vibration. Default: `3500.0`.
 - `vibration_intensity` (double): Rumble intensity in `[0.0, 1.0]`. Default: `0.8`.
 - `mute_duration_sec` (double): How long the mute lasts after pressing `mute`. Default: `300.0` seconds (5 minutes).
+- `ignore_zero_voltage` (bool): If `true`, zero voltage readings are ignored (useful for unpopulated cells). Default: `true`.
+- `ignore_nan_voltage` (bool): If `true`, NaN voltage readings are ignored. Default: `true`.
