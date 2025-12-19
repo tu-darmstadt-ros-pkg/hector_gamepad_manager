@@ -27,7 +27,7 @@ void checkPath( const ros_babel_fish::CompoundMessage &root, const std::string &
       return;
     const auto &c = curr->as<ros_babel_fish::CompoundMessage>();
     if ( !c.containsKey( token ) ) {
-      RCLCPP_INFO_THROTTLE( logger, *clock, 3000,
+      RCLCPP_INFO_THROTTLE( logger, *clock, 9000,
                             "[BatteryMonitor] Path '%s' does not exist in message", path.c_str() );
       return;
     }
@@ -45,7 +45,7 @@ void checkPath( const ros_babel_fish::CompoundMessage &root, const std::string &
           check_func( static_cast<double>( typed_arr[i] ) );
         }
       } else {
-        RCLCPP_INFO_THROTTLE( logger, *clock, 3000,
+        RCLCPP_INFO_THROTTLE( logger, *clock, 9000,
                               "[BatteryMonitor] Unsupported array element type in path '%s'",
                               path.c_str() );
       }
@@ -58,7 +58,7 @@ void checkPath( const ros_babel_fish::CompoundMessage &root, const std::string &
     try {
       check_func( curr->value<double>() );
     } catch ( ... ) {
-      RCLCPP_INFO_THROTTLE( logger, *clock, 3000,
+      RCLCPP_INFO_THROTTLE( logger, *clock, 9000,
                             "[BatteryMonitor] Unsupported array element type in path '%s'",
                             path.c_str() );
     }
@@ -131,8 +131,8 @@ void BatteryMonitorPlugin::trySubscribe()
       subscription_timer_.reset();
     }
   } else {
-    RCLCPP_INFO_THROTTLE( node_->get_logger(), *node_->get_clock(), 5000,
-                          "[BatteryMonitor] Waiting for topic '%s'...", topic_name.c_str() );
+    RCLCPP_DEBUG_THROTTLE( node_->get_logger(), *node_->get_clock(), 5000,
+                           "[BatteryMonitor] Waiting for topic '%s'...", topic_name.c_str() );
   }
 }
 
