@@ -13,6 +13,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rcl_interfaces REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(backward_ros REQUIRED)
 # Header-only interface target
@@ -23,7 +24,8 @@ target_include_directories(
   INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
             "$<INSTALL_INTERFACE:include>")
 target_link_libraries(${PROJECT_NAME} INTERFACE yaml-cpp)
-ament_target_dependencies(${PROJECT_NAME} INTERFACE rclcpp rcl_interfaces)
+ament_target_dependencies(${PROJECT_NAME} INTERFACE rclcpp rcl_interfaces
+                          sensor_msgs)
 
 install(
   TARGETS ${PROJECT_NAME}
@@ -54,7 +56,21 @@ if(BUILD_TESTING)
     target_compile_options(test_blackboard_yaml PRIVATE -Wall -Wextra
                                                         -Wpedantic)
   endif()
+  ament_add_gtest(test_vibration_pattern test/test_vibration_pattern.cpp)
+  if(TARGET test_vibration_pattern)
+    target_link_libraries(test_vibration_pattern ${PROJECT_NAME})
+    target_compile_features(test_vibration_pattern PRIVATE cxx_std_17)
+    target_compile_options(test_vibration_pattern PRIVATE -Wall -Wextra
+                                                          -Wpedantic)
+  endif()
+  ament_add_gtest(test_feedback_manager test/test_feedback_manager.cpp)
+  if(TARGET test_feedback_manager)
+    target_link_libraries(test_feedback_manager ${PROJECT_NAME})
+    target_compile_features(test_feedback_manager PRIVATE cxx_std_17)
+    target_compile_options(test_feedback_manager PRIVATE -Wall -Wextra
+                                                         -Wpedantic)
+  endif()
 endif()
 
-ament_export_dependencies(rclcpp rcl_interfaces yaml-cpp)
+ament_export_dependencies(rclcpp rcl_interfaces sensor_msgs yaml-cpp)
 ament_package()

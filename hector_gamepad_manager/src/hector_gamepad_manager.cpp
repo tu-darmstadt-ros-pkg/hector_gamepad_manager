@@ -27,6 +27,7 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
   qos_profile.durability( RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL );
   active_config_publisher_ =
       ocs_ns_node_->create_publisher<std_msgs::msg::String>( "active_config", qos_profile );
+  feedback_manager_->initialize( ocs_ns_node_ );
 
   // load meta switch config and all referenced config files
   if ( loadConfigSwitchesConfig( config_switches_filename ) ) {
@@ -34,8 +35,6 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
 
     joy_subscription_ = ocs_ns_node_->create_subscription<sensor_msgs::msg::Joy>(
         "joy", 1, std::bind( &HectorGamepadManager::joyCallback, this, std::placeholders::_1 ) );
-    joy_feedback_publisher_ =
-        ocs_ns_node_->create_publisher<sensor_msgs::msg::JoyFeedback>( "joy/set_feedback", 1 );
   }
 }
 
@@ -183,15 +182,6 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
 
   // Update all active plugins
   for ( const auto &plugin : active_plugins_ ) { plugin->update(); }
-
-  const double intensity = feedback_manager_->getVibrationIntensity();
-  if ( intensity >= 0.0 ) {
-    sensor_msgs::msg::JoyFeedback feedback;
-    feedback.type = sensor_msgs::msg::JoyFeedback::TYPE_RUMBLE;
-    feedback.id = 0; // all motors
-    feedback.intensity = intensity;
-    joy_feedback_publisher_->publish( feedback );
-  }
 }
 
 void HectorGamepadManager::activatePlugins( const std::string &config_name )

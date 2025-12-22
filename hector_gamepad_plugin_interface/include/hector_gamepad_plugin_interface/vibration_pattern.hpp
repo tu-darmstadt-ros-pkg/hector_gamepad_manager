@@ -12,6 +12,9 @@
 namespace hector_gamepad_plugin_interface
 {
 
+/**
+ * @brief Configuration defaults for a vibration pattern.
+ */
 struct VibrationPatternDefaults {
   std::vector<double> on_durations_sec;
   std::vector<double> off_durations_sec;
@@ -19,9 +22,19 @@ struct VibrationPatternDefaults {
   bool cycle{ true };
 };
 
+/**
+ * @brief Time-based rumble pattern with on/off pulses.
+ */
 class VibrationPattern
 {
 public:
+  /**
+   * @brief Configure the pattern parameters and register runtime parameter updates.
+   *
+   * @param node ROS node used for time and parameters.
+   * @param param_ns Parameter namespace for the pattern settings.
+   * @param defaults Default values to use when parameters are not set.
+   */
   void configure( const rclcpp::Node::SharedPtr &node, const std::string &param_ns,
                   const VibrationPatternDefaults &defaults = VibrationPatternDefaults() )
   {
@@ -32,10 +45,12 @@ public:
     intensity_ = defaults.intensity;
     cycle_ = defaults.cycle;
 
-    declareOrGet( param_ns_ + ".on_durations_sec", on_durations_sec_ );
-    declareOrGet( param_ns_ + ".off_durations_sec", off_durations_sec_ );
-    declareOrGet( param_ns_ + ".intensity", intensity_ );
-    declareOrGet( param_ns_ + ".cycle", cycle_ );
+    on_durations_sec_ = node_->declare_parameter<std::vector<double>>(
+        param_ns_ + ".on_durations_sec", on_durations_sec_ );
+    off_durations_sec_ = node_->declare_parameter<std::vector<double>>(
+        param_ns_ + ".off_durations_sec", off_durations_sec_ );
+    intensity_ = node_->declare_parameter<double>( param_ns_ + ".intensity", intensity_ );
+    cycle_ = node_->declare_parameter<bool>( param_ns_ + ".cycle", cycle_ );
 
     normalizeDurations();
     updateTotalDuration();
@@ -47,6 +62,9 @@ public:
         } );
   }
 
+  /**
+   * @brief Restart the pattern timing reference.
+   */
   void reset()
   {
     if ( !node_ ) {
@@ -55,6 +73,11 @@ public:
     start_time_ = node_->now();
   }
 
+  /**
+   * @brief Enable or disable the pattern.
+   *
+   * @param active True to start/continue the pattern, false to stop it.
+   */
   void setActive( const bool active )
   {
     if ( active && !active_ ) {
@@ -63,8 +86,16 @@ public:
     active_ = active;
   }
 
+  /**
+   * @brief Check whether the pattern is currently active.
+   */
   bool isActive() const { return active_; }
 
+  /**
+   * @brief Get the instantaneous intensity based on the current time.
+   *
+   * @return Intensity in [0.0, 1.0] when active, 0.0 otherwise.
+   */
   double getIntensityNow() const
   {
     if ( !active_ || !node_ ) {
@@ -102,21 +133,18 @@ public:
   }
 
 private:
-  template<typename T>
-  void declareOrGet( const std::string &name, T &value )
-  {
-    if ( !node_->has_parameter( name ) ) {
-      node_->declare_parameter<T>( name, value );
-    }
-    node_->get_parameter( name, value );
-  }
-
+  /**
+   * @brief Clamp on/off durations to non-negative values.
+   */
   void normalizeDurations()
   {
     for ( auto &value : on_durations_sec_ ) { value = std::max( 0.0, value ); }
     for ( auto &value : off_durations_sec_ ) { value = std::max( 0.0, value ); }
   }
 
+  /**
+   * @brief Recompute the total cycle length from the configured durations.
+   */
   void updateTotalDuration()
   {
     total_duration_sec_ = 0.0;
@@ -129,6 +157,9 @@ private:
     }
   }
 
+  /**
+   * @brief Apply runtime parameter updates for this pattern namespace.
+   */
   rcl_interfaces::msg::SetParametersResult
   onParameterUpdate( const std::vector<rclcpp::Parameter> &params )
   {
