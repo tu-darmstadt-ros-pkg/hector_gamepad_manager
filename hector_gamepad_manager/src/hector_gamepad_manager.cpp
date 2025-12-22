@@ -5,7 +5,8 @@ namespace hector_gamepad_manager
 HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node )
     : plugin_loader_( "hector_gamepad_manager",
                       "hector_gamepad_plugin_interface::GamepadFunctionPlugin" ),
-      blackboard_( std::make_shared<hector_gamepad_plugin_interface::Blackboard>() )
+      blackboard_( std::make_shared<hector_gamepad_plugin_interface::Blackboard>() ),
+      feedback_manager_( std::make_shared<hector_gamepad_plugin_interface::FeedbackManager>() )
 {
   // declare & get parameters
   node->declare_parameter<std::string>( "config_name", "athena" );
@@ -125,7 +126,7 @@ bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::st
           try {
             std::shared_ptr<GamepadFunctionPlugin> plugin =
                 plugin_loader_.createSharedInstance( plugin_name );
-            plugin->initializePlugin( robot_ns_node_, plugin_name, blackboard_ );
+            plugin->initializePlugin( robot_ns_node_, plugin_name, blackboard_, feedback_manager_ );
             plugins_[plugin_name] = plugin;
             RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Loaded plugin: %s", plugin_name.c_str() );
           } catch ( const std::exception &e ) {
@@ -183,12 +184,8 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
   // Update all active plugins
   for ( const auto &plugin : active_plugins_ ) { plugin->update(); }
 
-  // collect vibration feedback
-  double intensity = 0.0;
-  for ( const auto &plugin : active_plugins_ ) {
-    intensity = std::max( intensity, plugin->getVibrationFeedback() );
-  }
-  if ( intensity > 0.0 ) {
+  const double intensity = feedback_manager_->getVibrationIntensity();
+  if ( intensity >= 0.0 ) {
     sensor_msgs::msg::JoyFeedback feedback;
     feedback.type = sensor_msgs::msg::JoyFeedback::TYPE_RUMBLE;
     feedback.id = 0; // all motors

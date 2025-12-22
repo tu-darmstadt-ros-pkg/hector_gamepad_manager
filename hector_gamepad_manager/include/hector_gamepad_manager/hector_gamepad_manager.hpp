@@ -1,6 +1,7 @@
 #ifndef HECTOR_GAMEPAD_MANAGER_HECTOR_GAMEPAD_MANAGER_HPP
 #define HECTOR_GAMEPAD_MANAGER_HECTOR_GAMEPAD_MANAGER_HPP
 
+#include "hector_gamepad_plugin_interface/feedback_manager.hpp"
 #include "hector_gamepad_plugin_interface/gamepad_plugin_interface.hpp"
 
 #include <pluginlib/class_loader.hpp>
@@ -77,7 +78,11 @@ private:
   // stores the plugins present in the active configuration file
   std::vector<std::shared_ptr<GamepadFunctionPlugin>> active_plugins_;
 
+  // Blackboard for inter-plugin communication and function arguments
   std::shared_ptr<hector_gamepad_plugin_interface::Blackboard> blackboard_;
+
+  // Feedback manager for handling vibration patterns
+  std::shared_ptr<hector_gamepad_plugin_interface::FeedbackManager> feedback_manager_;
 
   // Deadzone to consider an axis as pressed
   static constexpr float AXIS_DEADZONE = 0.5;

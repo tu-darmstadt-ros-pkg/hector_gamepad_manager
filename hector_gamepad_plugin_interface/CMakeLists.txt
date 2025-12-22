@@ -12,6 +12,7 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rcl_interfaces REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(backward_ros REQUIRED)
 # Header-only interface target
@@ -22,6 +23,7 @@ target_include_directories(
   INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
             "$<INSTALL_INTERFACE:include>")
 target_link_libraries(${PROJECT_NAME} INTERFACE yaml-cpp)
+ament_target_dependencies(${PROJECT_NAME} INTERFACE rclcpp rcl_interfaces)
 
 install(
   TARGETS ${PROJECT_NAME}
@@ -54,5 +56,5 @@ if(BUILD_TESTING)
   endif()
 endif()
 
-ament_export_dependencies(yaml-cpp)
+ament_export_dependencies(rclcpp rcl_interfaces yaml-cpp)
 ament_package()
