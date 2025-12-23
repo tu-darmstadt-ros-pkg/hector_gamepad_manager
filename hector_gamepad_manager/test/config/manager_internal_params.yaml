@@ -1,0 +1,6 @@
+/**:
+  ros__parameters:
+        config_name: "manager_internal_switches"
+        config_directory: "test/config"
+        robot_namespace: "athena"
+        ocs_namespace: "ocs"

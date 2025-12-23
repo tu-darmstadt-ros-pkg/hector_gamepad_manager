@@ -36,11 +36,10 @@ repos:
     rev: v0.6.13
     hooks:
     - id: cmake-format
-    - id: cmake-lint
 
 
   - repo: https://github.com/Joschi3/package_xml_validation.git
-    rev: v1.1.5
+    rev: v1.3.0
     hooks:
       - id: format-package-xml
         name: Validate and Format package.xml

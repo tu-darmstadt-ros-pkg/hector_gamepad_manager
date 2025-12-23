@@ -1,0 +1,37 @@
+# Test-only config for manager internal logic tests
+axes:
+  0: {plugin: "hector_gamepad_manager_plugins::TestProbePlugin", function: "axis"}
+  1: {plugin: "", function: ""}
+  2: {plugin: "", function: ""}
+  3: {plugin: "", function: ""}
+  4: {plugin: "", function: ""}
+  5: {plugin: "", function: ""}
+  6: {plugin: "", function: ""}
+  7: {plugin: "", function: ""}
+
+buttons:
+  0: {plugin: "hector_gamepad_manager_plugins::TestProbePlugin", function: "probe"}
+  1: {plugin: "", function: ""}
+  2: {plugin: "", function: ""}
+  3: {plugin: "", function: ""}
+  4: {plugin: "", function: ""}
+  5: {plugin: "", function: ""}
+  6: {plugin: "", function: ""}
+  7: {plugin: "", function: ""}
+  8: {plugin: "", function: ""}
+  9: {plugin: "", function: ""}
+  10: {plugin: "", function: ""}
+  11: {plugin: "hector_gamepad_manager_plugins::TestProbePlugin", function: "virtual"}
+  12: {plugin: "", function: ""}
+  13: {plugin: "", function: ""}
+  14: {plugin: "", function: ""}
+  15: {plugin: "", function: ""}
+  16: {plugin: "", function: ""}
+  17: {plugin: "", function: ""}
+  18: {plugin: "", function: ""}
+  19: {plugin: "", function: ""}
+  20: {plugin: "", function: ""}
+  21: {plugin: "", function: ""}
+  22: {plugin: "", function: ""}
+  23: {plugin: "", function: ""}
+  24: {plugin: "", function: ""}
