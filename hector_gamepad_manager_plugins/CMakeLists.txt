@@ -4,6 +4,12 @@ project(hector_gamepad_manager_plugins LANGUAGES CXX)
 # Default to C++17 if(NOT CMAKE_CXX_STANDARD) set(CMAKE_CXX_STANDARD 17)
 # set(CMAKE_CXX_STANDARD_REQUIRED ON) endif()
 
+option(ENABLE_COVERAGE "Enable coverage flags" OFF)
+if(ENABLE_COVERAGE AND (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang"))
+  add_compile_options(-O0 -g --coverage)
+  add_link_options(--coverage)
+endif()
+
 # if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 # add_compile_options(-Wall -Wextra -Wpedantic) endif()
 
@@ -39,7 +45,8 @@ set(HEADERS
     include/hector_gamepad_manager_plugins/flipper_plugin.hpp
     include/hector_gamepad_manager_plugins/manipulation_plugin.hpp
     include/hector_gamepad_manager_plugins/moveit_plugin.hpp
-    include/hector_gamepad_manager_plugins/blackboard_plugin.hpp)
+    include/hector_gamepad_manager_plugins/blackboard_plugin.hpp
+    include/hector_gamepad_manager_plugins/test_probe_plugin.hpp)
 
 set(SOURCES
     src/controller_helper.cpp
@@ -48,7 +55,8 @@ set(SOURCES
     src/battery_monitor_plugin.cpp
     src/manipulation_plugin.cpp
     src/moveit_plugin.cpp
-    src/blackboard_plugin.cpp)
+    src/blackboard_plugin.cpp
+    src/test_probe_plugin.cpp)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES} ${HEADERS})
 target_include_directories(
@@ -56,6 +64,15 @@ target_include_directories(
                          $<INSTALL_INTERFACE:include>)
 
 ament_target_dependencies(${PROJECT_NAME} PUBLIC ${DEPENDENCIES})
+# Build plugins with rtest mocks when testing so rtest can observe
+# publishers/subscriptions.
+if(BUILD_TESTING)
+  find_package(rtest REQUIRED)
+  target_link_libraries(
+    ${PROJECT_NAME}
+    PRIVATE rtest::publisher_mock rtest::subscription_mock rtest::timer_mock
+            rtest::rtest_common rtest::service_mock rtest::service_client_mock)
+endif()
 # target_link_libraries(${PROJECT_NAME} PRIVATE
 # controller_orchestrator::controller_orchestrator)
 
