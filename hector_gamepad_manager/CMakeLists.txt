@@ -6,6 +6,12 @@ if(NOT CMAKE_CXX_STANDARD)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
 endif()
 
+option(ENABLE_COVERAGE "Enable coverage flags" OFF)
+if(ENABLE_COVERAGE AND (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang"))
+  add_compile_options(-O0 -g --coverage)
+  add_link_options(--coverage)
+endif()
+
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
@@ -39,6 +45,7 @@ install(
 install(DIRECTORY include/ DESTINATION include)
 install(TARGETS hector_gamepad_manager_node DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
+install(DIRECTORY test/config/ DESTINATION share/${PROJECT_NAME}/test/config)
 
 if(BUILD_TESTING)
   find_package(ament_cmake_gmock REQUIRED)
@@ -50,8 +57,9 @@ if(BUILD_TESTING)
   ament_target_dependencies(${PROJECT_NAME}_test_doubles ${DEPENDENCIES})
 
   # 1. Create the GTest/GMock executable
-  ament_add_gmock(${PROJECT_NAME}_test test/main.cpp
-                  test/test_hector_gamepad_manager.cpp)
+  ament_add_gmock(
+    ${PROJECT_NAME}_test test/main.cpp test/test_hector_gamepad_manager.cpp
+    test/test_hector_gamepad_manager_internal.cpp)
 
   # 1. Link against the Test Doubles
   target_link_libraries(${PROJECT_NAME}_test

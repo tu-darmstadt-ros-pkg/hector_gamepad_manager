@@ -72,6 +72,12 @@ protected:
     ASSERT_TRUE( pub_gripper_ );
     ASSERT_TRUE( pub_flipper_ );
 
+    EXPECT_CALL( *pub_config_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
+    EXPECT_CALL( *pub_cmd_vel_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
+    EXPECT_CALL( *pub_twist_eef_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
+    EXPECT_CALL( *pub_gripper_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
+    EXPECT_CALL( *pub_flipper_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
+
     button_map_ = { { "a", 0 },
                     { "b", 1 },
                     { "x", 2 },

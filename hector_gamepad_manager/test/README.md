@@ -111,3 +111,23 @@ Why this is reliable:
 - `test/test_hector_gamepad_manager.cpp`: test implementation using rtest
 - `test/main.cpp`: gtest main that initializes and shuts down `rclcpp`
 - `test/config/athena_plugin_config.yaml`: test params file
+- `test/config/manager_internal_params.yaml`: test params for internal-logic tests
+
+## Coverage
+
+Coverage is enabled by passing `-DENABLE_COVERAGE=ON` to CMake for both
+`hector_gamepad_manager` and `hector_gamepad_manager_plugins`.
+
+Example:
+```sh
+colcon build --packages-up-to hector_gamepad_manager \
+  --cmake-args -DBUILD_TESTING=ON -DENABLE_COVERAGE=ON
+
+colcon test --packages-select hector_gamepad_manager \
+  --event-handlers console_cohesion+
+
+lcov --capture --directory build/hector_gamepad_manager \
+  --output-file coverage.info
+
+genhtml coverage.info --output-directory coverage_html
+```
