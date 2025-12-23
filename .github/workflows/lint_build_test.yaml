@@ -81,10 +81,9 @@ jobs:
         run: |
           source /opt/ros/${{ matrix.setup.rosdistro }}/setup.bash
           colcon build
-       # TODO: Enable tests After Fixing them: they sometimes fail in the CI even though they pass locally
        # Only run tests for the packages in this repo
-#      - name: test --packages-select he
-#        run: |
-#          source /opt/ros/${{ matrix.setup.rosdistro }}/setup.bash
-#          colcon test --packages-select-regex hector_gamepad-*
-#          colcon test-result --verbose
+      - name: test
+        run: |
+          source /opt/ros/${{ matrix.setup.rosdistro }}/setup.bash
+          colcon test --packages-select-regex hector_gamepad-*
+          colcon test-result --verbose
