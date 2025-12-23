@@ -2,6 +2,7 @@
 #define HECTOR_GAMEPAD_MANAGER_GAMEPAD_FUNCTION_PLUGIN_HPP
 
 #include "blackboard.hpp"
+#include "feedback_manager.hpp"
 #include <algorithm>
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
@@ -15,10 +16,12 @@ public:
   virtual ~GamepadFunctionPlugin() = default;
 
   void initializePlugin( const rclcpp::Node::SharedPtr &node, const std::string &plugin_id,
-                         std::shared_ptr<Blackboard> blackboard )
+                         std::shared_ptr<Blackboard> blackboard,
+                         std::shared_ptr<FeedbackManager> feedback_manager )
   {
     node_ = node;
     blackboard_ = blackboard;
+    feedback_manager_ = feedback_manager;
     setPluginId( plugin_id );
     initialize( node );
   }
@@ -96,13 +99,6 @@ public:
     (void)function;
     (void)id;
   }
-
-  /**
-   * @brief Get vibration feedback value for the gamepad.
-   *
-   * @return Vibration feedback value (0.0 to 1.0).
-   */
-  virtual double getVibrationFeedback() { return 0.0; }
 
   /**
    *
@@ -211,6 +207,7 @@ protected:
   std::string plugin_name_;
   std::string plugin_namespace_;
   std::shared_ptr<Blackboard> blackboard_;
+  std::shared_ptr<FeedbackManager> feedback_manager_;
 };
 } // namespace hector_gamepad_plugin_interface
 
