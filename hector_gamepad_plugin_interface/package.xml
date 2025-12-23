@@ -10,6 +10,7 @@
   <author email="aljoscha.schmidt@tu-darmstadt.de">Aljoscha Schmidt</author>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>backward_ros</depend>
   <depend>rclcpp</depend>
   <depend>std_msgs</depend>
   <depend>yaml-cpp</depend>

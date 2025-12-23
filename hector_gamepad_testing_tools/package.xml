@@ -9,6 +9,8 @@
   <license>TODO</license>
   <author email="aljoscha.schmidt@tu-darmstadt.de">Aljoscha Schmidt</author>
 
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
   <depend>ament_cmake</depend>
   <depend>ament_cmake_python</depend>
   <depend>rclpy</depend>
