@@ -64,14 +64,50 @@ target_include_directories(
                          $<INSTALL_INTERFACE:include>)
 
 ament_target_dependencies(${PROJECT_NAME} PUBLIC ${DEPENDENCIES})
-# Build plugins with rtest mocks when testing so rtest can observe
-# publishers/subscriptions.
+
 if(BUILD_TESTING)
+  find_package(ament_cmake_gmock REQUIRED)
+  find_package(GTest CONFIG REQUIRED COMPONENTS GTest GMock)
   find_package(rtest REQUIRED)
+  add_library(${PROJECT_NAME}_test_doubles SHARED ${SOURCES} ${HEADERS})
+  target_include_directories(
+    ${PROJECT_NAME}_test_doubles
+    PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+           $<INSTALL_INTERFACE:include>)
+  ament_target_dependencies(${PROJECT_NAME}_test_doubles PUBLIC ${DEPENDENCIES})
   target_link_libraries(
-    ${PROJECT_NAME}
-    PRIVATE rtest::publisher_mock rtest::subscription_mock rtest::timer_mock
-            rtest::rtest_common rtest::service_mock rtest::service_client_mock)
+    ${PROJECT_NAME}_test_doubles
+    PRIVATE rtest::publisher_mock rtest::subscription_mock rtest::service_mock
+            rtest::service_client_mock rtest::rtest_common)
+  set_target_properties(
+    ${PROJECT_NAME}_test_doubles
+    PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib"
+               ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib"
+               RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib")
+
+  file(MAKE_DIRECTORY
+       "${CMAKE_CURRENT_BINARY_DIR}/share/hector_gamepad_manager_plugins")
+  file(MAKE_DIRECTORY
+       "${CMAKE_CURRENT_BINARY_DIR}/share/ament_index/resource_index/"
+       "hector_gamepad_manager__pluginlib__plugin")
+  file(MAKE_DIRECTORY
+       "${CMAKE_CURRENT_BINARY_DIR}/share/ament_index/resource_index/packages")
+  configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/plugins_test.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/share/hector_gamepad_manager_plugins/plugins_test.xml
+    COPYONLY)
+  configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/package.xml
+    ${CMAKE_CURRENT_BINARY_DIR}/share/hector_gamepad_manager_plugins/package.xml
+    COPYONLY)
+  file(
+    WRITE
+    "${CMAKE_CURRENT_BINARY_DIR}/share/ament_index/resource_index/hector_gamepad_manager__pluginlib__plugin/hector_gamepad_manager_plugins"
+    "share/hector_gamepad_manager_plugins/plugins_test.xml\n")
+  file(
+    WRITE
+    "${CMAKE_CURRENT_BINARY_DIR}/share/ament_index/resource_index/packages/hector_gamepad_manager_plugins"
+    "${CMAKE_CURRENT_BINARY_DIR}\n")
 endif()
 # target_link_libraries(${PROJECT_NAME} PRIVATE
 # controller_orchestrator::controller_orchestrator)

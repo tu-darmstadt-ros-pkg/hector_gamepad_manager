@@ -71,6 +71,15 @@ if(BUILD_TESTING)
   # 1. Add includes for tests
   target_include_directories(${PROJECT_NAME}_test
                              PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+  set(PLUGIN_TEST_PREFIX
+      "${CMAKE_BINARY_DIR}/../hector_gamepad_manager_plugins")
+  set_tests_properties(
+    ${PROJECT_NAME}_test
+    PROPERTIES
+      ENVIRONMENT
+      "AMENT_PREFIX_PATH=${PLUGIN_TEST_PREFIX}:${CMAKE_INSTALL_PREFIX}:$ENV{AMENT_PREFIX_PATH}"
+  )
 endif()
 
 ament_export_targets(${PROJECT_NAME}-targets)
