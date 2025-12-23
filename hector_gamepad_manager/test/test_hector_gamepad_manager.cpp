@@ -5,6 +5,7 @@
 
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <sensor_msgs/msg/joy.hpp>
+#include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/float64.hpp>
 #include <std_msgs/msg/float64_multi_array.hpp>
 #include <std_msgs/msg/string.hpp>
@@ -157,8 +158,16 @@ protected:
     }
     resetJoy();
   }
+
+  void enableInvertSteering()
+  {
+    setButton( "power", 1, true );
+    sendJoy();
+    resetJoy();
+  }
 };
 
+// Verifies config switching publishes the expected active config sequence.
 TEST_F( HectorGamepadManagerTest, SwitchConfig )
 {
   ::testing::Sequence seq;
@@ -184,6 +193,7 @@ TEST_F( HectorGamepadManagerTest, SwitchConfig )
   sendJoy();
 }
 
+// Verifies drive axes publish a non-zero cmd_vel twist in driving mode.
 TEST_F( HectorGamepadManagerTest, CmdVel )
 {
   switchToConfig( "driving" );
@@ -216,6 +226,7 @@ TEST_F( HectorGamepadManagerTest, CmdVel )
   sendJoy();
 }
 
+// Verifies slow/fast buttons scale cmd_vel speed factors.
 TEST_F( HectorGamepadManagerTest, SpeedButtons )
 {
   switchToConfig( "driving" );
@@ -258,6 +269,24 @@ TEST_F( HectorGamepadManagerTest, SpeedButtons )
   sendJoy();
 }
 
+// Verifies invert_steering flips linear but not angular cmd_vel.
+TEST_F( HectorGamepadManagerTest, CmdVelInvertedSteering )
+{
+  switchToConfig( "driving" );
+  enableInvertSteering();
+
+  EXPECT_CALL( *pub_cmd_vel_, publish( ::testing::_ ) )
+      .WillOnce( []( const geometry_msgs::msg::TwistStamped &msg ) {
+        EXPECT_LT( msg.twist.linear.x, 0.0 );
+        EXPECT_GT( msg.twist.angular.z, 0.0 );
+      } );
+
+  setAxis( "left_stick_left_right", 0.5f, true );
+  setAxis( "left_stick_up_down", 0.5f );
+  sendJoy();
+}
+
+// Verifies switching to manipulation stops publishing drive cmd_vel.
 TEST_F( HectorGamepadManagerTest, NoMoreCmdVelTwistWhenSwitchingToManipulationConfig )
 {
   switchToConfig( "driving" );
@@ -286,6 +315,7 @@ TEST_F( HectorGamepadManagerTest, NoMoreCmdVelTwistWhenSwitchingToManipulationCo
   sendJoy();
 }
 
+// Verifies manipulation linear EEF twist axes map to expected components.
 TEST_F( HectorGamepadManagerTest, EefTwistLinear )
 {
   switchToConfig( "manipulation" );
@@ -339,6 +369,7 @@ TEST_F( HectorGamepadManagerTest, EefTwistLinear )
   sendJoy();
 }
 
+// Verifies manipulation angular EEF twist axes map to expected components.
 TEST_F( HectorGamepadManagerTest, EefTwistAngular )
 {
   switchToConfig( "manipulation" );
@@ -392,6 +423,7 @@ TEST_F( HectorGamepadManagerTest, EefTwistAngular )
   sendJoy();
 }
 
+// Verifies switching to driving zeros the EEF twist command.
 TEST_F( HectorGamepadManagerTest, SendZeroEefTwistWhenActivatingDriving )
 {
   switchToConfig( "manipulation" );
@@ -419,6 +451,7 @@ TEST_F( HectorGamepadManagerTest, SendZeroEefTwistWhenActivatingDriving )
   ::testing::Mock::VerifyAndClearExpectations( pub_config_.get() );
 }
 
+// Verifies gripper open/close buttons publish expected velocities.
 TEST_F( HectorGamepadManagerTest, GripperFunctions )
 {
   switchToConfig( "manipulation" );
@@ -440,6 +473,7 @@ TEST_F( HectorGamepadManagerTest, GripperFunctions )
   sendJoy();
 }
 
+// Verifies switching to driving zeroes gripper command.
 TEST_F( HectorGamepadManagerTest, ZeroGripperWhenSwitchingToDriving )
 {
   switchToConfig( "manipulation" );
@@ -462,6 +496,7 @@ TEST_F( HectorGamepadManagerTest, ZeroGripperWhenSwitchingToDriving )
   ::testing::Mock::VerifyAndClearExpectations( pub_config_.get() );
 }
 
+// Verifies basic flipper commands publish symmetric velocities.
 TEST_F( HectorGamepadManagerTest, FlipperCmdsReceived )
 {
   switchToConfig( "driving" );
@@ -484,5 +519,119 @@ TEST_F( HectorGamepadManagerTest, FlipperCmdsReceived )
       } );
   setAxis( "rt", 1.0f, true );
   setAxis( "lt", 1.0f );
+  sendJoy();
+}
+
+// Verifies invert_steering swaps flipper outputs in basic mode.
+TEST_F( HectorGamepadManagerTest, FlipperInvertedSteeringBasic )
+{
+  switchToConfig( "driving" );
+  enableInvertSteering();
+  constexpr double flipper_speed = 1.5;
+
+  EXPECT_CALL( *pub_flipper_, publish( ::testing::_ ) )
+      .WillOnce( [flipper_speed]( const std_msgs::msg::Float64MultiArray &msg ) {
+        ASSERT_EQ( msg.data.size(), 4u );
+        EXPECT_EQ( msg.data[0], 0.0 );
+        EXPECT_EQ( msg.data[1], 0.0 );
+        EXPECT_EQ( msg.data[2], flipper_speed );
+        EXPECT_EQ( msg.data[3], flipper_speed );
+      } );
+  setButton( "rb", 1, true );
+  sendJoy();
+}
+
+// Verifies invert_steering swaps outputs in individual front mode.
+TEST_F( HectorGamepadManagerTest, FlipperInvertedSteeringIndividualFront )
+{
+  switchToConfig( "driving" );
+  enableInvertSteering();
+  constexpr double flipper_speed = 1.5;
+
+  setButton( "y", 1, true );
+  sendJoy();
+
+  EXPECT_CALL( *pub_flipper_, publish( ::testing::_ ) )
+      .WillOnce( [flipper_speed]( const std_msgs::msg::Float64MultiArray &msg ) {
+        ASSERT_EQ( msg.data.size(), 4u );
+        EXPECT_EQ( msg.data[0], 0.0 );
+        EXPECT_EQ( msg.data[1], 0.0 );
+        EXPECT_EQ( msg.data[2], 0.0 );
+        EXPECT_EQ( msg.data[3], flipper_speed );
+      } );
+  setButton( "y", 1, true );
+  setButton( "lb", 1 );
+  sendJoy();
+}
+
+// Verifies invert_steering swaps outputs in individual back mode.
+TEST_F( HectorGamepadManagerTest, FlipperInvertedSteeringIndividualBack )
+{
+  switchToConfig( "driving" );
+  enableInvertSteering();
+  constexpr double flipper_speed = 1.5;
+
+  setButton( "b", 1, true );
+  sendJoy();
+
+  EXPECT_CALL( *pub_flipper_, publish( ::testing::_ ) )
+      .WillOnce( [flipper_speed]( const std_msgs::msg::Float64MultiArray &msg ) {
+        ASSERT_EQ( msg.data.size(), 4u );
+        EXPECT_EQ( msg.data[0], flipper_speed );
+        EXPECT_EQ( msg.data[1], 0.0 );
+        EXPECT_EQ( msg.data[2], 0.0 );
+        EXPECT_EQ( msg.data[3], 0.0 );
+      } );
+  setButton( "b", 1, true );
+  setButton( "rb", 1 );
+  sendJoy();
+}
+
+// Verifies individual front mode drives only the front-left flipper.
+TEST_F( HectorGamepadManagerTest, FlipperIndividualFrontMode )
+{
+  switchToConfig( "driving" );
+  constexpr double flipper_speed = 1.5;
+
+  setButton( "y", 1, true );
+  sendJoy();
+
+  EXPECT_CALL( *pub_flipper_, publish( ::testing::_ ) )
+      .WillOnce( [flipper_speed]( const std_msgs::msg::Float64MultiArray &msg ) {
+        ASSERT_EQ( msg.data.size(), 4u );
+        EXPECT_EQ( msg.data[0], flipper_speed );
+        EXPECT_EQ( msg.data[1], 0.0 );
+        EXPECT_EQ( msg.data[2], 0.0 );
+        EXPECT_EQ( msg.data[3], 0.0 );
+      } );
+  setButton( "y", 1, true );
+  setButton( "lb", 1 );
+  sendJoy();
+}
+
+// Verifies e-stop toggle publishes expected Bool transitions.
+TEST_F( HectorGamepadManagerTest, BlackboardEstopTogglePublishes )
+{
+  switchToConfig( "driving" );
+  // e-stop publisher is created on first use, so trigger it once to create it
+  setButton( "right_joy", 1, true );
+  sendJoy();
+
+  auto pub_estop = rtest::findPublisher<std_msgs::msg::Bool>( node_, "/athena/gamepad_e_stop" );
+  ASSERT_TRUE( pub_estop );
+
+  setButton( "right_joy", 0, true );
+  sendJoy();
+
+  EXPECT_CALL( *pub_estop, publish( ::testing::Field( &std_msgs::msg::Bool::data, false ) ) ).Times( 1 );
+  setButton( "right_joy", 1, true );
+  sendJoy();
+  ::testing::Mock::VerifyAndClearExpectations( pub_estop.get() );
+
+  setButton( "right_joy", 0, true );
+  sendJoy();
+
+  EXPECT_CALL( *pub_estop, publish( ::testing::Field( &std_msgs::msg::Bool::data, true ) ) ).Times( 1 );
+  setButton( "right_joy", 1, true );
   sendJoy();
 }
