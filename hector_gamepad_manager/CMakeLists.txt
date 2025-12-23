@@ -51,6 +51,7 @@ if(BUILD_TESTING)
   find_package(ament_cmake_gmock REQUIRED)
   find_package(rtest REQUIRED)
   find_package(GTest CONFIG REQUIRED COMPONENTS GTest GMock)
+  find_package(controller_manager_msgs REQUIRED)
 
   # 1. Generate Test Doubles
   test_tools_add_doubles(${PROJECT_NAME})
@@ -64,7 +65,8 @@ if(BUILD_TESTING)
   # 1. Link against the Test Doubles
   target_link_libraries(${PROJECT_NAME}_test
                         ${PROJECT_NAME}::${PROJECT_NAME}_test_doubles)
-  ament_target_dependencies(${PROJECT_NAME}_test ${DEPENDENCIES} rtest)
+  ament_target_dependencies(${PROJECT_NAME}_test ${DEPENDENCIES} rtest
+                            controller_manager_msgs)
 
   # 1. Add includes for tests
   target_include_directories(${PROJECT_NAME}_test

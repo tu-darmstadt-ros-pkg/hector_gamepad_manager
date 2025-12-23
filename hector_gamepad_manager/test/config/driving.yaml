@@ -126,16 +126,28 @@ buttons:
 
   21: # Cross left
     plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
-    function: "flipper_group/tub"
+    function: "go_to_pose"
+    args:
+      group: "flipper_group"
+      pose: "tub"
 
   22: # Cross right
     plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
-    function: "flipper_group/compact"
+    function: "go_to_pose"
+    args:
+      group: "flipper_group"
+      pose: "compact"
 
   23: # Cross up
     plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
-    function: "flipper_group/up"
+    function: "go_to_pose"
+    args:
+      group: "flipper_group"
+      pose: "up"
 
   24: # Cross down
     plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
-    function: "flipper_group/flat"
+    function: "go_to_pose"
+    args:
+      group: "flipper_group"
+      pose: "flat"

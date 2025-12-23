@@ -1,8 +1,15 @@
 #include <gmock/gmock.h>
 #include <rclcpp/rclcpp.hpp>
 #include <rtest/publisher_mock.hpp>
+#include <rtest/service_client_mock.hpp>
+#include <rtest/static_registry.hpp>
 #include <rtest/subscription_mock.hpp>
 
+#include <controller_manager_msgs/msg/controller_manager_activity.hpp>
+#include <controller_manager_msgs/msg/named_lifecycle_state.hpp>
+#include <controller_manager_msgs/srv/list_controllers.hpp>
+#include <controller_manager_msgs/srv/list_hardware_components.hpp>
+#include <controller_manager_msgs/srv/switch_controller.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <sensor_msgs/msg/joy.hpp>
 #include <std_msgs/msg/bool.hpp>
@@ -13,6 +20,8 @@
 #include <hector_gamepad_manager/hector_gamepad_manager.hpp>
 
 #include <filesystem>
+#include <functional>
+#include <future>
 #include <map>
 #include <memory>
 #include <string>
