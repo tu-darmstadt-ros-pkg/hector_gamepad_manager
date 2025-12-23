@@ -41,15 +41,26 @@ install(TARGETS hector_gamepad_manager_node DESTINATION lib/${PROJECT_NAME})
 install(DIRECTORY launch config DESTINATION share/${PROJECT_NAME})
 
 if(BUILD_TESTING)
-  find_package(ament_cmake_gtest REQUIRED)
-  find_package(ros_testing REQUIRED)
-  ament_add_gtest_executable(${PROJECT_NAME}_test
-                             test/test_hector_gamepad_manager.cpp)
-  target_link_libraries(${PROJECT_NAME}_test ${PROJECT_NAME})
-  ament_target_dependencies(${PROJECT_NAME}_test
-                            ${THIS_PACKAGE_INCLUDE_DEPENDS})
-  add_ros_test(test/test_hector_gamepad_manager.launch.py ARGS
-               "test_binary_dir:=${CMAKE_CURRENT_BINARY_DIR}")
+  find_package(ament_cmake_gmock REQUIRED)
+  find_package(rtest REQUIRED)
+  find_package(GTest CONFIG REQUIRED COMPONENTS GTest GMock)
+
+  # 1. Generate Test Doubles
+  test_tools_add_doubles(${PROJECT_NAME})
+  ament_target_dependencies(${PROJECT_NAME}_test_doubles ${DEPENDENCIES})
+
+  # 1. Create the GTest/GMock executable
+  ament_add_gmock(${PROJECT_NAME}_test test/main.cpp
+                  test/test_hector_gamepad_manager.cpp)
+
+  # 1. Link against the Test Doubles
+  target_link_libraries(${PROJECT_NAME}_test
+                        ${PROJECT_NAME}::${PROJECT_NAME}_test_doubles)
+  ament_target_dependencies(${PROJECT_NAME}_test ${DEPENDENCIES} rtest)
+
+  # 1. Add includes for tests
+  target_include_directories(${PROJECT_NAME}_test
+                             PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 endif()
 
 ament_export_targets(${PROJECT_NAME}-targets)
