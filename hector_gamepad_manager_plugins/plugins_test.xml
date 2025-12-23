@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<library path="hector_gamepad_manager_plugins_test_doubles">
+    <class type="hector_gamepad_manager_plugins::DrivePlugin" base_class_type="hector_gamepad_plugin_interface::GamepadFunctionPlugin">
+        <description>Drive functionality plugin (test doubles)</description>
+    </class>
+    <class type="hector_gamepad_manager_plugins::ManipulationPlugin" base_class_type="hector_gamepad_plugin_interface::GamepadFunctionPlugin">
+        <description>Manipulation functionality plugin (test doubles)</description>
+    </class>
+    <class type="hector_gamepad_manager_plugins::FlipperPlugin" base_class_type="hector_gamepad_plugin_interface::GamepadFunctionPlugin">
+        <description>Flipper functionality plugin (test doubles)</description>
+    </class>
+    <class type="hector_gamepad_manager_plugins::MoveitPlugin" base_class_type="hector_gamepad_plugin_interface::GamepadFunctionPlugin">
+        <description>Interface to moveit planners (test doubles).</description>
+    </class>
+    <class type="hector_gamepad_manager_plugins::BlackboardPlugin" base_class_type="hector_gamepad_plugin_interface::GamepadFunctionPlugin">
+        <description>Interface set blackboard variables (test doubles).</description>
+    </class>
+    <class type="hector_gamepad_manager_plugins::BatteryMonitorPlugin" base_class_type="hector_gamepad_plugin_interface::GamepadFunctionPlugin">
+        <description>Vibrates the gamepad when a cell voltage drops below a configured threshold (test doubles).</description>
+    </class>
+    <class type="hector_gamepad_manager_plugins::TestProbePlugin" base_class_type="hector_gamepad_plugin_interface::GamepadFunctionPlugin">
+        <description>Test probe plugin for unit tests (test doubles).</description>
+    </class>
+</library>
