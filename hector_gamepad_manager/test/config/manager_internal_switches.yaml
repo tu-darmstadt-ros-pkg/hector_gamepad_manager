@@ -1,0 +1,28 @@
+# Test-only config switch map for internal gamepad manager tests
+default_config: "manager_internal"
+buttons:
+  0: {package: "", config: ""}
+  1: {package: "", config: ""}
+  2: {package: "", config: ""}
+  3: {package: "", config: ""}
+  4: {package: "", config: ""}
+  5: {package: "", config: ""}
+  6: {package: "hector_gamepad_manager", config: "manager_internal_alt"}
+  7: {package: "hector_gamepad_manager", config: "manager_internal"}
+  8: {package: "", config: ""}
+  9: {package: "", config: ""}
+  10: {package: "", config: ""}
+  11: {package: "", config: ""}
+  12: {package: "", config: ""}
+  13: {package: "", config: ""}
+  14: {package: "", config: ""}
+  15: {package: "", config: ""}
+  16: {package: "", config: ""}
+  17: {package: "", config: ""}
+  18: {package: "", config: ""}
+  19: {package: "", config: ""}
+  20: {package: "", config: ""}
+  21: {package: "", config: ""}
+  22: {package: "", config: ""}
+  23: {package: "", config: ""}
+  24: {package: "", config: ""}

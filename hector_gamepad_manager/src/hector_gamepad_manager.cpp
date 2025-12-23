@@ -1,5 +1,7 @@
 #include "hector_gamepad_manager/hector_gamepad_manager.hpp"
 
+#include <filesystem>
+
 namespace hector_gamepad_manager
 {
 HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node )
@@ -10,12 +12,14 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
 {
   // declare & get parameters
   node->declare_parameter<std::string>( "config_name", "athena" );
+  node->declare_parameter<std::string>( "config_directory", "config" );
   node->declare_parameter<std::string>( "robot_namespace", "athena" );
   node->declare_parameter<std::string>( "ocs_namespace", "ocs" );
   const std::string config_switches_filename = node->get_parameter( "config_name" ).as_string();
 
   robot_namespace_ = node->get_parameter( "robot_namespace" ).as_string();
   ocs_namespace_ = node->get_parameter( "ocs_namespace" ).as_string();
+  config_directory_ = node->get_parameter( "config_directory" ).as_string();
 
   // create subnodes: one for the OCS and one for the robot
   ocs_ns_node_ = node->create_sub_node( ocs_namespace_ );
@@ -268,11 +272,17 @@ HectorGamepadManager::convertJoyToGamepadInputs( const sensor_msgs::msg::Joy::Sh
 
 std::string HectorGamepadManager::getPath( const std::string &pkg_name, const std::string &file_name )
 {
-  const auto package_path = ament_index_cpp::get_package_share_directory( pkg_name );
-  std::string path = package_path + "/config/" + file_name;
+  std::filesystem::path path;
+  std::filesystem::path config_dir( config_directory_ );
+  if ( config_dir.is_absolute() ) {
+    path = config_dir / file_name;
+  } else {
+    const auto package_path = ament_index_cpp::get_package_share_directory( pkg_name );
+    path = std::filesystem::path( package_path ) / config_directory_ / file_name;
+  }
   if ( file_name.find( ".yaml" ) == std::string::npos ) {
     path += ".yaml";
   }
-  return path;
+  return path.string();
 }
 } // namespace hector_gamepad_manager

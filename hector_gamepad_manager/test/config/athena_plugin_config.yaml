@@ -1,6 +1,7 @@
 /**:
     ros__parameters:
         config_name: "athena"
+        config_directory: "test/config"
         robot_namespace: "athena"
         ocs_namespace: "ocs"
         drive_plugin:
