@@ -140,8 +140,8 @@ void BatteryMonitorPlugin::trySubscribe()
       subscription_timer_.reset();
     }
   } else {
-    RCLCPP_INFO_THROTTLE( node_->get_logger(), *node_->get_clock(), 5000,
-                          "[BatteryMonitor] Waiting for topic '%s'...", topic_name.c_str() );
+    RCLCPP_DEBUG_THROTTLE( node_->get_logger(), *node_->get_clock(), 5000,
+                           "[BatteryMonitor] Waiting for topic '%s'...", topic_name.c_str() );
   }
 }
 
