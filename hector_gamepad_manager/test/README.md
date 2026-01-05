@@ -106,6 +106,15 @@ Why this is reliable:
   one. For tests, the manipulation plugin's `cmd_vel` publisher is disabled
   via `manipulation_plugin.enable_drive_cmd: false` in the test params file.
 
+## Plugin library setup for tests
+
+- The plugin package builds a separate `hector_gamepad_manager_plugins_test_doubles` library.
+- A test-only plugin XML (`hector_gamepad_manager_plugins/plugins_test.xml`) points to that
+  library and is written into the plugin build tree alongside a minimal package manifest and
+  ament index entries.
+- The test executable prepends the plugin build prefix to `AMENT_PREFIX_PATH`, so pluginlib
+  resolves plugins from the test-doubles XML instead of the installed runtime plugins.
+
 ## Files referenced
 
 - `test/test_hector_gamepad_manager.cpp`: test implementation using rtest
