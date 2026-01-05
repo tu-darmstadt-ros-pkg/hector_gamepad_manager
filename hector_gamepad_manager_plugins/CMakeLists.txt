@@ -1,17 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
 project(hector_gamepad_manager_plugins LANGUAGES CXX)
 
-# Default to C++17 if(NOT CMAKE_CXX_STANDARD) set(CMAKE_CXX_STANDARD 17)
-# set(CMAKE_CXX_STANDARD_REQUIRED ON) endif()
-
 option(ENABLE_COVERAGE "Enable coverage flags" OFF)
 if(ENABLE_COVERAGE AND (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang"))
   add_compile_options(-O0 -g --coverage)
   add_link_options(--coverage)
 endif()
-
-# if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-# add_compile_options(-Wall -Wextra -Wpedantic) endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
@@ -66,6 +60,10 @@ target_include_directories(
 ament_target_dependencies(${PROJECT_NAME} PUBLIC ${DEPENDENCIES})
 
 if(BUILD_TESTING)
+  # Here we create a library with test doubles to be used in tests rtest
+  # provides mocks for rclcpp entities like publishers, subscriptions, services,
+  # and service clients. This allows us to test our code without a running ROS2
+  # graph.
   find_package(ament_cmake_gmock REQUIRED)
   find_package(GTest CONFIG REQUIRED COMPONENTS GTest GMock)
   find_package(rtest REQUIRED)
@@ -109,8 +107,6 @@ if(BUILD_TESTING)
     "${CMAKE_CURRENT_BINARY_DIR}/share/ament_index/resource_index/packages/hector_gamepad_manager_plugins"
     "${CMAKE_CURRENT_BINARY_DIR}\n")
 endif()
-# target_link_libraries(${PROJECT_NAME} PRIVATE
-# controller_orchestrator::controller_orchestrator)
 
 install(
   TARGETS ${PROJECT_NAME}
@@ -126,16 +122,6 @@ install(TARGETS ${PROJECT_NAME} DESTINATION lib/${PROJECT_NAME})
 install(FILES plugins.xml DESTINATION share/${PROJECT_NAME})
 
 pluginlib_export_plugin_description_file(hector_gamepad_manager plugins.xml)
-
-#[[# Linting and tests
-if(BUILD_TESTING)
-  find_package(ament_lint_auto REQUIRED)
-  # the following line skips the linter which checks for copyrights
-  set(ament_cmake_copyright_FOUND TRUE)
-  # the following line skips cpplint (only works in a git repo)
-  set(ament_cmake_cpplint_FOUND TRUE)
-  ament_lint_auto_find_test_dependencies()
-endif()]]
 
 ament_export_targets(${PROJECT_NAME}-targets)
 ament_export_include_directories(include)

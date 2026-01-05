@@ -34,8 +34,6 @@ void DrivePlugin::initialize( const rclcpp::Node::SharedPtr &node )
 
   drive_command_publisher_ =
       node_->create_publisher<geometry_msgs::msg::TwistStamped>( "cmd_vel", 1 );
-  RCLCPP_INFO( node_->get_logger(), "Created publisher on topic: %s",
-               drive_command_publisher_->get_topic_name() );
 }
 
 void DrivePlugin::handleAxis( const std::string &function, const std::string &id, const double value )
