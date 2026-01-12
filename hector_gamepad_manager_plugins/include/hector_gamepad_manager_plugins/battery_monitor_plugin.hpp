@@ -49,6 +49,5 @@ private:
   bool low_voltage_detected_{ false };
   rclcpp::Time muted_until_{ 0, 0, RCL_ROS_TIME };
   std::string vibration_pattern_id_;
-  std::shared_ptr<hector_gamepad_plugin_interface::VibrationPattern> vibration_pattern_;
 };
 } // namespace hector_gamepad_manager_plugins

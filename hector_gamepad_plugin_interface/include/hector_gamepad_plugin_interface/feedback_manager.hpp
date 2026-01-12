@@ -38,23 +38,28 @@ public:
     const auto period = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::duration<double>( 1.0 / publish_rate_hz_ ) );
     publish_timer_ = node_->create_wall_timer( period, [this]() { publishFeedback(); } );
+    initialized_ = true;
   }
 
   /**
-   * @brief Register a vibration pattern by id.
+   * @brief Create a vibration pattern by id.
    */
-  void registerVibrationPattern( const std::string &id, const PatternPtr &pattern )
+  void createVibrationPattern( const std::string &id,
+                               const VibrationPatternDefaults &defaults = VibrationPatternDefaults() )
   {
-    if ( !pattern ) {
+    if ( !initialized_ ) {
+      RCLCPP_WARN( rclcpp::get_logger( "GamepadManager - FeedbackManager" ),
+                   "FeedbackManager not yet initialized" );
       return;
     }
-    vibration_patterns_[id] = pattern;
+    vibration_patterns_[id] = std::make_unique<VibrationPattern>();
+    vibration_patterns_[id]->configure( node_, id, defaults );
   }
 
   /**
    * @brief Unregister a vibration pattern by id.
    */
-  void unregisterVibrationPattern( const std::string &id ) { vibration_patterns_.erase( id ); }
+  void removeVibrationPattern( const std::string &id ) { vibration_patterns_.erase( id ); }
 
   /**
    * @brief Enable or disable a registered pattern.
@@ -62,13 +67,11 @@ public:
   void setPatternActive( const std::string &id, const bool active )
   {
     auto it = vibration_patterns_.find( id );
-    if ( it == vibration_patterns_.end() ) {
-      return;
-    }
-    if ( auto pattern = it->second.lock() ) {
-      pattern->setActive( active );
-    } else {
-      vibration_patterns_.erase( it );
+    if ( it != vibration_patterns_.end() ) {
+      auto pattern = it->second.get();
+      if ( pattern ) {
+        pattern->setActive( active );
+      }
     }
   }
 
@@ -81,7 +84,7 @@ public:
   {
     double intensity = 0.0;
     for ( auto it = vibration_patterns_.begin(); it != vibration_patterns_.end(); ) {
-      auto pattern = it->second.lock();
+      const auto &pattern = it->second;
       if ( !pattern ) {
         it = vibration_patterns_.erase( it );
         continue;
@@ -105,11 +108,12 @@ public:
    */
   bool isActive( const std::string &id ) const
   {
-    auto it = vibration_patterns_.find( id );
+    const auto it = vibration_patterns_.find( id );
     if ( it == vibration_patterns_.end() ) {
       return false;
     }
-    if ( auto pattern = it->second.lock() ) {
+    const auto &pattern = it->second;
+    if ( pattern ) {
       return pattern->isActive();
     }
     return false;
@@ -135,9 +139,10 @@ private:
     joy_feedback_publisher_->publish( feedback );
   }
 
-  std::unordered_map<std::string, std::weak_ptr<VibrationPattern>> vibration_patterns_;
+  std::unordered_map<std::string, std::unique_ptr<VibrationPattern>> vibration_patterns_;
   double last_intensity_{ 0.0 };
   double publish_rate_hz_{ 10.0 };
+  bool initialized_{ false };
   rclcpp::Node::SharedPtr node_;
   rclcpp::Publisher<sensor_msgs::msg::JoyFeedback>::SharedPtr joy_feedback_publisher_;
   rclcpp::TimerBase::SharedPtr publish_timer_;

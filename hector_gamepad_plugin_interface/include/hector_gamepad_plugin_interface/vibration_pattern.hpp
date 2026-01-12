@@ -105,10 +105,7 @@ public:
       return 0.0;
     }
 
-    double elapsed = ( node_->now() - start_time_ ).seconds();
-    if ( elapsed < 0.0 ) {
-      elapsed = 0.0;
-    }
+    double elapsed = std::max( ( node_->now() - start_time_ ).seconds(), 0.0 );
     if ( cycle_ ) {
       elapsed = std::fmod( elapsed, total_duration_sec_ );
     } else if ( elapsed >= total_duration_sec_ ) {

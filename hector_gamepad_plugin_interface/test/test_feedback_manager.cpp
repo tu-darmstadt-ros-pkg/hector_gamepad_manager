@@ -40,16 +40,15 @@ bool waitForCondition( const std::function<bool()> &condition,
 TEST( FeedbackManager, EmitsSingleZeroAfterStopping )
 {
   auto node = makeNode( "feedback_manager" );
-  auto pattern = std::make_shared<VibrationPattern>();
   VibrationPatternDefaults defaults;
   defaults.on_durations_sec = { 0.03 };
   defaults.off_durations_sec = { 0.02 };
   defaults.intensity = 0.4;
   defaults.cycle = false;
-  pattern->configure( node, "pattern.feedback", defaults );
 
   FeedbackManager manager;
-  manager.registerVibrationPattern( "pattern", pattern );
+  manager.initialize( node );
+  manager.createVibrationPattern( "pattern", defaults );
   manager.setPatternActive( "pattern", true );
 
   EXPECT_TRUE( waitForCondition( [&]() { return manager.getVibrationIntensity() > 0.0; },
@@ -64,16 +63,15 @@ TEST( FeedbackManager, EmitsSingleZeroAfterStopping )
 TEST( FeedbackManager, InactivePatternsReturnIdle )
 {
   auto node = makeNode( "feedback_inactive" );
-  auto pattern = std::make_shared<VibrationPattern>();
   VibrationPatternDefaults defaults;
   defaults.on_durations_sec = { 0.02 };
   defaults.off_durations_sec = { 0.01 };
   defaults.intensity = 0.2;
   defaults.cycle = true;
-  pattern->configure( node, "pattern.inactive", defaults );
 
   FeedbackManager manager;
-  manager.registerVibrationPattern( "pattern", pattern );
+  manager.initialize( node );
+  manager.createVibrationPattern( "pattern", defaults );
   manager.setPatternActive( "pattern", false );
 
   EXPECT_DOUBLE_EQ( manager.getVibrationIntensity(), -1.0 );

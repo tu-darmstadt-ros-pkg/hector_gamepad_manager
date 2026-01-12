@@ -92,11 +92,9 @@ void BatteryMonitorPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   pattern_defaults.off_durations_sec = { 0.2, 5.0 };
   pattern_defaults.intensity = 0.8;
   pattern_defaults.cycle = true;
-  vibration_pattern_ = std::make_shared<hector_gamepad_plugin_interface::VibrationPattern>();
-  vibration_pattern_->configure( node, ns + ".vibration_pattern", pattern_defaults );
   vibration_pattern_id_ = ns + ".low_voltage";
   if ( feedback_manager_ ) {
-    feedback_manager_->registerVibrationPattern( vibration_pattern_id_, vibration_pattern_ );
+    feedback_manager_->createVibrationPattern( vibration_pattern_id_, pattern_defaults );
     feedback_manager_->setPatternActive( vibration_pattern_id_, false );
   }
 
