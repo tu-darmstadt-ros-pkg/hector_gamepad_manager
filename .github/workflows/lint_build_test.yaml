@@ -60,6 +60,14 @@ jobs:
           path: src/hector_controller_spawner
       - uses: actions/checkout@v4
         with:
+          repository: tu-darmstadt-ros-pkg/hector_testing_utils
+          path: src/hector_testing_utils
+      - uses: actions/checkout@v4
+        with:
+          repository: tu-darmstadt-ros-pkg/hector_ros_controllers
+          path: src/hector_ros_controllers
+      - uses: actions/checkout@v4
+        with:
           path: src/repo
       - name: rosdep
         run: |
