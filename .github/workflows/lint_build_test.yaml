@@ -56,8 +56,20 @@ jobs:
           path: src/hector_ros2_utils
       - uses: actions/checkout@v4
         with:
-          repository: tu-darmstadt-ros-pkg/hector_transmission_interface
-          path: src/hector_transmission_interface
+          repository: tu-darmstadt-ros-pkg/hector_controller_spawner
+          path: src/hector_controller_spawner
+      - uses: actions/checkout@v4
+        with:
+          repository: tu-darmstadt-ros-pkg/hector_testing_utils
+          path: src/hector_testing_utils
+      - uses: actions/checkout@v4
+        with:
+          repository: tu-darmstadt-ros-pkg/hector_ros_controllers
+          path: src/hector_ros_controllers
+      - uses: actions/checkout@v4
+        with:
+          repository: tu-darmstadt-ros-pkg/ad_kinematics
+          path: src/ad_kinematics
       - uses: actions/checkout@v4
         with:
           path: src/repo
@@ -70,8 +82,9 @@ jobs:
           source /opt/ros/${{ matrix.setup.rosdistro }}/setup.bash
           colcon build
        # TODO: Enable tests After Fixing them: they sometimes fail in the CI even though they pass locally
-#      - name: test
+       # Only run tests for the packages in this repo
+#      - name: test --packages-select he
 #        run: |
 #          source /opt/ros/${{ matrix.setup.rosdistro }}/setup.bash
-#          colcon test
+#          colcon test --packages-select-regex hector_gamepad-*
 #          colcon test-result --verbose

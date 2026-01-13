@@ -3,6 +3,7 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include <hector_gamepad_plugin_interface/gamepad_plugin_interface.hpp>
+#include <hector_gamepad_plugin_interface/vibration_pattern.hpp>
 #include <hector_ros2_utils/parameters/reconfigurable_parameter.hpp>
 #include <ros_babel_fish/babel_fish.hpp>
 #include <vector>
@@ -19,12 +20,9 @@ public:
   void handleRelease( const std::string &function, const std::string &id ) override { }
   void handleAxis( const std::string &function, const std::string &id, double value ) override { }
 
-  void update() override { }
-
   void activate() override;
   void deactivate() override;
-
-  double getVibrationFeedback() override;
+  void update() override;
 
 private:
   void trySubscribe();
@@ -37,13 +35,11 @@ private:
   rclcpp::TimerBase::SharedPtr subscription_timer_;
 
   hector::ParameterSubscription low_cell_threshold_param_;
-  hector::ParameterSubscription vibration_intensity_param_;
   hector::ParameterSubscription mute_duration_param_;
   hector::ParameterSubscription ignore_zero_voltage_param_;
   hector::ParameterSubscription ignore_nan_voltage_param_;
 
   double low_cell_threshold_{ 3300.0 };
-  double vibration_intensity_{ 0.8 };
   double mute_duration_sec_{ 300.0 }; // default to 5 minutes
   bool ignore_zero_voltage_{ true };
   bool ignore_nan_voltage_{ true };
@@ -52,5 +48,6 @@ private:
 
   bool low_voltage_detected_{ false };
   rclcpp::Time muted_until_{ 0, 0, RCL_ROS_TIME };
+  std::string vibration_pattern_id_;
 };
 } // namespace hector_gamepad_manager_plugins

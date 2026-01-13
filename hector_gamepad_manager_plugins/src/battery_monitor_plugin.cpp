@@ -76,10 +76,6 @@ void BatteryMonitorPlugin::initialize( const rclcpp::Node::SharedPtr &node )
       node, ns + ".low_cell_threshold", std::ref( low_cell_threshold_ ), "Low-cell threshold",
       Opts().onValidate( []( auto v ) { return v > 0.0; } ) );
 
-  vibration_intensity_param_ = hector::createReconfigurableParameter(
-      node, ns + ".vibration_intensity", std::ref( vibration_intensity_ ), "Vibration intensity",
-      Opts().onValidate( []( auto v ) { return v >= 0.0 && v <= 1.0; } ) );
-
   mute_duration_param_ = hector::createReconfigurableParameter(
       node, ns + ".mute_duration_sec", std::ref( mute_duration_sec_ ), "Mute duration",
       Opts().onValidate( []( auto v ) { return v > 0.0; } ) );
@@ -90,6 +86,17 @@ void BatteryMonitorPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   ignore_zero_voltage_param_ = hector::createReconfigurableParameter(
       node, ns + ".ignore_zero_voltage", std::ref( ignore_zero_voltage_ ),
       "Ignore zero cell voltages" );
+
+  hector_gamepad_plugin_interface::VibrationPatternDefaults pattern_defaults;
+  pattern_defaults.on_durations_sec = { 0.2, 0.2 };
+  pattern_defaults.off_durations_sec = { 0.2, 5.0 };
+  pattern_defaults.intensity = 0.8;
+  pattern_defaults.cycle = true;
+  vibration_pattern_id_ = ns + ".low_voltage";
+  if ( feedback_manager_ ) {
+    feedback_manager_->createVibrationPattern( vibration_pattern_id_, pattern_defaults );
+    feedback_manager_->setPatternActive( vibration_pattern_id_, false );
+  }
 
   node_->declare_parameters<std::vector<std::string>>(
       ns,
@@ -141,12 +148,18 @@ void BatteryMonitorPlugin::activate()
   active_ = true;
   low_voltage_detected_ = false;
   muted_until_ = rclcpp::Time( 0, 0, node_->get_clock()->get_clock_type() );
+  if ( feedback_manager_ ) {
+    feedback_manager_->setPatternActive( vibration_pattern_id_, false );
+  }
 }
 
 void BatteryMonitorPlugin::deactivate()
 {
   active_ = false;
   low_voltage_detected_ = false;
+  if ( feedback_manager_ ) {
+    feedback_manager_->setPatternActive( vibration_pattern_id_, false );
+  }
 }
 
 void BatteryMonitorPlugin::handlePress( const std::string &function, const std::string &id )
@@ -161,11 +174,13 @@ void BatteryMonitorPlugin::handlePress( const std::string &function, const std::
   }
 }
 
-double BatteryMonitorPlugin::getVibrationFeedback()
+void BatteryMonitorPlugin::update()
 {
-  return ( active_ && !isMuted() && low_voltage_detected_ )
-             ? std::clamp( vibration_intensity_, 0.0, 1.0 )
-             : 0.0;
+  if ( !feedback_manager_ ) {
+    return;
+  }
+  const bool should_vibrate = active_ && !isMuted() && low_voltage_detected_;
+  feedback_manager_->setPatternActive( vibration_pattern_id_, should_vibrate );
 }
 
 void BatteryMonitorPlugin::onBatteryMessage( const ros_babel_fish::CompoundMessage::SharedPtr &msg )
