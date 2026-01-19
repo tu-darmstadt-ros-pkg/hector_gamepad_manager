@@ -68,6 +68,7 @@ private:
   bool hold_mode_change_requested_ = false;
   bool last_drive_cmd_zero_ = false;
   bool last_eef_cmd_zero_ = true;
+  bool enable_drive_cmd_ = true;
 
   double move_left_right_ = 0.0;
   double move_up_down_ = 0.0;

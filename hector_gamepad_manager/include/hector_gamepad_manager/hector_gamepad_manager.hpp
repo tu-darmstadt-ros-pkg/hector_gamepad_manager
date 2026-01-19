@@ -64,6 +64,9 @@ private:
   // Name of the config activated at startup
   std::string default_config_;
 
+  // Config directory relative to package share or absolute path override
+  std::string config_directory_;
+
   // used for to prefix the configs
   std::string robot_namespace_;
 

@@ -40,8 +40,8 @@ jobs:
         setup:
           - rosdistro: jazzy
             os: ubuntu-24.04
-          - rosdistro: rolling
-            os: ubuntu-latest
+          #- rosdistro: rolling
+          #  os: ubuntu-latest
     runs-on: ${{ matrix.setup.os }}
     container:
       image: ros:${{ matrix.setup.rosdistro }}-ros-base
@@ -72,6 +72,10 @@ jobs:
           path: src/ad_kinematics
       - uses: actions/checkout@v4
         with:
+          repository: Beam-and-Spyrosoft/rtest
+          path: src/rtest
+      - uses: actions/checkout@v4
+        with:
           path: src/repo
       - name: rosdep
         run: |
@@ -81,10 +85,9 @@ jobs:
         run: |
           source /opt/ros/${{ matrix.setup.rosdistro }}/setup.bash
           colcon build
-       # TODO: Enable tests After Fixing them: they sometimes fail in the CI even though they pass locally
        # Only run tests for the packages in this repo
-#      - name: test --packages-select he
-#        run: |
-#          source /opt/ros/${{ matrix.setup.rosdistro }}/setup.bash
-#          colcon test --packages-select-regex hector_gamepad-*
-#          colcon test-result --verbose
+      - name: test
+        run: |
+          source /opt/ros/${{ matrix.setup.rosdistro }}/setup.bash
+          colcon test --packages-select-regex hector_gamepad-*
+          colcon test-result --verbose

@@ -44,11 +44,15 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
                                          "moveit_twist_controller" );
   twist_controller_name_ =
       node_->get_parameter( plugin_namespace + ".twist_controller_name" ).as_string();
+  node_->declare_parameter<bool>( plugin_namespace + ".enable_drive_cmd", true );
+  enable_drive_cmd_ = node_->get_parameter( plugin_namespace + ".enable_drive_cmd" ).as_bool();
 
   // Setup publishers and clients
   eef_cmd_pub_ = node_->create_publisher<geometry_msgs::msg::TwistStamped>(
       twist_controller_name_ + "/eef_cmd", 10 );
-  drive_cmd_pub_ = node_->create_publisher<geometry_msgs::msg::TwistStamped>( "cmd_vel", 10 );
+  if ( enable_drive_cmd_ ) {
+    drive_cmd_pub_ = node_->create_publisher<geometry_msgs::msg::TwistStamped>( "cmd_vel", 10 );
+  }
   gripper_cmd_pub_ = node_->create_publisher<std_msgs::msg::Float64>(
       twist_controller_name_ + "/gripper_vel_cmd", 10 );
   hold_mode_client_ =
@@ -194,6 +198,9 @@ void ManipulationPlugin::reset()
 
 void ManipulationPlugin::sendDriveCommand( const double linear_speed, const double angular_speed )
 {
+  if ( !enable_drive_cmd_ ) {
+    return;
+  }
   drive_cmd_.header.stamp = node_->now();
   drive_cmd_.twist.linear.x = linear_speed;
   drive_cmd_.twist.angular.z = angular_speed;
