@@ -4,6 +4,7 @@
 #include "hector_gamepad_plugin_interface/feedback_manager.hpp"
 #include "hector_gamepad_plugin_interface/gamepad_plugin_interface.hpp"
 
+#include <controller_orchestrator/controller_orchestrator.hpp>
 #include <pluginlib/class_loader.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joy.hpp>
@@ -84,6 +85,9 @@ private:
 
   // Feedback manager for handling vibration patterns
   std::shared_ptr<hector_gamepad_plugin_interface::FeedbackManager> feedback_manager_;
+
+  // Controller Orchestrator for activating controllers
+  std::shared_ptr<controller_orchestrator::ControllerOrchestrator> controller_orchestrator_;
 
   // Deadzone to consider an axis as pressed
   static constexpr float AXIS_DEADZONE = 0.5;

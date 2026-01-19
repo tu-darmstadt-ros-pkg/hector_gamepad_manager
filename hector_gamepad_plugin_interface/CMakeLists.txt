@@ -16,6 +16,7 @@ find_package(rcl_interfaces REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(yaml-cpp REQUIRED)
 find_package(backward_ros REQUIRED)
+find_package(controller_orchestrator REQUIRED)
 # Header-only interface target
 add_library(${PROJECT_NAME} INTERFACE)
 
@@ -25,7 +26,7 @@ target_include_directories(
             "$<INSTALL_INTERFACE:include>")
 target_link_libraries(${PROJECT_NAME} INTERFACE yaml-cpp)
 ament_target_dependencies(${PROJECT_NAME} INTERFACE rclcpp rcl_interfaces
-                          sensor_msgs)
+                          sensor_msgs controller_orchestrator)
 
 install(
   TARGETS ${PROJECT_NAME}
@@ -72,5 +73,6 @@ if(BUILD_TESTING)
   endif()
 endif()
 
-ament_export_dependencies(rclcpp rcl_interfaces sensor_msgs yaml-cpp)
+ament_export_dependencies(rclcpp rcl_interfaces sensor_msgs yaml-cpp
+                          controller_orchestrator)
 ament_package()

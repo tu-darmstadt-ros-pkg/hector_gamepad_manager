@@ -45,7 +45,6 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   flipper_command_publisher_ = node_->create_publisher<std_msgs::msg::Float64MultiArray>(
       "/" + node_->get_parameter( "robot_namespace" ).as_string() + "/" + command_topic, 10 );
 
-  controller_helper_.initialize( node, plugin_namespace );
   active_ = true;
 }
 
@@ -123,7 +122,7 @@ void FlipperPlugin::update()
   const bool current_cmd_zero = checkCurrentCmdIsZero();
 
   if ( last_cmd_zero_ && !current_cmd_zero )
-    controller_helper_.switchControllers( teleop_controller_ /*, { standard_controller_ } */ );
+    activateControllers( teleop_controller_ );
 
   if ( !( last_cmd_zero_ && current_cmd_zero ) )
     publishCommands();
