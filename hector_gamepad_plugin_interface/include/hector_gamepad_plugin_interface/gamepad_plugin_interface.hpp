@@ -163,12 +163,15 @@ public:
    * @brief Activate controllers asynchronously.
    * @note After calling this function, the controllers will be switched in the background.
    * @param controller_names The names of the controllers to be activated.
+   * @param callback Optional callback function to be called upon completion of the controller switch.
    */
-  void activateControllers( const std::vector<std::string> &controller_names ) const
+  void activateControllers(
+      const std::vector<std::string> &controller_names,
+      const std::function<void( bool success, const std::string &message )> &callback = nullptr ) const
   {
     if ( controller_orchestrator_ ) {
       controller_orchestrator_->smartSwitchControllerAsync(
-          controller_names, []( bool success, const std::string &message ) {
+          controller_names, callback ? callback : []( bool success, const std::string &message ) {
             if ( success ) {
               RCLCPP_INFO( rclcpp::get_logger( "my_node" ), "Switch successful!" );
             } else {
