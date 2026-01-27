@@ -49,9 +49,6 @@ void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node )
         robot_description_semantic_ = msg->data;
         robot_description_semantic_subscriber_.reset();
       } );
-  joint_state_subscriber_ = node_->create_subscription<sensor_msgs::msg::JointState>(
-      "joint_states", 10,
-      [this]( const sensor_msgs::msg::JointState::SharedPtr msg ) { joint_state_ = *msg; } );
 }
 
 void MoveitPlugin::handlePress( const std::string &function, const std::string &id )
@@ -75,6 +72,8 @@ void MoveitPlugin::handlePress( const std::string &function, const std::string &
         if ( success ) {
           RCLCPP_DEBUG( node_->get_logger(), "[MoveitPlugin] Controller Switch successful!" );
         } else {
+          // the controller switch failed, go back to IDLE (but if we were in EXECUTING, stay in
+          // EXECUTING) e.g. controller were switched manually while waiting for controller switch
           if ( state_ == State::CONTROLLER_SWITCH )
             state_ = State::IDLE;
           RCLCPP_WARN( node_->get_logger(), "[MoveitPlugin] Controller Switch failed: %s",
@@ -244,28 +243,6 @@ void MoveitPlugin::initializeNamedPoses()
     }
     named_poses_[toGroupPoseName( group_state.group_, group_state.name_ )] = constraints;
   }
-}
-
-double MoveitPlugin::getJointPosition( const std::string &name ) const
-{
-  // read joint position from joint state
-  for ( size_t i = 0; i < joint_state_.name.size(); i++ ) {
-    if ( joint_state_.name[i] == name ) {
-      return joint_state_.position[i];
-    }
-  }
-  RCLCPP_ERROR( node_->get_logger(), "[MoveitPlugin] Joint %s not found in joint state",
-                name.c_str() );
-  return 0.0;
-}
-
-double MoveitPlugin::getNormalizedJointPosition( const std::string &name ) const
-{
-  double position = getJointPosition( name );
-  // make sure in interval [-pi, pi]
-  while ( position > M_PI ) { position -= 2 * M_PI; }
-  while ( position < -M_PI ) { position += 2 * M_PI; }
-  return position;
 }
 
 std::string MoveitPlugin::toGroupPoseName( const std::string &group_name,

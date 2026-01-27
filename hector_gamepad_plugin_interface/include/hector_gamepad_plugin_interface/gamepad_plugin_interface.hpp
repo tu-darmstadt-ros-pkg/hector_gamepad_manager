@@ -171,11 +171,11 @@ public:
   {
     if ( controller_orchestrator_ ) {
       controller_orchestrator_->smartSwitchControllerAsync(
-          controller_names, callback ? callback : []( bool success, const std::string &message ) {
+          controller_names, callback ? callback : [this]( bool success, const std::string &message ) {
             if ( success ) {
-              RCLCPP_INFO( rclcpp::get_logger( "my_node" ), "Switch successful!" );
+              RCLCPP_INFO( node_->get_logger(), "Switch successful!" );
             } else {
-              RCLCPP_ERROR( rclcpp::get_logger( "my_node" ), "Switch failed: %s", message.c_str() );
+              RCLCPP_ERROR( node_->get_logger(), "Switch failed: %s", message.c_str() );
             }
           } );
     } else {
@@ -218,7 +218,7 @@ protected:
     // make sure the plugin name is snake_case
     plugin_name_ = camel_to_snake( plugin_name_ );
   }
-  std::string camel_to_snake( const std::string &input )
+  static std::string camel_to_snake( const std::string &input )
   {
     std::string result;
     result.reserve( input.size() * 2 ); // conservative allocation
