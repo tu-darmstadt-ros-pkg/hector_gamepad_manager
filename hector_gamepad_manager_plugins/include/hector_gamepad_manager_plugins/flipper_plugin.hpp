@@ -3,7 +3,6 @@
 
 #include <hector_gamepad_plugin_interface/gamepad_plugin_interface.hpp>
 
-#include "hector_gamepad_manager_plugins/controller_helper.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include <hector_ros2_utils/parameters/reconfigurable_parameter.hpp>
 
