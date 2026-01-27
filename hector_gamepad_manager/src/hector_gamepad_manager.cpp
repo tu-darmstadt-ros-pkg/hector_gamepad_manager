@@ -32,7 +32,8 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
   active_config_publisher_ =
       ocs_ns_node_->create_publisher<std_msgs::msg::String>( "active_config", qos_profile );
   feedback_manager_->initialize( ocs_ns_node_ );
-
+  controller_orchestrator_ =
+      std::make_shared<controller_orchestrator::ControllerOrchestrator>( robot_ns_node_ );
   // load meta switch config and all referenced config files
   if ( loadConfigSwitchesConfig( config_switches_filename ) ) {
     switchConfig( default_config_ );
@@ -129,7 +130,8 @@ bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::st
           try {
             std::shared_ptr<GamepadFunctionPlugin> plugin =
                 plugin_loader_.createSharedInstance( plugin_name );
-            plugin->initializePlugin( robot_ns_node_, plugin_name, blackboard_, feedback_manager_ );
+            plugin->initializePlugin( robot_ns_node_, plugin_name, blackboard_, feedback_manager_,
+                                      controller_orchestrator_ );
             plugins_[plugin_name] = plugin;
             RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Loaded plugin: %s", plugin_name.c_str() );
           } catch ( const std::exception &e ) {

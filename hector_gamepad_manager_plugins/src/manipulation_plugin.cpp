@@ -57,7 +57,6 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
       twist_controller_name_ + "/gripper_vel_cmd", 10 );
   hold_mode_client_ =
       node_->create_client<std_srvs::srv::SetBool>( twist_controller_name_ + "/hold_mode" );
-  controller_helper_.initialize( node, plugin_namespace );
 }
 
 void ManipulationPlugin::handlePress( const std::string &function, const std::string &id )
@@ -141,7 +140,7 @@ void ManipulationPlugin::update()
   const bool is_zero_cmd = isZeroCmd();
   // make sure controllers are active
   if ( last_eef_cmd_zero_ && !is_zero_cmd ) {
-    controller_helper_.switchControllers( { twist_controller_name_ } );
+    activateControllers( { twist_controller_name_ } );
   }
   // avoid repeatedly sending zero commands
   if ( !( last_eef_cmd_zero_ && is_zero_cmd ) ) {
@@ -157,7 +156,7 @@ void ManipulationPlugin::update()
 void ManipulationPlugin::activate()
 {
   active_ = true;
-  controller_helper_.switchControllers( { twist_controller_name_ } );
+  activateControllers( { twist_controller_name_ } );
 }
 
 void ManipulationPlugin::deactivate()

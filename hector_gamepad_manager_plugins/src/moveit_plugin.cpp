@@ -49,10 +49,6 @@ void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node )
         robot_description_semantic_ = msg->data;
         robot_description_semantic_subscriber_.reset();
       } );
-  controller_helper_.initialize( node, plugin_name );
-  joint_state_subscriber_ = node_->create_subscription<sensor_msgs::msg::JointState>(
-      "joint_states", 10,
-      [this]( const sensor_msgs::msg::JointState::SharedPtr msg ) { joint_state_ = *msg; } );
 }
 
 void MoveitPlugin::handlePress( const std::string &function, const std::string &id )
@@ -63,22 +59,51 @@ void MoveitPlugin::handlePress( const std::string &function, const std::string &
     initializeNamedPoses();
     initializedNamedPoses = true;
   }
-  if ( request_active_ ) {
-    RCLCPP_WARN( node_->get_logger(), "Moveit action still active. Ignoring new request." );
+  if ( state_ != State::IDLE ) {
+    RCLCPP_WARN( node_->get_logger(),
+                 "[MoveitPlugin] Moveit action still active. Ignoring new request." );
     return;
   }
   if ( function == "go_to_pose" ) {
     auto [group, pose] = functionIdToGroupGroupAndPose( function, id );
     if ( named_poses_.count( toGroupPoseName( group, pose ) ) > 0 ) {
-      controller_helper_.switchControllers( start_controllers_ );
+      state_ = State::CONTROLLER_SWITCH;
+      activateControllers( start_controllers_, [this]( bool success, const std::string &message ) {
+        if ( success ) {
+          RCLCPP_DEBUG( node_->get_logger(), "[MoveitPlugin] Controller Switch successful!" );
+        } else {
+          // the controller switch failed, go back to IDLE (but if we were in EXECUTING, stay in
+          // EXECUTING) e.g. controller were switched manually while waiting for controller switch
+          if ( state_ == State::CONTROLLER_SWITCH )
+            state_ = State::IDLE;
+          RCLCPP_WARN( node_->get_logger(), "[MoveitPlugin] Controller Switch failed: %s",
+                       message.c_str() );
+        }
+      } );
+    } else {
+      RCLCPP_WARN( node_->get_logger(), "[MoveitPlugin] No pose named %s found in group %s",
+                   pose.c_str(), group.c_str() );
+    }
+  }
+}
+
+void MoveitPlugin::handleHold( const std::string &function, const std::string &id )
+{
+  // wait until controller switch is done
+  if ( state_ != State::CONTROLLER_SWITCH ) {
+    return;
+  }
+  if ( function == "go_to_pose" && areControllersActive( start_controllers_ ) ) {
+    auto [group, pose] = functionIdToGroupGroupAndPose( function, id );
+    if ( named_poses_.count( toGroupPoseName( group, pose ) ) > 0 ) {
       RCLCPP_WARN( node_->get_logger(),
-                   "Start Moveit Planning & Execution of pose [%s] in group [%s]", pose.c_str(),
-                   group.c_str() );
-      request_active_ = true;
+                   "[MoveitPlugin] Start Moveit Planning & Execution of pose [%s] in group [%s]",
+                   pose.c_str(), group.c_str() );
+      state_ = State::EXECUTING;
       sendNamedPoseGoal( group, pose );
     } else {
-      RCLCPP_WARN( node_->get_logger(), "No pose named %s found in group %s", pose.c_str(),
-                   group.c_str() );
+      RCLCPP_WARN( node_->get_logger(), "[MoveitPlugin] No pose named %s found in group %s",
+                   pose.c_str(), group.c_str() );
     }
   }
 }
@@ -91,6 +116,7 @@ void MoveitPlugin::handleRelease( const std::string &function, const std::string
   if ( named_poses_.count( toGroupPoseName( group, pose ) ) > 0 ) {
     cancelGoal(); // cancels all current goals
   }
+  state_ = State::IDLE;
 }
 
 void MoveitPlugin::update() { }
@@ -101,17 +127,18 @@ void MoveitPlugin::deactivate()
 {
   active_ = false;
   cancelGoal(); // cancels all Goals
+  state_ = State::IDLE;
 }
 
 void MoveitPlugin::sendNamedPoseGoal( const std::string &move_group, const std::string &pose_name )
 {
   std::string group_pose_name = toGroupPoseName( move_group, pose_name );
   if ( named_poses_.find( group_pose_name ) == named_poses_.end() ) {
-    RCLCPP_ERROR( node_->get_logger(), "Named pose %s not found.", pose_name.c_str() );
+    RCLCPP_ERROR( node_->get_logger(), "[MoveitPlugin] Named pose %s not found.", pose_name.c_str() );
     return;
   }
   if ( !action_client_->wait_for_action_server( std::chrono::seconds( 5 ) ) ) {
-    RCLCPP_ERROR( node_->get_logger(), "Action server not available after waiting" );
+    RCLCPP_ERROR( node_->get_logger(), "[MoveitPlugin] Action server not available after waiting" );
     return;
   }
 
@@ -167,25 +194,26 @@ void MoveitPlugin::resultCallback(
     const rclcpp_action::ClientGoalHandle<moveit_msgs::action::MoveGroup>::WrappedResult &result )
 {
   if ( result.code != rclcpp_action::ResultCode::SUCCEEDED ) {
-    RCLCPP_ERROR( node_->get_logger(), "Moveit action failed with result code %d",
+    RCLCPP_ERROR( node_->get_logger(), "[MoveitPlugin] Moveit action failed with result code %d",
                   static_cast<int>( result.code ) );
   }
-  request_active_ = false;
+  state_ = State::IDLE;
 }
 
 void MoveitPlugin::feedbackCallback(
     rclcpp_action::ClientGoalHandle<moveit_msgs::action::MoveGroup>::SharedPtr,
     const std::shared_ptr<const moveit_msgs::action::MoveGroup::Feedback> feedback )
 {
-  RCLCPP_INFO( node_->get_logger(), "Moveit action feedback: %s", feedback->state.c_str() );
+  RCLCPP_INFO( node_->get_logger(), "[MoveitPlugin] Moveit action feedback: %s",
+               feedback->state.c_str() );
 }
 
 void MoveitPlugin::goalResponseCallback(
     const rclcpp_action::ClientGoalHandle<moveit_msgs::action::MoveGroup>::SharedPtr &goal_handle )
 {
   if ( !goal_handle ) {
-    RCLCPP_ERROR( node_->get_logger(), "Goal was rejected by server" );
-    request_active_ = false;
+    RCLCPP_ERROR( node_->get_logger(), "[MoveitPlugin] Goal was rejected by server" );
+    state_ = State::IDLE;
   } else {
     RCLCPP_INFO( node_->get_logger(), "Goal accepted by server, waiting for result" );
   }
@@ -194,10 +222,10 @@ void MoveitPlugin::goalResponseCallback(
 void MoveitPlugin::initializeNamedPoses()
 {
   if ( robot_description_.empty() || robot_description_semantic_.empty() ) {
-    RCLCPP_ERROR( node_->get_logger(), "Failed to get urdf and srdf file." );
+    RCLCPP_ERROR( node_->get_logger(), "[MoveitPlugin] Failed to get urdf and srdf file." );
     return;
   }
-  urdf::ModelInterfaceSharedPtr urdf_model = urdf::parseURDF( robot_description_ );
+  const urdf::ModelInterfaceSharedPtr urdf_model = urdf::parseURDF( robot_description_ );
   srdf::Model srdf_model;
   srdf_model.initString( *urdf_model, robot_description_semantic_ );
   const auto group_states = srdf_model.getGroupStates();
@@ -215,27 +243,6 @@ void MoveitPlugin::initializeNamedPoses()
     }
     named_poses_[toGroupPoseName( group_state.group_, group_state.name_ )] = constraints;
   }
-}
-
-double MoveitPlugin::getJointPosition( const std::string &name ) const
-{
-  // read joint position from joint state
-  for ( size_t i = 0; i < joint_state_.name.size(); i++ ) {
-    if ( joint_state_.name[i] == name ) {
-      return joint_state_.position[i];
-    }
-  }
-  RCLCPP_ERROR( node_->get_logger(), "Joint %s not found in joint state", name.c_str() );
-  return 0.0;
-}
-
-double MoveitPlugin::getNormalizedJointPosition( const std::string &name ) const
-{
-  double position = getJointPosition( name );
-  // make sure in interval [-pi, pi]
-  while ( position > M_PI ) { position -= 2 * M_PI; }
-  while ( position < -M_PI ) { position += 2 * M_PI; }
-  return position;
 }
 
 std::string MoveitPlugin::toGroupPoseName( const std::string &group_name,

@@ -17,11 +17,15 @@ namespace hector_gamepad_manager_plugins
 {
 class MoveitPlugin final : public hector_gamepad_plugin_interface::GamepadFunctionPlugin
 {
+
+  enum class State { IDLE, CONTROLLER_SWITCH, EXECUTING };
+
 public:
   void initialize( const rclcpp::Node::SharedPtr &node ) override;
 
   void handlePress( const std::string &function, const std::string &id ) override;
   void handleRelease( const std::string &function, const std::string &id ) override;
+  void handleHold( const std::string &function, const std::string &id ) override;
 
   void update() override;
 
@@ -40,14 +44,12 @@ private:
   void goalResponseCallback(
       const rclcpp_action::ClientGoalHandle<moveit_msgs::action::MoveGroup>::SharedPtr &goal_handle );
   void initializeNamedPoses();
-  double getJointPosition( const std::string &name ) const;
-  double getNormalizedJointPosition( const std::string &name ) const;
 
   static std::string toGroupPoseName( const std::string &group_name, const std::string &pose_name );
   std::pair<std::string, std::string> functionIdToGroupGroupAndPose( const std::string &function,
                                                                      const std::string &id ) const;
   bool active_ = false;
-  bool request_active_ = false;
+  State state_ = State::IDLE;
   double joint_tolerance_ = 0.05;
   double max_acceleration_scaling_factor_ = 0.3;
   double max_velocity_scaling_factor_ = 0.3;
@@ -56,13 +58,11 @@ private:
   std::string robot_description_semantic_;
   std::map<std::string, moveit_msgs::msg::Constraints> named_poses_; // map <group>_<pose_name> to constraints
   std::vector<std::string> start_controllers_;
-  ControllerHelper controller_helper_{};
   sensor_msgs::msg::JointState joint_state_;
   rclcpp::Node::SharedPtr node_;
   hector::ParameterSubscription velocity_scaling_factor_subscriber_;
   hector::ParameterSubscription acceleration_scaling_factor_subscriber_;
   hector::ParameterSubscription joint_tolerance_subscriber_;
-  rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_subscriber_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr robot_description_subscriber_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr robot_description_semantic_subscriber_;
   rclcpp_action::Client<moveit_msgs::action::MoveGroup>::SharedPtr action_client_;

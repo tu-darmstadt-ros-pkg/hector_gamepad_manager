@@ -3,7 +3,9 @@
 
 #include "blackboard.hpp"
 #include "feedback_manager.hpp"
+
 #include <algorithm>
+#include <controller_orchestrator/controller_orchestrator.hpp>
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
 
@@ -15,13 +17,15 @@ public:
   // Destructor
   virtual ~GamepadFunctionPlugin() = default;
 
-  void initializePlugin( const rclcpp::Node::SharedPtr &node, const std::string &plugin_id,
-                         std::shared_ptr<Blackboard> blackboard,
-                         std::shared_ptr<FeedbackManager> feedback_manager )
+  void initializePlugin(
+      const rclcpp::Node::SharedPtr &node, const std::string &plugin_id,
+      std::shared_ptr<Blackboard> blackboard, std::shared_ptr<FeedbackManager> feedback_manager,
+      std::shared_ptr<controller_orchestrator::ControllerOrchestrator> controller_orchestrator )
   {
     node_ = node;
     blackboard_ = blackboard;
     feedback_manager_ = feedback_manager;
+    controller_orchestrator_ = controller_orchestrator;
     setPluginId( plugin_id );
     initialize( node );
   }
@@ -155,6 +159,42 @@ public:
    */
   std::string getPluginNamespace() const { return plugin_namespace_; }
 
+  /**
+   * @brief Activate controllers asynchronously.
+   * @note After calling this function, the controllers will be switched in the background.
+   * @param controller_names The names of the controllers to be activated.
+   * @param callback Optional callback function to be called upon completion of the controller switch.
+   */
+  void activateControllers(
+      const std::vector<std::string> &controller_names,
+      const std::function<void( bool success, const std::string &message )> &callback = nullptr ) const
+  {
+    if ( controller_orchestrator_ ) {
+      controller_orchestrator_->smartSwitchControllerAsync(
+          controller_names, callback ? callback : [this]( bool success, const std::string &message ) {
+            if ( success ) {
+              RCLCPP_INFO( node_->get_logger(), "Switch successful!" );
+            } else {
+              RCLCPP_ERROR( node_->get_logger(), "Switch failed: %s", message.c_str() );
+            }
+          } );
+    } else {
+      RCLCPP_WARN( node_->get_logger(),
+                   "Controller Orchestrator not initialized. Cannot start controllers." );
+    }
+  }
+
+  bool areControllersActive( const std::vector<std::string> &controller_names ) const
+  {
+    if ( controller_orchestrator_ ) {
+      return controller_orchestrator_->areControllersActive( controller_names );
+    } else {
+      RCLCPP_WARN( node_->get_logger(),
+                   "Controller Orchestrator not initialized. Cannot check controller states." );
+      return false;
+    }
+  }
+
 protected:
   /**
    * @brief Initialize function that is called when the plugin is loaded.
@@ -178,7 +218,7 @@ protected:
     // make sure the plugin name is snake_case
     plugin_name_ = camel_to_snake( plugin_name_ );
   }
-  std::string camel_to_snake( const std::string &input )
+  static std::string camel_to_snake( const std::string &input )
   {
     std::string result;
     result.reserve( input.size() * 2 ); // conservative allocation
@@ -208,6 +248,7 @@ protected:
   std::string plugin_namespace_;
   std::shared_ptr<Blackboard> blackboard_;
   std::shared_ptr<FeedbackManager> feedback_manager_;
+  std::shared_ptr<controller_orchestrator::ControllerOrchestrator> controller_orchestrator_;
 };
 } // namespace hector_gamepad_plugin_interface
 

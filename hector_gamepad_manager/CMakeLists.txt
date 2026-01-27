@@ -18,7 +18,7 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 set(DEPENDENCIES pluginlib rclcpp sensor_msgs yaml-cpp
-                 hector_gamepad_plugin_interface)
+                 hector_gamepad_plugin_interface controller_orchestrator)
 
 foreach(dependency IN LISTS DEPENDENCIES)
   find_package(${dependency} REQUIRED)

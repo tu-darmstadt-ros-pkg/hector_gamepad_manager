@@ -45,8 +45,6 @@ private:
   std::string standard_controller_;
   std::vector<std::string> teleop_controller_;
 
-  ControllerHelper controller_helper_{};
-
   std_msgs::msg::Float64MultiArray flipper_speed_commands_;
 
   std::array<double, 4> button_vel_commands_ = {};

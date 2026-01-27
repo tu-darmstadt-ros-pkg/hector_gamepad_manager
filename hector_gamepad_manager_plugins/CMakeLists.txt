@@ -33,7 +33,6 @@ foreach(dependency IN LISTS DEPENDENCIES)
 endforeach()
 find_package(backward_ros REQUIRED)
 set(HEADERS
-    include/hector_gamepad_manager_plugins/controller_helper.hpp
     include/hector_gamepad_manager_plugins/drive_plugin.hpp
     include/hector_gamepad_manager_plugins/battery_monitor_plugin.hpp
     include/hector_gamepad_manager_plugins/flipper_plugin.hpp
@@ -43,7 +42,6 @@ set(HEADERS
     include/hector_gamepad_manager_plugins/test_probe_plugin.hpp)
 
 set(SOURCES
-    src/controller_helper.cpp
     src/drive_plugin.cpp
     src/flipper_plugin.cpp
     src/battery_monitor_plugin.cpp
