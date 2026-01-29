@@ -2,6 +2,37 @@
 #include <srdfdom/model.h>
 #include <std_msgs/msg/string.hpp>
 #include <urdf_parser/urdf_parser.h>
+/**
+ * @brief Implementation of the MoveitPlugin for hector_gamepad_manager.
+ * * DESIGN OVERVIEW:
+ * This plugin facilitates robot motions to named poses (SRDF) using a hybrid approach:
+ * 1. MoveIt! Planning: Used for global, collision-aware motion.
+ * 2. Trajectory Control: Used for direct, joint-space execution (bypassing MoveIt planning).
+ * * VIA-POSE LOGIC:
+ * To reach a "folded" or complex position that MoveIt cannot plan to directly (due to
+ * self-collision constraints in the planning scene), the plugin uses a 'Via-Pose' sequence:
+ * - The user holds the button for the target_pose (e.g., "folded").
+ * - If the robot is far away, the plugin calls MoveIt to reach via_pose (e.g., "folded_partial").
+ * - Once the robot arrives at the via_pose, the plugin uses the Trajectory Controller to
+ * perform the final "blind" tuck into the target_pose.
+ * * STATE MACHINE & ASYNCHRONOUS TRACKING:
+ * The state is managed via the 'State' enum to prevent overlapping commands:
+ * * [IDLE] ----------------(handlePress)----------------> [CONTROLLER_SWITCH]
+ * ^                                                         |
+ * |                                                         v
+ * | <-----------(handleHold evaluates robot state)----------|
+ * |          /                                \             |
+ * |   [EXECUTING] (MoveIt Action)       [TRAJECTORY_CONTROL] (Direct)
+ * |          \                                /             |
+ * |           \---(Result Callback resets)---/ <------------/
+ * |                          |
+ * +---(handleRelease)--------+
+ * * Key Mechanism:
+ * When an action (MoveIt or Trajectory) finishes, the result callbacks flip the state back
+ * to CONTROLLER_SWITCH. If the user is still holding the button, the next cycle of
+ * handleHold re-evaluates the joint positions. This allows the plugin to "chain" the
+ * MoveIt-to-Via motion and the Trajectory-to-Target motion seamlessly while the button is held.
+ */
 
 namespace hector_gamepad_manager_plugins
 {
@@ -10,9 +41,9 @@ void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node )
 {
   node_ = node;
   const std::string plugin_name = getPluginName();
-
-  node_->declare_parameter<std::vector<std::string>>( plugin_name + ".start_controllers", {} );
-  start_controllers_ = node_->get_parameter( plugin_name + ".start_controllers" ).as_string_array();
+  rclcpp::sleep_for( std::chrono::milliseconds( 5000 ) );
+  start_controllers_ = node_->declare_parameter<std::vector<std::string>>(
+      plugin_name + ".start_controllers", std::vector<std::string>() );
 
   // Reconfigurable params
   velocity_scaling_factor_subscriber_ = hector::createReconfigurableParameter(
@@ -57,22 +88,24 @@ void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node )
 void MoveitPlugin::loadViaPoses()
 {
   const std::string plugin_name = getPluginName();
-  node_->declare_parameter<std::vector<std::string>>( plugin_name + ".via_pose_ids", {} );
+  node_->declare_parameter<std::vector<std::string>>( plugin_name + ".via_pose_ids",
+                                                      std::vector<std::string>() );
   auto via_ids = node_->get_parameter( plugin_name + ".via_pose_ids" ).as_string_array();
 
   for ( const auto &id : via_ids ) {
     ViaPose vp;
-    vp.group = node_->get_parameter( plugin_name + "." + id + ".group" ).as_string();
-    vp.target_pose_name = node_->get_parameter( plugin_name + "." + id + ".target_pose" ).as_string();
-    vp.via_pose_name = node_->get_parameter( plugin_name + "." + id + ".via_pose" ).as_string();
+    vp.group = node_->declare_parameter<std::string>( plugin_name + "." + id + ".group" );
+    vp.target_pose_name =
+        node_->declare_parameter<std::string>( plugin_name + "." + id + ".target_pose" );
+    vp.via_pose_name = node_->declare_parameter<std::string>( plugin_name + "." + id + ".via_pose" );
     via_poses_.push_back( vp );
 
     std::string action_topic =
         node_->declare_parameter<std::string>( plugin_name + ".controllers." + vp.group, "" );
     if ( !action_topic.empty() && trajectory_clients_.count( vp.group ) == 0 ) {
       trajectory_clients_[vp.group] =
-          rclcpp_action::create_client<control_msgs::action::FollowJointTrajectory>( node_,
-                                                                                     action_topic );
+          rclcpp_action::create_client<control_msgs::action::FollowJointTrajectory>(
+              node_, node_->get_effective_namespace() + "/" + action_topic );
     }
   }
 }
@@ -87,13 +120,26 @@ void MoveitPlugin::handleHold( const std::string &function, const std::string &i
 
   auto [group, goal_pose] = functionIdToGroupGroupAndPose( function, id );
 
-  if ( isAtPose( goal_pose ) ) {
+  if ( isAtPose( toGroupPoseName( group, goal_pose ) ) ) {
     RCLCPP_INFO( node_->get_logger(), "[MoveitPlugin] Already at goal pose [%s] for group [%s].",
                  goal_pose.c_str(), group.c_str() );
     state_ = State::IDLE;
     return;
   }
 
+  // Case 1: move from a pose with a registered via pose
+  for ( const auto &vp : via_poses_ ) {
+    if ( vp.group == group && isAtPose( toGroupPoseName( group, vp.target_pose_name ) ) ) {
+      RCLCPP_INFO( node_->get_logger(),
+                   "[MoveitPlugin] At target pose [%s]. First moving to via pose [%s].",
+                   vp.target_pose_name.c_str(), goal_pose.c_str() );
+      state_ = State::TRAJECTORY_CONTROL;
+      if ( !moveUsingTrajectoryController( group, vp.via_pose_name ) )
+        state_ = State::CONTROLLER_SWITCH;
+      return;
+    }
+  }
+  // Case 2: moving to a target pose with a registered via pose
   for ( const auto &vp : via_poses_ ) {
     if ( vp.group == group && vp.target_pose_name == goal_pose ) {
       // Step A: We are at the intermediate via pose -> Move to final goal via Trajectory Controller
@@ -115,7 +161,7 @@ void MoveitPlugin::handleHold( const std::string &function, const std::string &i
     }
   }
 
-  // Standard case: Plan directly to goal via MoveIt
+  // Case 3: Plan directly to goal via MoveIt
   state_ = State::EXECUTING;
   sendNamedPoseGoal( group, goal_pose );
 }
@@ -142,6 +188,11 @@ bool MoveitPlugin::moveUsingTrajectoryController( const std::string &group,
   options.result_callback =
       std::bind( &MoveitPlugin::trajectoryResultCallback, this, std::placeholders::_1 );
 
+  // check if action server is available (only wait for short time)
+  if ( !trajectory_clients_[group]->wait_for_action_server( std::chrono::microseconds( 500 ) ) ) {
+    RCLCPP_WARN( node_->get_logger(),
+                 "[MoveitPlugin] Waiting for action server to be available for trajectory " );
+  }
   trajectory_clients_[group]->async_send_goal( goal, options );
   return true;
 }
@@ -151,7 +202,14 @@ void MoveitPlugin::resultCallback(
 {
   RCLCPP_INFO( node_->get_logger(),
                "[MoveitPlugin] MoveIt action finished. Returning to ready state." );
-  state_ = State::CONTROLLER_SWITCH;
+  if ( result.code == rclcpp_action::ResultCode::SUCCEEDED ) {
+    RCLCPP_INFO( node_->get_logger(), "[MoveitPlugin] MoveIt goal succeeded." );
+    state_ = State::CONTROLLER_SWITCH;
+
+  } else {
+    RCLCPP_WARN( node_->get_logger(), "[MoveitPlugin] MoveIt goal did not succeed." );
+    state_ = State::ABORTED;
+  }
 }
 
 void MoveitPlugin::trajectoryResultCallback(
@@ -159,7 +217,13 @@ void MoveitPlugin::trajectoryResultCallback(
 {
   RCLCPP_INFO( node_->get_logger(),
                "[MoveitPlugin] Trajectory action finished. Returning to ready state." );
-  state_ = State::CONTROLLER_SWITCH;
+  if ( result.code == rclcpp_action::ResultCode::SUCCEEDED ) {
+    RCLCPP_INFO( node_->get_logger(), "[MoveitPlugin] Trajectory goal succeeded." );
+    state_ = State::CONTROLLER_SWITCH;
+  } else {
+    RCLCPP_WARN( node_->get_logger(), "[MoveitPlugin] Trajectory goal did not succeed." );
+    state_ = State::ABORTED;
+  }
 }
 
 void MoveitPlugin::handlePress( const std::string &function, const std::string &id )
@@ -196,16 +260,21 @@ bool MoveitPlugin::isAtPose( const std::string &group_pose_name )
   if ( named_poses_.count( group_pose_name ) == 0 || joint_state_.name.empty() )
     return false;
   const auto &constraints = named_poses_[group_pose_name].joint_constraints;
-
+  bool at_position = true;
   for ( const auto &jc : constraints ) {
     auto it = std::find( joint_state_.name.begin(), joint_state_.name.end(), jc.joint_name );
     if ( it == joint_state_.name.end() )
       continue;
     size_t idx = std::distance( joint_state_.name.begin(), it );
-    if ( std::abs( joint_state_.position[idx] - jc.position ) > joint_tolerance_ )
-      return false;
+    double error = std::remainder( joint_state_.position[idx] - jc.position, 2 * M_PI );
+    if ( std::abs( error ) > 2 * joint_tolerance_ ) {
+      RCLCPP_WARN( node_->get_logger(),
+                   "[MoveitPlugin] Joint [%s] not at target position (current: %.3f, target: %.3f)",
+                   jc.joint_name.c_str(), joint_state_.position[idx], jc.position );
+      at_position = false;
+    }
   }
-  return true;
+  return at_position;
 }
 
 void MoveitPlugin::sendNamedPoseGoal( const std::string &move_group, const std::string &pose_name )
@@ -219,8 +288,8 @@ void MoveitPlugin::sendNamedPoseGoal( const std::string &move_group, const std::
 
   auto constraints = named_poses_[group_pose_name];
   for ( auto &jc : constraints.joint_constraints ) {
-    jc.tolerance_above = joint_tolerance_;
-    jc.tolerance_below = joint_tolerance_;
+    jc.tolerance_above = joint_tolerance_ / 2;
+    jc.tolerance_below = joint_tolerance_ / 2;
   }
 
   goal.request.goal_constraints.push_back( constraints );

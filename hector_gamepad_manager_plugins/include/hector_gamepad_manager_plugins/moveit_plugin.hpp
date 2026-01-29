@@ -32,7 +32,8 @@ class MoveitPlugin final : public hector_gamepad_plugin_interface::GamepadFuncti
     IDLE,               ///< Plugin is inactive or waiting for press
     CONTROLLER_SWITCH,  ///< Ready to accept hold commands (controllers active)
     TRAJECTORY_CONTROL, ///< Direct FollowJointTrajectory action is in progress
-    EXECUTING           ///< MoveIt MoveGroup action is in progress
+    EXECUTING,          ///< MoveIt MoveGroup action is in progress
+    ABORTED
   };
 
   struct ViaPose {
