@@ -12,6 +12,7 @@
 
   <depend>ament_cmake_gen_version_h</depend>
   <depend>backward_ros</depend>
+  <depend>control_msgs</depend>
   <depend>controller_manager_msgs</depend>
   <depend>controller_orchestrator</depend>
   <depend>geometry_msgs</depend>

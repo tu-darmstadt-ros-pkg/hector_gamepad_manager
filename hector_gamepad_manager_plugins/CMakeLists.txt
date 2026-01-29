@@ -26,7 +26,8 @@ set(DEPENDENCIES
     rclcpp_action
     sensor_msgs
     srdfdom
-    std_srvs)
+    std_srvs
+    control_msgs)
 
 foreach(dependency IN LISTS DEPENDENCIES)
   find_package(${dependency} REQUIRED)
