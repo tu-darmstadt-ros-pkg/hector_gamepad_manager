@@ -1,0 +1,12 @@
+moveit_plugin_test:
+  ros__parameters:
+    moveit_plugin:
+      start_controllers: []
+      via_pose_ids:
+        - via_target
+      via_target:
+        group: arm
+        target_pose: target
+        via_pose: via
+      controllers:
+        arm: trajectory_controller/follow_joint_trajectory
