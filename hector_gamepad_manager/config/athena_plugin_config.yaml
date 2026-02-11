@@ -22,9 +22,24 @@
             max_drive_angular_speed: 0.5
             twist_controller_name: "moveit_twist_controller"
         moveit_plugin:
-            start_controllers: ["arm_trajectory_controller", "gripper_trajectory_controller", "flipper_trajectory_controller"]
-            max_velocity_scaling_factor: 0.04
-            max_acceleration_scaling_factor: 0.04
+            start_controllers:
+                - "arm_trajectory_controller"
+                - "gripper_trajectory_controller"
+                - "flipper_trajectory_controller"
+            max_velocity_scaling_factor: 0.05
+            max_acceleration_scaling_factor: 0.05
+            # List of via pose identifiers to load
+            via_pose_ids: ["folded_arm_logic"]
+
+            # Configuration for the 'folded' via pose logic
+            folded_arm_logic:
+                group: "arm_group"
+                target_pose: "folded"          # The final target pose in SRDF
+                via_pose: "folded_partial"     # The intermediate pose in SRDF
+            controllers:
+                arm_group: "arm_trajectory_controller/follow_joint_trajectory"
+                flipper_group: "flipper_trajectory_controller/follow_joint_trajectory"
+
         battery_monitor_plugin:
             cell_voltage_fields:
                 - "cell_voltages_battery1_mv"
