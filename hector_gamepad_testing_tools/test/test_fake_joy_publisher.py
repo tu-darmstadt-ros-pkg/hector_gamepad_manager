@@ -91,7 +91,7 @@ class Probe(Node):
         self.joy_msgs = deque(maxlen=50)
 
         self.sub_cfg = self.create_subscription(
-            String, f"{ocs_ns}/active_config", self._on_cfg, qos_latched
+            String, f"{ocs_ns}/joy_teleop_profile", self._on_cfg, qos_latched
         )
         self.sub_joy = self.create_subscription(Joy, f"{ocs_ns}/joy", self._on_joy, 10)
 

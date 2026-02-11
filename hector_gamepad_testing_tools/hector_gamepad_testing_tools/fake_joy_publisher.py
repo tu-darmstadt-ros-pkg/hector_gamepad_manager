@@ -265,7 +265,7 @@ class FakeJoyPublisher(Node):
         qos_cfg.durability = DurabilityPolicy.TRANSIENT_LOCAL
         self._active_config_sub = self.create_subscription(
             String,
-            f"{ocs_ns.strip('/')}/active_config",
+            f"{ocs_ns.strip('/')}/joy_teleop_profile",
             self._active_config_cb,
             qos_cfg,
         )
