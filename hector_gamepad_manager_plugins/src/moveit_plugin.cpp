@@ -41,7 +41,6 @@ void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node )
 {
   node_ = node;
   const std::string plugin_name = getPluginName();
-  rclcpp::sleep_for( std::chrono::milliseconds( 5000 ) );
   start_controllers_ = node_->declare_parameter<std::vector<std::string>>(
       plugin_name + ".start_controllers", std::vector<std::string>() );
 
