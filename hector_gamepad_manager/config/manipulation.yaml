@@ -69,6 +69,7 @@ buttons:
     function: "toggle"
     args:
       name: "invert_steering"
+      ocs_topic: "joy_teleop_direction"
 
   9: # Left joystick press
     plugin: "hector_gamepad_manager_plugins::BatteryMonitorPlugin"

@@ -30,7 +30,7 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
   qos_profile.reliability( RMW_QOS_POLICY_RELIABILITY_RELIABLE );
   qos_profile.durability( RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL );
   active_config_publisher_ =
-      ocs_ns_node_->create_publisher<std_msgs::msg::String>( "active_config", qos_profile );
+      ocs_ns_node_->create_publisher<std_msgs::msg::String>( "joy_teleop_profile", qos_profile );
   feedback_manager_->initialize( ocs_ns_node_ );
   controller_orchestrator_ =
       std::make_shared<controller_orchestrator::ControllerOrchestrator>( robot_ns_node_ );
@@ -101,8 +101,8 @@ bool HectorGamepadManager::switchConfig( const std::string &config_name )
   }
   if ( config_name == active_config_ )
     return true;
-  RCLCPP_INFO( ocs_ns_node_->get_logger(), "Switching from config %s to config: %s",
-               active_config_.c_str(), config_name.c_str() );
+  RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Switching from config %s to config: %s",
+                active_config_.c_str(), config_name.c_str() );
   deactivatePlugins();
   active_config_publisher_->publish( std_msgs::msg::String().set__data( config_name ) );
   active_config_ = config_name;
@@ -130,8 +130,8 @@ bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::st
           try {
             std::shared_ptr<GamepadFunctionPlugin> plugin =
                 plugin_loader_.createSharedInstance( plugin_name );
-            plugin->initializePlugin( robot_ns_node_, plugin_name, blackboard_, feedback_manager_,
-                                      controller_orchestrator_ );
+            plugin->initializePlugin( robot_ns_node_, ocs_ns_node_, plugin_name, blackboard_,
+                                      feedback_manager_, controller_orchestrator_ );
             plugins_[plugin_name] = plugin;
             RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Loaded plugin: %s", plugin_name.c_str() );
           } catch ( const std::exception &e ) {

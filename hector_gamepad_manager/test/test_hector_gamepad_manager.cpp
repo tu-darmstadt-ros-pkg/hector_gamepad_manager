@@ -65,7 +65,7 @@ protected:
     manager_ = std::make_shared<hector_gamepad_manager::HectorGamepadManager>( node_ );
 
     sub_joy_ = rtest::findSubscription<sensor_msgs::msg::Joy>( node_, "/ocs/joy" );
-    pub_config_ = rtest::findPublisher<std_msgs::msg::String>( node_, "/ocs/active_config" );
+    pub_config_ = rtest::findPublisher<std_msgs::msg::String>( node_, "/ocs/joy_teleop_profile" );
     pub_cmd_vel_ =
         rtest::findPublisher<geometry_msgs::msg::TwistStamped>( node_, "/athena/cmd_vel" );
     pub_twist_eef_ = rtest::findPublisher<geometry_msgs::msg::TwistStamped>(
