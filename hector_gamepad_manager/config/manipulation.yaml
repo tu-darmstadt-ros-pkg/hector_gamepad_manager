@@ -72,8 +72,8 @@ buttons:
       ocs_topic: "joy_teleop_direction"
 
   9: # Left joystick press
-    plugin: "hector_gamepad_manager_plugins::BatteryMonitorPlugin"
-    function: "mute"
+    plugin: ""
+    function: ""
 
   10: # Right joystick press
     plugin: "hector_gamepad_manager_plugins::BlackboardPlugin"

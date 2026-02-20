@@ -23,8 +23,8 @@
             twist_controller_name: "moveit_twist_controller"
         moveit_plugin:
             start_controllers: ["arm_trajectory_controller", "gripper_trajectory_controller", "flipper_trajectory_controller"]
-            max_velocity_scaling_factor: 0.2
-            max_acceleration_scaling_factor: 0.2
+            max_velocity_scaling_factor: 0.1
+            max_acceleration_scaling_factor: 0.1
             action_topic: "fold_manager_action"
         battery_monitor_plugin:
             cell_voltage_fields:
