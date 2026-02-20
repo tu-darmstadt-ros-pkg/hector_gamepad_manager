@@ -36,3 +36,16 @@
                 intensity: 1.0
                 cycle: true
             mute_duration_sec: 300.0
+        virtual_camera_plugin:
+            camera_names: ["front_wideangle", "back_wideangle"]
+            node_names: ["image_projection_pinhole_front", "image_projection_pinhole_back"]
+            pan_speed: [0.5, 0.5]
+            tilt_speed: [0.5, 0.5]
+            min_pan: [-3.1415, -3.1415]
+            max_pan: [3.1415, 3.1415]
+            min_tilt: [-3.1415, -3.1415]
+            max_tilt: [3.1415, 3.1415]
+            base_pan: [0.0, 0.0]
+            base_tilt: [0.873, 0.873]
+            base_roll: [0.0, 0.0]
+            stick_hold_time: 1.0

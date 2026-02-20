@@ -21,4 +21,7 @@
     <class type="hector_gamepad_manager_plugins::TestProbePlugin" base_class_type="hector_gamepad_plugin_interface::GamepadFunctionPlugin">
         <description>Test probe plugin for unit tests.</description>
     </class>
+    <class type="hector_gamepad_manager_plugins::VirtualCameraPlugin" base_class_type="hector_gamepad_plugin_interface::GamepadFunctionPlugin">
+        <description>Plugin to control a virtual camera's (Image projection) pan and tilt angles via gamepad input.</description>
+    </class>
 </library>

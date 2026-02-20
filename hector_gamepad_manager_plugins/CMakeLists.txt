@@ -26,6 +26,7 @@ set(DEPENDENCIES
     rclcpp_action
     sensor_msgs
     srdfdom
+    std_msgs
     std_srvs)
 
 foreach(dependency IN LISTS DEPENDENCIES)
@@ -39,7 +40,8 @@ set(HEADERS
     include/hector_gamepad_manager_plugins/manipulation_plugin.hpp
     include/hector_gamepad_manager_plugins/moveit_plugin.hpp
     include/hector_gamepad_manager_plugins/blackboard_plugin.hpp
-    include/hector_gamepad_manager_plugins/test_probe_plugin.hpp)
+    include/hector_gamepad_manager_plugins/test_probe_plugin.hpp
+    include/hector_gamepad_manager_plugins/virtual_camera_plugin.hpp)
 
 set(SOURCES
     src/drive_plugin.cpp
@@ -48,7 +50,8 @@ set(SOURCES
     src/manipulation_plugin.cpp
     src/moveit_plugin.cpp
     src/blackboard_plugin.cpp
-    src/test_probe_plugin.cpp)
+    src/test_probe_plugin.cpp
+    src/virtual_camera_plugin.cpp)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES} ${HEADERS})
 target_include_directories(

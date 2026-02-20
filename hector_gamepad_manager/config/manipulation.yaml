@@ -72,16 +72,16 @@ buttons:
       ocs_topic: "joy_teleop_direction"
 
   9: # Left joystick press
-    plugin: "hector_gamepad_manager_plugins::BatteryMonitorPlugin"
-    function: "mute"
-
-  10: # Right joystick press
     plugin: "hector_gamepad_manager_plugins::BlackboardPlugin"
     function: "toggle"
     args:
       name: "software_e_stop"
       initial: "false"
       topic: "gamepad_e_stop"
+
+  10: # Right joystick press
+    plugin: "hector_gamepad_manager_plugins::BlackboardPlugin"
+    function: "swap_camera"
 
   # -------------------- All the axes can also be used as buttons if specified here --------------------
   11: # Left joystick left
