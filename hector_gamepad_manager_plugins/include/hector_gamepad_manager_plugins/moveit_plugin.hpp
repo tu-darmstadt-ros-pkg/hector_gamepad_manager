@@ -58,6 +58,8 @@ private:
   std::map<std::string, moveit_msgs::msg::Constraints> named_poses_; // map <group>_<pose_name> to constraints
   std::vector<std::string> start_controllers_;
   sensor_msgs::msg::JointState joint_state_;
+  std::string success_vibration_id_;
+  std::string failure_vibration_id_;
   rclcpp::Node::SharedPtr node_;
   hector::ParameterSubscription velocity_scaling_factor_subscriber_;
   hector::ParameterSubscription acceleration_scaling_factor_subscriber_;
