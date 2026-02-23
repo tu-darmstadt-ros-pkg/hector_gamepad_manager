@@ -11,7 +11,7 @@ import launch_testing.actions
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy, HistoryPolicy
+from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 from std_msgs.msg import String
 from sensor_msgs.msg import Joy
 
@@ -79,11 +79,6 @@ class Probe(Node):
             depth=1,
             reliability=ReliabilityPolicy.RELIABLE,
             durability=DurabilityPolicy.TRANSIENT_LOCAL,
-        )
-        qos_best = QoSProfile(
-            depth=10,
-            history=HistoryPolicy.KEEP_LAST,
-            reliability=ReliabilityPolicy.BEST_EFFORT,
         )
 
         self.active_config = None

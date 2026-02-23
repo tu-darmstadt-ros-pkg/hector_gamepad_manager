@@ -8,7 +8,7 @@ import re
 
 import rclpy
 from rclpy.node import Node
-from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
+from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 from rcl_interfaces.srv import GetParameters
 from rcl_interfaces.msg import ParameterType as PT
 from sensor_msgs.msg import Joy
@@ -276,9 +276,9 @@ class FakeJoyPublisher(Node):
         # Physical Joy state and logical intents
         self._axes = self.layout.neutral_axes()
         self._buttons = [0] * self.layout.button_count
-        self._deflected_axes: Dict[Key, float] = (
-            {}
-        )  # logical values (0..1 for triggers, else -1..1)
+        self._deflected_axes: Dict[
+            Key, float
+        ] = {}  # logical values (0..1 for triggers, else -1..1)
         self._held_buttons: Set[Key] = set()
         # one-shot presses to apply on publish
         self._pending_one_shot_keys: Set[Key] = set()
@@ -408,14 +408,14 @@ class FakeJoyPublisher(Node):
                     elif len(in_mode) > 1:
                         raise AttributeError(
                             f"Ambiguous button '{fn_safe}' in active mode '{self._active_mode}': "
-                            f"{[f'{k.plugin}::{k.function}' for k in sorted(in_mode, key=lambda x:(x.plugin,x.function))]}"
+                            f"{[f'{k.plugin}::{k.function}' for k in sorted(in_mode, key=lambda x: (x.plugin, x.function))]}"
                         )
                 if len(candidates) == 1:
                     key = next(iter(candidates))
                     return lambda: caller(key.plugin, key.function)
                 raise AttributeError(
                     f"Ambiguous button '{fn_safe}' across modes: "
-                    f"{[f'{k.plugin}::{k.function}' for k in sorted(candidates, key=lambda x:(x.plugin,x.function))]}"
+                    f"{[f'{k.plugin}::{k.function}' for k in sorted(candidates, key=lambda x: (x.plugin, x.function))]}"
                 )
         # Axis helper (no prefix) -> deflect(value)
         fn_safe = _safe_func_name(name)
@@ -431,14 +431,14 @@ class FakeJoyPublisher(Node):
             elif len(in_mode) > 1:
                 raise AttributeError(
                     f"Ambiguous axis '{name}' in active mode '{self._active_mode}': "
-                    f"{[f'{k.plugin}::{k.function}' for k in sorted(in_mode, key=lambda x:(x.plugin,x.function))]}"
+                    f"{[f'{k.plugin}::{k.function}' for k in sorted(in_mode, key=lambda x: (x.plugin, x.function))]}"
                 )
         if len(candidates) == 1:
             key = next(iter(candidates))
             return lambda value: self.deflect(key.plugin, key.function, value)
         raise AttributeError(
             f"Ambiguous axis '{name}' across modes: "
-            f"{[f'{k.plugin}::{k.function}' for k in sorted(candidates, key=lambda x:(x.plugin,x.function))]}"
+            f"{[f'{k.plugin}::{k.function}' for k in sorted(candidates, key=lambda x: (x.plugin, x.function))]}"
         )
 
     # ---------- Internals ----------

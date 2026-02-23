@@ -1,22 +1,17 @@
 import os
 import yaml
 import unittest
-import pytest
 
 import launch_ros
 import launch
 import launch_testing.actions
 import launch_testing.asserts
 
-from launch import LaunchDescription
 from launch.some_substitutions_type import SomeSubstitutionsType
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 
 from ament_index_python.packages import get_package_share_directory
-from launch.actions import IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch_ros.actions import Node, ComposableNodeContainer
-from launch_ros.descriptions import ComposableNode
+from launch_ros.actions import Node
 
 
 # see https://github.com/tylerjw/moveit2/blob/115bfde368e40907f858c43c4e8da4f8c6997d54/moveit_ros/moveit_servo/test/launch/test_servo_pose_tracking.test.py
@@ -70,8 +65,7 @@ def generate_hector_gamepad_manager_test_description(
         [
             launch.actions.DeclareLaunchArgument(
                 name="test_binary_dir",
-                description="Binary directory of package "
-                "containing test executables",
+                description="Binary directory of package containing test executables",
             ),
             hector_gamepad_manager,
             hector_gamepad_manager_gtest,
