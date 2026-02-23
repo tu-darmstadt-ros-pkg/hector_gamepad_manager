@@ -1,39 +1,39 @@
 /**:
-    ros__parameters:
-        drive_plugin:
-            slow_factor: 0.5
-            fast_factor: 1.5
-            max_angular_speed: 0.5
-            max_linear_speed: 0.5
-        flipper_plugin:
-            flipper_back_factor: 1.0
-            flipper_front_factor: 1.0
-            speed: 1.5  # max of dynamixel motors
-            standard_controller: "flipper_trajectory_controller"
-            teleop_controller:
-                - "flipper_velocity_controller"
-            command_topic: "flipper_velocity_controller/commands"
-        manipulation_plugin:
-            max_eef_linear_speed: 0.15
-            max_eef_angular_speed: 0.25
-            eef_twist_frame: "gripper_grasp_main_link"
-            max_gripper_speed: 0.2
-            max_drive_linear_speed: 0.5
-            max_drive_angular_speed: 0.5
-            twist_controller_name: "moveit_twist_controller"
-        moveit_plugin:
-            start_controllers: ["arm_trajectory_controller", "gripper_trajectory_controller", "flipper_trajectory_controller"]
-            max_velocity_scaling_factor: 0.1
-            max_acceleration_scaling_factor: 0.1
-            action_topic: "fold_manager_action"
-        battery_monitor_plugin:
-            cell_voltage_fields:
-                - "cell_voltages_battery1_mv"
-                - "cell_voltages_battery2_mv"
-            low_cell_threshold: 3500.0
-            vibration_pattern:
-                on_durations_sec: [0.5, 0.5]
-                off_durations_sec: [0.25, 5.0]
-                intensity: 1.0
-                cycle: true
-            mute_duration_sec: 300.0
+  ros__parameters:
+    drive_plugin:
+      slow_factor: 0.5
+      fast_factor: 1.5
+      max_angular_speed: 0.5
+      max_linear_speed: 0.5
+    flipper_plugin:
+      flipper_back_factor: 1.0
+      flipper_front_factor: 1.0
+      speed: 1.5        # max of dynamixel motors
+      standard_controller: flipper_trajectory_controller
+      teleop_controller:
+      - flipper_velocity_controller
+      command_topic: flipper_velocity_controller/commands
+    manipulation_plugin:
+      max_eef_linear_speed: 0.15
+      max_eef_angular_speed: 0.25
+      eef_twist_frame: gripper_grasp_main_link
+      max_gripper_speed: 0.2
+      max_drive_linear_speed: 0.5
+      max_drive_angular_speed: 0.5
+      twist_controller_name: moveit_twist_controller
+    moveit_plugin:
+      start_controllers: [arm_trajectory_controller, gripper_trajectory_controller, flipper_trajectory_controller]
+      max_velocity_scaling_factor: 0.1
+      max_acceleration_scaling_factor: 0.1
+      action_topic: fold_manager_action
+    battery_monitor_plugin:
+      cell_voltage_fields:
+      - cell_voltages_battery1_mv
+      - cell_voltages_battery2_mv
+      low_cell_threshold: 3500.0
+      vibration_pattern:
+        on_durations_sec: [0.5, 0.5]
+        off_durations_sec: [0.25, 5.0]
+        intensity: 1.0
+        cycle: true
+      mute_duration_sec: 300.0

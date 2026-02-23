@@ -1,25 +1,25 @@
 launch:
 - arg:
     # Meta Config File that determines which buttons activate which config
-    name: "config_name"
-    default: "athena"
+    name: config_name
+    default: athena
 - arg:
-    name: "robot_namespace"
-    default: "athena"
+    name: robot_namespace
+    default: athena
 - arg:
-    name: "ocs_namespace"
-    default: "ocs"
+    name: ocs_namespace
+    default: ocs
 
 - node:
-    pkg: "hector_gamepad_manager"
-    exec: "hector_gamepad_manager_node"
-    name: "$(anon hector_gamepad_manager_node)"
-    output: "screen"
+    pkg: hector_gamepad_manager
+    exec: hector_gamepad_manager_node
+    name: $(anon hector_gamepad_manager_node)
+    output: screen
     param:
-      - name: "config_name"
-        value: "$(var config_name)"
-      - name: "robot_namespace"
-        value: "$(var robot_namespace)"
-      - name: "ocs_namespace"
-        value: "$(var ocs_namespace)"
-      - from: "$(find-pkg-share hector_gamepad_manager)/config/$(var config_name)_plugin_config.yaml"
+    - name: config_name
+      value: $(var config_name)
+    - name: robot_namespace
+      value: $(var robot_namespace)
+    - name: ocs_namespace
+      value: $(var ocs_namespace)
+    - from: $(find-pkg-share hector_gamepad_manager)/config/$(var config_name)_plugin_config.yaml
