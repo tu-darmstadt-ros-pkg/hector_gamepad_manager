@@ -12,6 +12,7 @@
     flipper_plugin:
       flipper_back_factor: 1.0
       flipper_front_factor: 1.0
+      button_speed_scaling: 1.0
       speed: 1.5      # max of dynamixel motors
       standard_controller: flipper_trajectory_controller
       teleop_controller:

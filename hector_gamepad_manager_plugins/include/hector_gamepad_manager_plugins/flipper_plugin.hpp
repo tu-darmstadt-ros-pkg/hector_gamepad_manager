@@ -33,10 +33,12 @@ private:
   hector::ParameterSubscription speed_sub_;
   hector::ParameterSubscription flipper_front_factor_param_sub_;
   hector::ParameterSubscription flipper_back_factor_param_sub_;
+  hector::ParameterSubscription button_speed_scaling_param_sub_;
 
   double speed_ = 0.0;
   double flipper_front_factor_ = 0.0;
   double flipper_back_factor_ = 0.0;
+  double button_speed_scaling_ = 0.75;
 
   bool individual_front_flipper_mode_ = false;
   bool individual_back_flipper_mode_ = false;
