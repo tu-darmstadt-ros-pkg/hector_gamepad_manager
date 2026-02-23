@@ -7,13 +7,6 @@ repositories:
     type: git
     url: https://github.com/tu-darmstadt-ros-pkg/hector_controller_spawner.git
     version: jazzy
-  hector_testing_utils:
-    type: git
-    url: https://github.com/tu-darmstadt-ros-pkg/hector_testing_utils.git
-    version: main
-  hector_testing_utils:
-    type: git
-    url: https://github.com/tu-darmstadt-ros-pkg/hector_testing_utils.git
     version: main
   rtest:
     type: git
