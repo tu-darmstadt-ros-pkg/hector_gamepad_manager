@@ -14,7 +14,6 @@
   <depend>backward_ros</depend>
   <depend>controller_manager_msgs</depend>
   <depend>controller_orchestrator</depend>
-  <depend>eigen3</depend>
   <depend>geometry_msgs</depend>
   <depend>hector_gamepad_plugin_interface</depend>
   <depend>hector_ros2_utils</depend>

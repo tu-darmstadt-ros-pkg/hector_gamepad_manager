@@ -78,7 +78,7 @@ buttons:
       name: "software_e_stop"
       initial: "false"
       topic: "gamepad_e_stop"
-    
+
 
   10: # Right joystick press
     plugin: "hector_gamepad_manager_plugins::VirtualCameraPlugin"

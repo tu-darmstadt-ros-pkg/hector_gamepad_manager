@@ -1,19 +1,18 @@
-#ifndef  HECTOR_GAMEPAD_MANAGER_PLUGINS_VIRTUAL_CAMERA_PLUGIN_HPP
+#ifndef HECTOR_GAMEPAD_MANAGER_PLUGINS_VIRTUAL_CAMERA_PLUGIN_HPP
 #define HECTOR_GAMEPAD_MANAGER_PLUGINS_VIRTUAL_CAMERA_PLUGIN_HPP
 
+#include <eigen3/Eigen/Dense>
+#include <geometry_msgs/msg/transform.hpp>
 #include <hector_gamepad_plugin_interface/gamepad_plugin_interface.hpp>
 #include <hector_ros2_utils/parameters/reconfigurable_parameter.hpp>
 #include <rclcpp/parameter_client.hpp>
 #include <std_msgs/msg/string.hpp>
-#include <eigen3/Eigen/Dense>
-#include <geometry_msgs/msg/transform.hpp>
 #include <tf2_eigen/tf2_eigen.hpp>
 
 namespace hector_gamepad_manager_plugins
 {
-  // TODO try to parse in config as structs?
-struct PanTiltBounds
-{
+// TODO try to parse in config as structs?
+struct PanTiltBounds {
   double min_pan;
   double max_pan;
   double min_tilt;
@@ -44,6 +43,7 @@ public:
   void loadCameras();
 
   void poseCallback( const std::vector<rclcpp::Parameter> &parameters, const uint &camera_idx );
+
 private:
   rclcpp::Node::SharedPtr node_;
 
@@ -70,8 +70,8 @@ private:
   double max_tilt_ = 1.5708;
   double min_tilt_ = -1.5708;
 
-  std::vector<double> back_transform_ = {0.0, 0.0, 0.0};
-  std::vector<double> front_transform_ = {0.0, 0.0, 0.0};
+  std::vector<double> back_transform_ = { 0.0, 0.0, 0.0 };
+  std::vector<double> front_transform_ = { 0.0, 0.0, 0.0 };
 
   double stick_hold_time_ = 1.0;
   double stick_hold_timer_ = 0.0;
