@@ -27,7 +27,8 @@ set(DEPENDENCIES
     sensor_msgs
     srdfdom
     std_msgs
-    std_srvs)
+    std_srvs
+    tf2_eigen)
 
 foreach(dependency IN LISTS DEPENDENCIES)
   find_package(${dependency} REQUIRED)

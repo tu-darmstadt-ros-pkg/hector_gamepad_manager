@@ -6,6 +6,8 @@
 #include <rclcpp/parameter_client.hpp>
 #include <std_msgs/msg/string.hpp>
 #include <eigen3/Eigen/Dense>
+#include <geometry_msgs/msg/transform.hpp>
+#include <tf2_eigen/tf2_eigen.hpp>
 
 namespace hector_gamepad_manager_plugins
 {
@@ -39,27 +41,16 @@ public:
 
   void deactivate() override;
 
-  void loadCamera( const uint &camera_idx );
+  void loadCameras();
 
   void poseCallback( const std::vector<rclcpp::Parameter> &parameters, const uint &camera_idx );
 private:
-  std::vector<std::string> node_names_ = {"camera_1"};
-  std::vector<std::string> camera_names_ = {"Camera 1"};
-  rclcpp::AsyncParametersClient::SharedPtr param_client_;
-
-  // TODO try to parse as struct directly from yaml?
-  std::vector<double> base_tilts_ = {0.0};
-  std::vector<double> base_pans_ = {0.0};
-  std::vector<double> base_rolls_ = {0.0};
-  std::vector<double> max_pans_ = {0.0};
-  std::vector<double> min_pans_ = {0.0};
-  std::vector<double> max_tilts_ = {0.0};
-  std::vector<double> min_tilts_ = {0.0};
-  std::vector<double> pan_speeds_ = {0.0};
-  std::vector<double> tilt_speeds_ = {0.0};
-
   rclcpp::Node::SharedPtr node_;
-  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr camera_change_publisher_;
+
+  std::string back_camera_topic_name_ = "virtual_camera/back";
+  std::string front_camera_topic_name_ = "virtual_camera/front";
+  rclcpp::Publisher<geometry_msgs::msg::Transform>::SharedPtr front_transform_publisher_;
+  rclcpp::Publisher<geometry_msgs::msg::Transform>::SharedPtr back_transform_publisher_;
 
   hector::ParameterSubscription pan_speed_param_sub_;
   hector::ParameterSubscription tilt_speed_param_sub_;
@@ -67,17 +58,10 @@ private:
   hector::ParameterSubscription min_pan_param_sub_;
   hector::ParameterSubscription max_tilt_param_sub_;
   hector::ParameterSubscription min_tilt_param_sub_;
-  hector::ParameterSubscription node_names_param_sub_;
-  hector::ParameterSubscription camera_names_param_sub_;
+  hector::ParameterSubscription back_camera_topic_name_sub_;
+  hector::ParameterSubscription front_camera_topic_name_sub_;
   hector::ParameterSubscription stick_hold_time_param_sub_;
-  hector::ParameterSubscription base_tilts_param_sub_;
-  hector::ParameterSubscription base_pans_param_sub_;
-  hector::ParameterSubscription base_rolls_param_sub_;
-
-  // TODO
-  //std::vector<PanTiltBounds> camera_bounds_;
-
-  std::vector<double> base_pose_ = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0}; // x, y, z, roll, pitch, yaw
+  hector::ParameterSubscription invert_y_axis_param_sub_;
 
   double pan_speed_ = 0.5;
   double tilt_speed_ = 0.5;
@@ -85,24 +69,19 @@ private:
   double min_pan_ = -3.14159;
   double max_tilt_ = 1.5708;
   double min_tilt_ = -1.5708;
-  
-  Eigen::Affine3d base_transform_ = Eigen::Affine3d::Identity();
-  Eigen::Affine3d current_orientation_ = Eigen::Affine3d::Identity();
 
-  double current_pan_ = 0.0;
-  double current_tilt_ = 0.0;
+  std::vector<double> back_transform_ = {0.0, 0.0, 0.0};
+  std::vector<double> front_transform_ = {0.0, 0.0, 0.0};
 
   double stick_hold_time_ = 1.0;
-
-  uint active_camera_ = 0;
-
+  double stick_hold_timer_ = 0.0;
   double delta_t_ = 0.05; // Assuming fixed rate of 20Hz for update loop
 
-  double stick_hold_timer_ = 0.0;
+  bool reverse_ = false;
+  bool invert_y_axis_ = true;
 
   bool active_ = false;
   bool pose_changed_ = false;
-  bool valid_subscription_ = false;
 };
 } // namespace hector_gamepad_manager_plugins
 

@@ -82,7 +82,7 @@ buttons:
 
   10: # Right joystick press
     plugin: "hector_gamepad_manager_plugins::VirtualCameraPlugin"
-    function: "swap_camera"
+    function: "reset_camera"
 
   # -------------------- All the axes can also be used as buttons if specified here --------------------
   11: # Left joystick left
