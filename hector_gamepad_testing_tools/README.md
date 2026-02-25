@@ -114,5 +114,3 @@ The package includes a full **test suite** (`test_fake_joy_publisher.py`) that d
 * Requires `hector_gamepad_manager` to be running with a valid config (YAML).
 * Waits for the manager to publish its active config before publishing inputs.
 * Default publish rate: 50 Hz.
-
-

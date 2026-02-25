@@ -174,10 +174,8 @@ public:
     if ( controller_orchestrator_ ) {
       controller_orchestrator_->smartSwitchControllerAsync(
           controller_names, callback ? callback : [this]( bool success, const std::string &message ) {
-            if ( success ) {
-              RCLCPP_DEBUG( node_->get_logger(), "Controller Activation successful!" );
-            } else {
-              RCLCPP_WARN( node_->get_logger(), "Controller Activation failed: %s", message.c_str() );
+            if ( !success ) {
+              RCLCPP_ERROR( node_->get_logger(), "Switch failed: %s", message.c_str() );
             }
           } );
     } else {

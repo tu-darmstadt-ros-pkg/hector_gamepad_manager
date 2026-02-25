@@ -33,8 +33,31 @@ void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node )
           []( const auto &value ) { return value >= 0.0; } ) );
 
   // setup action client
+  node_->declare_parameter<std::string>( plugin_name + ".action_topic", "move_action" );
+  const auto action_topic = node_->get_parameter( plugin_name + ".action_topic" ).as_string();
   action_client_ = rclcpp_action::create_client<moveit_msgs::action::MoveGroup>(
-      node_, node_->get_effective_namespace() + "/move_action" );
+      node_, node_->get_effective_namespace() + "/" + action_topic );
+
+  // setup vibration feedback patterns
+  const std::string success_pattern_ns = plugin_name + ".vibration_success";
+  const std::string failure_pattern_ns = plugin_name + ".vibration_failure";
+  success_vibration_id_ = success_pattern_ns;
+  failure_vibration_id_ = failure_pattern_ns;
+  if ( feedback_manager_ ) {
+    hector_gamepad_plugin_interface::VibrationPatternDefaults success_defaults;
+    success_defaults.on_durations_sec = { 0.3 };
+    success_defaults.off_durations_sec = { 0.0 };
+    success_defaults.intensity = 0.8;
+    success_defaults.cycle = false;
+    feedback_manager_->createVibrationPattern( success_vibration_id_, success_defaults );
+
+    hector_gamepad_plugin_interface::VibrationPatternDefaults failure_defaults;
+    failure_defaults.on_durations_sec = { 0.3, 0.3 };
+    failure_defaults.off_durations_sec = { 0.2, 0.0 };
+    failure_defaults.intensity = 0.8;
+    failure_defaults.cycle = false;
+    feedback_manager_->createVibrationPattern( failure_vibration_id_, failure_defaults );
+  }
 
   // setup robot description subscribers
   auto qos = rclcpp::QoS( 1 );
@@ -139,6 +162,10 @@ void MoveitPlugin::sendNamedPoseGoal( const std::string &move_group, const std::
   }
   if ( !action_client_->wait_for_action_server( std::chrono::seconds( 5 ) ) ) {
     RCLCPP_ERROR( node_->get_logger(), "[MoveitPlugin] Action server not available after waiting" );
+    if ( feedback_manager_ ) {
+      feedback_manager_->setPatternActive( failure_vibration_id_, true );
+    }
+    state_ = State::IDLE;
     return;
   }
 
@@ -193,6 +220,13 @@ void MoveitPlugin::cancelGoal() const
 void MoveitPlugin::resultCallback(
     const rclcpp_action::ClientGoalHandle<moveit_msgs::action::MoveGroup>::WrappedResult &result )
 {
+  if ( feedback_manager_ ) {
+    if ( result.code == rclcpp_action::ResultCode::SUCCEEDED ) {
+      feedback_manager_->setPatternActive( success_vibration_id_, true );
+    } else {
+      feedback_manager_->setPatternActive( failure_vibration_id_, true );
+    }
+  }
   if ( result.code != rclcpp_action::ResultCode::SUCCEEDED ) {
     RCLCPP_ERROR( node_->get_logger(), "[MoveitPlugin] Moveit action failed with result code %d",
                   static_cast<int>( result.code ) );
@@ -213,6 +247,9 @@ void MoveitPlugin::goalResponseCallback(
 {
   if ( !goal_handle ) {
     RCLCPP_ERROR( node_->get_logger(), "[MoveitPlugin] Goal was rejected by server" );
+    if ( feedback_manager_ ) {
+      feedback_manager_->setPatternActive( failure_vibration_id_, true );
+    }
     state_ = State::IDLE;
   } else {
     RCLCPP_INFO( node_->get_logger(), "Goal accepted by server, waiting for result" );
