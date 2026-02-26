@@ -16,10 +16,9 @@ void VirtualCameraPlugin::initialize( const rclcpp::Node::SharedPtr &node )
       hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value > 0.0; } ) );
 
-  tilt_speed_param_sub_ =
-      hector::createReconfigurableParameter( node, plugin_namespace + ".tilt_speed",
-                                             std::ref( tilt_speed_ ), "Maximum tilt speed in rad/s.",
-                                             hector::ParameterOptions<double>().setRange( 0.01, 6.28, 0.01 ) );
+  tilt_speed_param_sub_ = hector::createReconfigurableParameter(
+      node, plugin_namespace + ".tilt_speed", std::ref( tilt_speed_ ), "Maximum tilt speed in rad/s.",
+      hector::ParameterOptions<double>().setRange( 0.01, 6.28, 0.01 ) );
 
   max_pan_param_sub_ = hector::createReconfigurableParameter(
       node, plugin_namespace + ".max_pan", std::ref( max_pan_ ), "Maximum pan angle in rad.",
@@ -53,7 +52,8 @@ void VirtualCameraPlugin::initialize( const rclcpp::Node::SharedPtr &node )
 
   invert_y_axis_param_sub_ = hector::createReconfigurableParameter(
       node, plugin_namespace + ".invert_y_axis", std::ref( invert_y_axis_ ),
-      "Whether to invert the Y axis of the camera control. Default Y direction is downwards.", hector::ParameterOptions<bool>() );
+      "Whether to invert the Y axis of the camera control. Default Y direction is downwards.",
+      hector::ParameterOptions<bool>() );
 
   loadCameras();
   RCLCPP_INFO(

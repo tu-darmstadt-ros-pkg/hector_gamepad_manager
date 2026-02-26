@@ -241,4 +241,4 @@ The plugin supports a front and back camera which are toggled with the `inverted
 - `max_tilt` (double): Maximum tilt angle in rad. Default: 1.57
 - `min_tilt` (double): Minimum tilt angle in rad. Default: -1.57
 - `stick_hold_time` (double): Time in seconds to hold the stick to trigger recentering. Default: 1.0
-- `invert_y_axis` (bool): Whether to invert the Y axis of the camera control. Default Y direction is downwards. Default: true 
+- `invert_y_axis` (bool): Whether to invert the Y axis of the camera control. Default Y direction is downwards. Default: true
