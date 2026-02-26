@@ -19,32 +19,31 @@ void VirtualCameraPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   tilt_speed_param_sub_ =
       hector::createReconfigurableParameter( node, plugin_namespace + ".tilt_speed",
                                              std::ref( tilt_speed_ ), "Maximum tilt speed in rad/s.",
-                                             hector::ParameterOptions<double>().onValidate(
-                                                 []( const auto &value ) { return value > 0.0; } ) );
+                                             hector::ParameterOptions<double>().setRange( 0.01, 6.28, 0.01 ) );
 
   max_pan_param_sub_ = hector::createReconfigurableParameter(
       node, plugin_namespace + ".max_pan", std::ref( max_pan_ ), "Maximum pan angle in rad.",
-      hector::ParameterOptions<double>() );
+      hector::ParameterOptions<double>().setRange( -6.28, 6.28, 0.01 ) );
 
   min_pan_param_sub_ = hector::createReconfigurableParameter(
       node, plugin_namespace + ".min_pan", std::ref( min_pan_ ), "Minimum pan angle in rad.",
-      hector::ParameterOptions<double>() );
+      hector::ParameterOptions<double>().setRange( -6.28, 6.28, 0.01 ) );
 
   max_tilt_param_sub_ = hector::createReconfigurableParameter(
       node, plugin_namespace + ".max_tilt", std::ref( max_tilt_ ), "Maximum tilt angle in rad.",
-      hector::ParameterOptions<double>() );
+      hector::ParameterOptions<double>().setRange( -6.28, 6.28, 0.01 ) );
 
   min_tilt_param_sub_ = hector::createReconfigurableParameter(
       node, plugin_namespace + ".min_tilt", std::ref( min_tilt_ ), "Minimum tilt angle in rad.",
-      hector::ParameterOptions<double>() );
+      hector::ParameterOptions<double>().setRange( -6.28, 6.28, 0.01 ) );
 
   back_camera_topic_name_sub_ = hector::createReconfigurableParameter(
       node, plugin_namespace + ".back_camera_topic_name", std::ref( back_camera_topic_name_ ),
-      "ROS topic name of the back camera." );
+      "ROS topic name for the back camera transform." );
 
   front_camera_topic_name_sub_ = hector::createReconfigurableParameter(
       node, plugin_namespace + ".front_camera_topic_name", std::ref( front_camera_topic_name_ ),
-      "ROS topic name of the front camera." );
+      "ROS topic name for the front camera transform." );
 
   stick_hold_time_param_sub_ = hector::createReconfigurableParameter(
       node, plugin_namespace + ".stick_hold_time", std::ref( stick_hold_time_ ),
@@ -54,7 +53,7 @@ void VirtualCameraPlugin::initialize( const rclcpp::Node::SharedPtr &node )
 
   invert_y_axis_param_sub_ = hector::createReconfigurableParameter(
       node, plugin_namespace + ".invert_y_axis", std::ref( invert_y_axis_ ),
-      "Whether to invert the Y axis of the camera control." );
+      "Whether to invert the Y axis of the camera control. Default Y direction is downwards.", hector::ParameterOptions<bool>() );
 
   loadCameras();
   RCLCPP_INFO(

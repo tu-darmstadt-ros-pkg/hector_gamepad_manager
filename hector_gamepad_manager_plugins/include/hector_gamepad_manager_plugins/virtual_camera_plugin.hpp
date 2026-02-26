@@ -65,10 +65,10 @@ private:
 
   double pan_speed_ = 0.5;
   double tilt_speed_ = 0.5;
-  double max_pan_ = 3.14159;
-  double min_pan_ = -3.14159;
-  double max_tilt_ = 1.5708;
-  double min_tilt_ = -1.5708;
+  double max_pan_ = 3.14;
+  double min_pan_ = -3.14;
+  double max_tilt_ = 1.57;
+  double min_tilt_ = -1.57;
 
   std::vector<double> back_transform_ = { 0.0, 0.0, 0.0 };
   std::vector<double> front_transform_ = { 0.0, 0.0, 0.0 };
