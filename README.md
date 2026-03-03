@@ -214,3 +214,31 @@ falls below a configured threshold. The vibration can be muted temporarily via a
 - `mute_duration_sec` (double): How long the mute lasts after pressing `mute`. Default: `300.0` seconds (5 minutes).
 - `ignore_zero_voltage` (bool): If `true`, zero voltage readings are ignored (useful for unpopulated cells). Default: `true`.
 - `ignore_nan_voltage` (bool): If `true`, NaN voltage readings are ignored. Default: `true`.
+
+## Virtual Camera Plugin
+
+Allows to pan and tilt a virtual camera which uses a geometry_msgs/msg/Transform similar as done in [image_projection](https://github.com/tu-darmstadt-ros-pkg/image_projection). Axis can pan and tilt, while a button hold can recenter the camera.
+The plugin supports a front and back camera which are toggled with the `inverted_steering` mode.
+
+### Functions
+
+### Axis
+
+- `move_left_right`: Pan the virtual camera.
+- `move_up_down`: Tilt the virtual camera.
+
+### Buttons
+- `hold`: Recenter current camera
+
+### Parameters
+
+- `back_camera_topic_name` (string): ROS topic name for the back camera transform. Default: `virtual_camera/back`
+- `front_camera_topic_name`(string): ROS topic name for the front camera transform. Default: `virtual_camera/front`
+- `pan_speed` (double): Maximum pan speed in rad/s. Default: 0.5
+- `tilt_speed` (double): Maximum tilt speed in rad/s. Default: 0.5
+- `max_pan` (double): Maximum pan angle in rad. Default: 3.14
+- `min_pan` (double): Minimum pan angle in rad. Default: -3.14
+- `max_tilt` (double): Maximum tilt angle in rad. Default: 1.57
+- `min_tilt` (double): Minimum tilt angle in rad. Default: -1.57
+- `stick_hold_time` (double): Time in seconds to hold the stick to trigger recentering. Default: 1.0
+- `invert_y_axis` (bool): Whether to invert the Y axis of the camera control. Default Y direction is downwards. Default: true
