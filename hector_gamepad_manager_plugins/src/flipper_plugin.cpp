@@ -23,6 +23,11 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
       "Flipper Back Factor", hector::ParameterOptions<double>().onValidate( []( const auto &value ) {
         return value > 0.0;
       } ) );
+  button_speed_scaling_param_sub_ = hector::createReconfigurableParameter(
+      node, plugin_namespace + ".button_speed_scaling", std::ref( button_speed_scaling_ ),
+      "Button Speed Scaling", hector::ParameterOptions<double>().onValidate( []( const auto &value ) {
+        return value >= 0.0 && value <= 1.0;
+      } ) );
 
   // Setup static parameters
   node_->declare_parameters<std::string>(
@@ -62,9 +67,9 @@ void FlipperPlugin::handlePress( const std::string &function, const std::string 
   }
 
   if ( individual_front_flipper_mode_ || individual_back_flipper_mode_ )
-    handleIndividualFlipperControlInput( 1, true, function );
+    handleIndividualFlipperControlInput( button_speed_scaling_, true, function );
   else
-    handleBasicControlInput( 1, true, function );
+    handleBasicControlInput( button_speed_scaling_, true, function );
 }
 
 void FlipperPlugin::handleRelease( const std::string &function, const std::string &id )

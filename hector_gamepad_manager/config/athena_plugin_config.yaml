@@ -8,7 +8,8 @@
     flipper_plugin:
       flipper_back_factor: 1.0
       flipper_front_factor: 1.0
-      speed: 0.75        # max of slowest dynamixel motors
+      button_speed_scaling: 0.75
+      speed: 0.75        # max of slowest flipper (FR)
       standard_controller: flipper_trajectory_controller
       teleop_controller:
       - flipper_velocity_controller
