@@ -23,7 +23,11 @@ buttons:
   2:
     plugin: hector_gamepad_manager_plugins::TestProbePlugin
     function: probe
-  3: {plugin: '', function: ''}
+  # Button Y: new-format entry with on_double_press but no on_press — must be skipped because
+  # the timeout-flush path would otherwise dispatch handlePress("") on a single tap.
+  3:
+    plugin: hector_gamepad_manager_plugins::TestProbePlugin
+    on_double_press: {function: probe_double}
   4: {plugin: '', function: ''}
   5: {plugin: '', function: ''}
   6: {plugin: '', function: ''}

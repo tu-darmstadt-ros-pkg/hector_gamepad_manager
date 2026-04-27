@@ -168,18 +168,17 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
       if ( mapping["on_release"] && mapping["on_release"]["function"] )
         on_release = mapping["on_release"]["function"].as<std::string>();
 
-      if ( on_press.empty() && on_double_press.empty() ) {
+      // on_press is required: it is the dispatch target for the timeout-flush path
+      // (and the fallback for on_hold/on_release). Without it, a single press of a
+      // double-press-configured button would dispatch handlePress/handleRelease with
+      // an empty function name.
+      if ( on_press.empty() ) {
         RCLCPP_WARN( ocs_ns_node_->get_logger(),
-                     "Button %d in config '%s' has new-format mapping but no on_press or "
-                     "on_double_press function. Skipping.",
+                     "Button %d in config '%s' has new-format mapping but no on_press "
+                     "function. on_press is required (it is the fallback for on_hold/"
+                     "on_release and the dispatch target on a single press). Skipping.",
                      id, config_name.c_str() );
         continue;
-      }
-      if ( on_press.empty() && ( !on_hold.empty() || !on_release.empty() ) ) {
-        RCLCPP_WARN( ocs_ns_node_->get_logger(),
-                     "Button %d in config '%s' specifies on_hold/on_release but no on_press "
-                     "to fall back to; those events will not fire on a single press.",
-                     id, config_name.c_str() );
       }
 
       // Args are stored under one shared blackboard prefix per button, matching the legacy

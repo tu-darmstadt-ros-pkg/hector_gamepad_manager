@@ -83,7 +83,7 @@ buttons:
 ```
 
 Available event types:
-- **`on_press`**: Triggered on button press (single press). This is equivalent to the basic `function` field.
+- **`on_press`** *(required)*: Triggered on button press (single press). This is equivalent to the basic `function` field. It is also the fallback target for `on_hold`/`on_release` and the dispatch target on a single tap when `on_double_press` is configured, so a new-format mapping without `on_press` is rejected at load time.
 - **`on_double_press`**: Triggered when the button is pressed twice within a short time window. The window length is configurable via the `double_press_window_sec` ROS parameter (default 0.25s). When configured, `on_press` is delayed until the window expires to avoid false triggers.
 - **`on_hold`**: Triggered repeatedly while the button is held down. Defaults to the `on_press` function if omitted.
 - **`on_release`**: Triggered when the button is released. Defaults to the `on_press` function if omitted.

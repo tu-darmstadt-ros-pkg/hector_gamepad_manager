@@ -102,10 +102,17 @@ TEST_F( HectorGamepadManagerMalformedConfigTest, MalformedMappingsAreSkipped )
   setButton( 0, 0 );
   sendJoy();
 
-  // Button 1: new format with no on_press — must be skipped.
+  // Button 1: new format with on_hold/on_release but no on_press — must be skipped.
   setButton( 1, 1 );
   sendJoy();
   setButton( 1, 0 );
+  sendJoy();
+
+  // Button 3: new format with on_double_press but no on_press — must be skipped. Without
+  // the strict check, the timeout-flush path would dispatch handlePress("") on this single tap.
+  setButton( 3, 1 );
+  sendJoy();
+  setButton( 3, 0 );
   sendJoy();
 }
 
