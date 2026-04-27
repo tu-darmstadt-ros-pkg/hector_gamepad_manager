@@ -21,13 +21,33 @@ public:
   explicit HectorGamepadManager( const rclcpp::Node::SharedPtr &node );
 
 private:
-  // Struct to store the mapping of a button or axis to a function of a plugin
+  // Struct to store the mapping of an axis to a function of a plugin
   struct FunctionMapping {
     // Name of the plugin
     std::shared_ptr<GamepadFunctionPlugin> plugin;
 
     // Name of the function
     std::string function_name;
+  };
+
+  // Struct to store the mapping of a button to plugin functions per event type
+  struct ButtonFunctionMapping {
+    std::shared_ptr<GamepadFunctionPlugin> plugin;
+
+    std::string on_press;        // function called on initial press
+    std::string on_double_press; // function called on double press (empty = disabled)
+    std::string on_hold;         // function called while held (empty = uses on_press)
+    std::string on_release;      // function called on release (empty = uses on_press)
+
+    bool hasDoublePress() const { return !on_double_press.empty(); }
+  };
+
+  // Per-button state for double-press detection
+  struct ButtonTracker {
+    bool pressed = false;          // current physical state
+    bool press_dispatched = false; // was on_press already sent?
+    bool awaiting_double_press = false;
+    rclcpp::Time last_press_time{ 0, 0, RCL_ROS_TIME };
   };
 
   // Struct to store the inputs from the gamepad
@@ -39,7 +59,7 @@ private:
   };
 
   struct GamepadConfig {
-    std::unordered_map<int, FunctionMapping> button_mappings;
+    std::unordered_map<int, ButtonFunctionMapping> button_mappings;
     std::unordered_map<int, FunctionMapping> axis_mappings;
   };
 
@@ -89,6 +109,13 @@ private:
   // Controller Orchestrator for activating controllers
   std::shared_ptr<controller_orchestrator::ControllerOrchestrator> controller_orchestrator_;
 
+  // Per-button trackers for double-press detection
+  std::unordered_map<int, ButtonTracker> button_trackers_;
+
+  // Time window for double-press detection (seconds), set from the
+  // `double_press_window_sec` ROS parameter (default 0.25).
+  double double_press_window_sec_;
+
   // Deadzone to consider an axis as pressed
   static constexpr float AXIS_DEADZONE = 0.5;
 
@@ -130,9 +157,15 @@ private:
    * @param mappings The mappings to be initialized.
    * @return True if the mappings were initialized successfully, false otherwise.
    */
+  bool initButtonMappings( const YAML::Node &config, const std::string &config_name,
+                           std::unordered_map<int, ButtonFunctionMapping> &mappings );
+
   bool initMappings( const YAML::Node &config, const std::string &type,
                      const std::string &config_name,
                      std::unordered_map<int, FunctionMapping> &mappings );
+
+  // Load the named plugin into plugins_ if not already present. Returns false on failure.
+  bool ensurePluginLoaded( const std::string &plugin_name );
 
   /**
    * @brief Activates all plugins present in the given config

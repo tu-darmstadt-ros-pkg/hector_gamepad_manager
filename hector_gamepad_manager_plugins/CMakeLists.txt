@@ -17,6 +17,7 @@ set(DEPENDENCIES
     controller_orchestrator
     geometry_msgs
     hector_gamepad_plugin_interface
+    hector_ros_controllers_msgs
     hector_ros2_utils
     moveit_msgs
     pluginlib

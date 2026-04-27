@@ -3,8 +3,12 @@
 
 #include <hector_gamepad_plugin_interface/gamepad_plugin_interface.hpp>
 
+#include "rclcpp_action/rclcpp_action.hpp"
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include <hector_ros2_utils/parameters/reconfigurable_parameter.hpp>
+
+#include <hector_ros_controllers_msgs/action/drive_flipper_group.hpp>
+#include <hector_ros_controllers_msgs/action/sync_flipper_group.hpp>
 
 namespace hector_gamepad_manager_plugins
 {
@@ -61,11 +65,21 @@ private:
   void handleIndividualFlipperControlInput( const double base_speed_factor, const bool is_button,
                                             const std::string &function );
 
+  void handleFlipperUpright( const std::string &function );
+  void handleFlipperSync( const std::string &function );
+
   void resetCommands();
 
   void publishCommands() const;
 
   bool checkCurrentCmdIsZero() const;
+
+  // Action clients for flipper group actions
+  using DriveFlipperGroupAction = hector_ros_controllers_msgs::action::DriveFlipperGroup;
+  using SyncFlipperGroupAction = hector_ros_controllers_msgs::action::SyncFlipperGroup;
+
+  rclcpp_action::Client<DriveFlipperGroupAction>::SharedPtr drive_flipper_client_;
+  rclcpp_action::Client<SyncFlipperGroupAction>::SharedPtr sync_flipper_client_;
 };
 } // namespace hector_gamepad_manager_plugins
 

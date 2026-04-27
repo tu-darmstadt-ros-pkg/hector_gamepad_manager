@@ -36,7 +36,7 @@ Each configuration file maps **buttons/axes** to **plugin functions**.
 Functions can now include **parameters** via the `args` field. These parameters are stored in the shared **blackboard**
 and are uniquely namespaced, so you can reuse the same function in different or even within the same config.
 
-#### Example: Driving Configuration
+#### Example: Driving Configuration (basic format)
 
 ```yaml
 axes:
@@ -60,6 +60,38 @@ buttons:
       group: "arm_group"
       pose: "folded"
 ```
+
+#### Per-Event Button Mapping
+
+Buttons support an extended format that maps different functions to different input events.
+This enables features like **double-press detection** without requiring plugin-side changes.
+
+```yaml
+buttons:
+  4: # Button LB
+    plugin: "hector_gamepad_manager_plugins::FlipperPlugin"
+    on_press:
+      function: "flipper_back_up"
+    on_double_press:
+      function: "flipper_back_upright"
+    on_hold:                          # optional, defaults to on_press function
+      function: "flipper_back_up"
+    on_release:                       # optional, defaults to on_press function
+      function: "flipper_back_up"
+    args:                             # shared by all events on this button
+      some_param: 1.0
+```
+
+Available event types:
+- **`on_press`**: Triggered on button press (single press). This is equivalent to the basic `function` field.
+- **`on_double_press`**: Triggered when the button is pressed twice within a short time window. The window length is configurable via the `double_press_window_sec` ROS parameter (default 0.25s). When configured, `on_press` is delayed until the window expires to avoid false triggers.
+- **`on_hold`**: Triggered repeatedly while the button is held down. Defaults to the `on_press` function if omitted.
+- **`on_release`**: Triggered when the button is released. Defaults to the `on_press` function if omitted.
+
+Args are placed at the top level of the button entry (not under individual events) and are shared by all events on that button. As a convenience, an `args` block under `on_press` is also accepted and treated identically. Per-event `args` under `on_double_press`, `on_hold`, or `on_release` are not currently distinguishable on the plugin read side and will be ignored with a warning.
+
+> **Note:** Buttons without `on_double_press` are dispatched immediately with zero added latency.
+> The basic format (`plugin` + `function`) is still fully supported and behaves identically to before.
 
 ---
 
@@ -105,14 +137,36 @@ This plugin is used to drive the robot using a gamepad.
 
 ## FlipperPlugin
 
-This plugin is used to steer the robot flippers using a gamepad.
+This plugin is used to steer the robot flippers using a gamepad. It sends velocity commands for manual control and uses action clients to trigger drive-to-upright and sync operations on the `vel_to_pos_controller`.
 
 ### Functions
 
-- `front_flippers_up`: Rotate front flippers upwards (counterclockwise). Default button: (RB)
-- `front_flippers_down`: Rotate front flippers downwards (clockwise). Default button: (LT)
-- `back_flippers_up`: Rotate back flippers upwards (clockwise). Default button: (LB)
-- `back_flippers_down`: Rotate back flippers downwards (counterclockwise). Default button: (LT)
+#### Velocity Control
+- `flipper_front_up`: Rotate front flippers upwards (counterclockwise). Default button: (RB)
+- `flipper_front_down`: Rotate front flippers downwards (clockwise). Default button: (RT)
+- `flipper_back_up`: Rotate back flippers upwards (clockwise). Default button: (LB)
+- `flipper_back_down`: Rotate back flippers downwards (counterclockwise). Default button: (LT)
+
+#### Drive to Upright (via `DriveFlipperGroup` action)
+- `flipper_front_upright`: Drive front flippers to upright position. Default trigger: double-press (RB)
+- `flipper_back_upright`: Drive back flippers to upright position. Default trigger: double-press (LB)
+
+#### Sync Flippers (via `SyncFlipperGroup` action)
+- `sync_front_flippers`: Sync front flipper pair to their average position. Default trigger: double-press (B)
+- `sync_back_flippers`: Sync back flipper pair to their average position. Default trigger: double-press (X)
+- `sync_all_flippers`: Sync all flipper groups simultaneously. (Not mapped by default)
+
+Running drive-to-upright and sync actions are **automatically pre-empted on the controller side** as soon as a manual velocity command arrives for the affected flipper group (e.g., pressing LB/RB or moving LT/RT). The plugin itself does not cancel goals; the `vel_to_pos_controller` aborts the active action when it sees an incoming velocity command.
+
+#### Mode Toggles
+- `individual_front_flipper_control_mode`: Toggle individual front flipper steering. Default button: (B)
+- `individual_back_flipper_control_mode`: Toggle individual back flipper steering. Default button: (X)
+
+### Parameters
+
+- `command_topic` (string): Topic to publish velocity commands. Default: `flipper_velocity_controller/commands`
+- `drive_flipper_action` (string): Action server for drive-to-target. Default: `/<robot_ns>/vel_to_pos_controller/drive_flipper_group`
+- `sync_flipper_action` (string): Action server for sync. Default: `/<robot_ns>/vel_to_pos_controller/sync_flipper_group`
 
 ## Manipulation Plugin
 
