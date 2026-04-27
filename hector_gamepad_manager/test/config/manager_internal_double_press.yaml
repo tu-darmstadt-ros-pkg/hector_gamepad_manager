@@ -22,7 +22,12 @@ buttons:
     on_double_press: {function: probe_double}
     on_hold: {function: probe_hold}
     on_release: {function: probe_release}
-  2: {plugin: '', function: ''}
+  # Button X: also double-press capable, with distinct function names so we can verify per-button
+  # tracker state is independent (interleaved presses on different buttons).
+  2:
+    plugin: hector_gamepad_manager_plugins::TestProbePlugin
+    on_press: {function: probe2}
+    on_double_press: {function: probe2_double}
   3: {plugin: '', function: ''}
   4: {plugin: '', function: ''}
   5: {plugin: '', function: ''}

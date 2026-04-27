@@ -288,12 +288,11 @@ void FlipperPlugin::handleFlipperUpright( const std::string &function )
   send_goal_options.result_callback =
       [this, group = goal.group_name](
           const rclcpp_action::ClientGoalHandle<DriveFlipperGroupAction>::WrappedResult &result ) {
+        const char *msg = result.result ? result.result->message.c_str() : "(no result payload)";
         if ( result.code == rclcpp_action::ResultCode::SUCCEEDED ) {
-          RCLCPP_INFO( node_->get_logger(), "Drive %s upright: %s", group.c_str(),
-                       result.result->message.c_str() );
+          RCLCPP_INFO( node_->get_logger(), "Drive %s upright: %s", group.c_str(), msg );
         } else {
-          RCLCPP_WARN( node_->get_logger(), "Drive %s upright failed: %s", group.c_str(),
-                       result.result->message.c_str() );
+          RCLCPP_WARN( node_->get_logger(), "Drive %s upright failed: %s", group.c_str(), msg );
         }
       };
 
@@ -330,11 +329,11 @@ void FlipperPlugin::handleFlipperSync( const std::string &function )
   auto send_goal_options = rclcpp_action::Client<SyncFlipperGroupAction>::SendGoalOptions();
   send_goal_options.result_callback =
       [this]( const rclcpp_action::ClientGoalHandle<SyncFlipperGroupAction>::WrappedResult &result ) {
+        const char *msg = result.result ? result.result->message.c_str() : "(no result payload)";
         if ( result.code == rclcpp_action::ResultCode::SUCCEEDED ) {
-          RCLCPP_INFO( node_->get_logger(), "Flipper sync: %s", result.result->message.c_str() );
+          RCLCPP_INFO( node_->get_logger(), "Flipper sync: %s", msg );
         } else {
-          RCLCPP_WARN( node_->get_logger(), "Flipper sync failed: %s",
-                       result.result->message.c_str() );
+          RCLCPP_WARN( node_->get_logger(), "Flipper sync failed: %s", msg );
         }
       };
 

@@ -132,8 +132,10 @@ This plugin is used to drive the robot using a gamepad.
 
 - `drive`: Forward and backward movement of the robot. Default button: (Left joystick up/down)
 - `steer`: Left and right steering of the robot. Default button: (Left joystick left/right)
-- `fast`: Fast driving mode. Default button: (A)
-- `slow`: Slow driving mode. Default button: (X)
+- `fast`: Fast driving mode. Default button: (Y)
+- `slow`: Slow driving mode. Default button: (A)
+
+> **Default-mapping change:** `fast` and `slow` were swapped from (A/X) to (Y/A) when the per-event button format landed, freeing up B and X for the FlipperPlugin's individual-control modes and double-press sync actions.
 
 ## FlipperPlugin
 
@@ -159,8 +161,10 @@ This plugin is used to steer the robot flippers using a gamepad. It sends veloci
 Running drive-to-upright and sync actions are **automatically pre-empted on the controller side** as soon as a manual velocity command arrives for the affected flipper group (e.g., pressing LB/RB or moving LT/RT). The plugin itself does not cancel goals; the `vel_to_pos_controller` aborts the active action when it sees an incoming velocity command.
 
 #### Mode Toggles
-- `individual_front_flipper_control_mode`: Toggle individual front flipper steering. Default button: (B)
-- `individual_back_flipper_control_mode`: Toggle individual back flipper steering. Default button: (X)
+- `individual_front_flipper_control_mode`: Toggle individual front flipper steering. Default button: (B, single-press)
+- `individual_back_flipper_control_mode`: Toggle individual back flipper steering. Default button: (X, single-press)
+
+> **Note on B/X and LB/RB:** these buttons each serve two functions via the per-event format. A single press toggles individual front/back control mode (B/X) or starts a velocity command (LB/RB); a double press triggers the corresponding sync or drive-to-upright action. Because `on_double_press` is configured on these buttons, single presses incur a small dispatch delay equal to `double_press_window_sec` (default 0.25s).
 
 ### Parameters
 

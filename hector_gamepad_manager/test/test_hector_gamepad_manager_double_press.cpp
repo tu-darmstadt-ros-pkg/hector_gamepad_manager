@@ -238,3 +238,143 @@ TEST_F( HectorGamepadManagerDoublePressTest, CustomHoldAndReleaseFunctionNamesAr
   setButton( 1, 0 );
   sendJoy();
 }
+
+// Test G — Two buttons that both have on_double_press are pressed in interleaved fashion.
+// Button 0 and button 2 each have independent trackers; a press on one must not flush or
+// double-trigger the other.
+TEST_F( HectorGamepadManagerDoublePressTest, InterleavedDoublePressButtonsTrackIndependently )
+{
+  // Press button 0 (probe), then press button 2 (probe2) inside button 0's window. Neither
+  // should fire on_press yet (still inside their respective windows), and neither should ever
+  // fire on_double_press because each button has only seen a single press.
+  EXPECT_CALL( *pub_probe_press_, publish( _ ) ).Times( 0 );
+  EXPECT_CALL( *pub_probe_release_, publish( _ ) ).Times( 0 );
+
+  setButton( 0, 1 );
+  sendJoy();
+  setButton( 0, 0 );
+  sendJoy();
+
+  advanceMs( 100 ); // still inside button 0's window
+
+  setButton( 2, 1 );
+  sendJoy();
+  setButton( 2, 0 );
+  sendJoy();
+  ::testing::Mock::VerifyAndClearExpectations( pub_probe_press_.get() );
+  ::testing::Mock::VerifyAndClearExpectations( pub_probe_release_.get() );
+
+  // Advance past button 0's window (total 300ms since button 0's first press) but still inside
+  // button 2's window. Button 0 should flush as a single press+release; button 2 should not.
+  EXPECT_CALL( *pub_probe_press_,
+               publish( Field( &std_msgs::msg::String::data, HasSubstr( "press:probe:" ) ) ) )
+      .Times( 1 );
+  EXPECT_CALL( *pub_probe_release_,
+               publish( Field( &std_msgs::msg::String::data, HasSubstr( "release:probe:" ) ) ) )
+      .Times( 1 );
+  EXPECT_CALL( *pub_probe_press_,
+               publish( Field( &std_msgs::msg::String::data, HasSubstr( "probe2" ) ) ) )
+      .Times( 0 );
+  advanceMs( 200 );
+  sendJoy();
+  ::testing::Mock::VerifyAndClearExpectations( pub_probe_press_.get() );
+  ::testing::Mock::VerifyAndClearExpectations( pub_probe_release_.get() );
+
+  // Now finish button 2 with a second press inside its window — must dispatch probe2_double, and
+  // must NOT re-dispatch any probe events on button 0.
+  EXPECT_CALL( *pub_probe_press_, publish( Field( &std_msgs::msg::String::data,
+                                                  HasSubstr( "press:probe2_double:" ) ) ) )
+      .Times( 1 );
+  EXPECT_CALL( *pub_probe_press_,
+               publish( Field( &std_msgs::msg::String::data, HasSubstr( "press:probe:" ) ) ) )
+      .Times( 0 );
+  setButton( 2, 1 );
+  sendJoy();
+}
+
+// Test H — Edge case: double_press_window_sec = 0 should disable buffering entirely. Buttons
+// configured with on_double_press still load, but on_press fires on the same frame as the
+// physical press (no waiting), and a second quick press just fires on_press again. on_double_press
+// is effectively unreachable when the window is 0 — but we must not deadlock or stuck-press.
+class HectorGamepadManagerZeroWindowTest : public ::testing::Test
+{
+protected:
+  rclcpp::NodeOptions opts_;
+  std::shared_ptr<rclcpp::Node> node_;
+  std::shared_ptr<hector_gamepad_manager::HectorGamepadManager> manager_;
+  std::unique_ptr<rtest::TestClock> clock_;
+
+  std::shared_ptr<rclcpp::Subscription<sensor_msgs::msg::Joy>> sub_joy_;
+  std::shared_ptr<rtest::PublisherMock<std_msgs::msg::String>> pub_config_;
+  std::shared_ptr<rtest::PublisherMock<std_msgs::msg::String>> pub_probe_press_;
+  std::shared_ptr<rtest::PublisherMock<std_msgs::msg::String>> pub_probe_release_;
+  std::shared_ptr<rtest::PublisherMock<std_msgs::msg::String>> pub_probe_hold_;
+
+  sensor_msgs::msg::Joy joy_msg_;
+
+  static std::string paramsFilePath()
+  {
+    auto path = std::filesystem::path( __FILE__ ).parent_path() / "config" /
+                "manager_internal_zero_window_params.yaml";
+    return path.string();
+  }
+
+  void SetUp() override
+  {
+    opts_ = rclcpp::NodeOptions();
+    opts_.arguments( { "--ros-args", "--params-file", paramsFilePath() } );
+
+    node_ = std::make_shared<rclcpp::Node>( "hector_gamepad_manager_zero_window_test", opts_ );
+    clock_ = std::make_unique<rtest::TestClock>( node_ );
+    manager_ = std::make_shared<hector_gamepad_manager::HectorGamepadManager>( node_ );
+
+    sub_joy_ = rtest::findSubscription<sensor_msgs::msg::Joy>( node_, "/ocs/joy" );
+    pub_config_ = rtest::findPublisher<std_msgs::msg::String>( node_, "/ocs/joy_teleop_profile" );
+    pub_probe_press_ =
+        rtest::findPublisher<std_msgs::msg::String>( node_, "/athena/test_probe/press" );
+    pub_probe_release_ =
+        rtest::findPublisher<std_msgs::msg::String>( node_, "/athena/test_probe/release" );
+    pub_probe_hold_ =
+        rtest::findPublisher<std_msgs::msg::String>( node_, "/athena/test_probe/hold" );
+
+    ASSERT_TRUE( sub_joy_ );
+    ASSERT_TRUE( pub_config_ );
+    ASSERT_TRUE( pub_probe_press_ );
+    ASSERT_TRUE( pub_probe_release_ );
+    ASSERT_TRUE( pub_probe_hold_ );
+
+    EXPECT_CALL( *pub_config_, publish( _ ) ).Times( AnyNumber() );
+
+    joy_msg_.axes = std::vector<float>( MAX_AXES, 0.0f );
+    joy_msg_.buttons = std::vector<int>( MAX_BUTTONS, 0 );
+    joy_msg_.axes[2] = 1.0f;
+    joy_msg_.axes[5] = 1.0f;
+  }
+
+  void setButton( int id, int value ) { joy_msg_.buttons[id] = value; }
+  void sendJoy() { sub_joy_->handle_message( joy_msg_ ); }
+};
+
+// With a zero window, a press of a double-press-configured button does not stick: on the same
+// frame the press is registered, the timeout already expired, so the press flushes immediately,
+// and a release on the next frame (after the button goes up) closes the cycle cleanly.
+TEST_F( HectorGamepadManagerZeroWindowTest, ZeroWindowFlushesPressImmediately )
+{
+  // Press → immediate flush (window already expired). The button is still held, so the timeout
+  // path leaves press_dispatched=true and no release fires yet.
+  EXPECT_CALL( *pub_probe_press_,
+               publish( Field( &std_msgs::msg::String::data, HasSubstr( "press:probe:" ) ) ) )
+      .Times( 1 );
+  EXPECT_CALL( *pub_probe_release_, publish( _ ) ).Times( 0 );
+  setButton( 0, 1 );
+  sendJoy();
+  ::testing::Mock::VerifyAndClearExpectations( pub_probe_press_.get() );
+  ::testing::Mock::VerifyAndClearExpectations( pub_probe_release_.get() );
+
+  // Release fires when the button goes up.
+  EXPECT_CALL( *pub_probe_release_,
+               publish( Field( &std_msgs::msg::String::data, HasSubstr( "release:probe:" ) ) ) )
+      .Times( 1 );
+  setButton( 0, 0 );
+  sendJoy();
+}

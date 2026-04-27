@@ -86,6 +86,26 @@ if(BUILD_TESTING)
                ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib"
                RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib")
 
+  # Standalone test for FlipperPlugin's action-client paths. We can't fold the
+  # action_client_mock into ${PROJECT_NAME}_test_doubles because
+  # BatteryMonitorPlugin transitively pulls ros_babel_fish, which specializes
+  # rclcpp_action::Client and is incompatible with the mocked Client class. So
+  # we link a flipper-only object set against the mock here.
+  ament_add_gmock(test_flipper_plugin test/test_flipper_plugin.cpp
+                  src/flipper_plugin.cpp)
+  target_include_directories(
+    test_flipper_plugin
+    PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+  ament_target_dependencies(test_flipper_plugin ${DEPENDENCIES} rtest)
+  target_link_libraries(
+    test_flipper_plugin
+    rtest::publisher_mock
+    rtest::subscription_mock
+    rtest::service_mock
+    rtest::service_client_mock
+    rtest::action_client_mock
+    rtest::rtest_common)
+
   file(MAKE_DIRECTORY
        "${CMAKE_CURRENT_BINARY_DIR}/share/hector_gamepad_manager_plugins")
   file(MAKE_DIRECTORY
