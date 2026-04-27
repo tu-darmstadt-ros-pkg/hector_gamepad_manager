@@ -168,6 +168,20 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
       if ( mapping["on_release"] && mapping["on_release"]["function"] )
         on_release = mapping["on_release"]["function"].as<std::string>();
 
+      if ( on_press.empty() && on_double_press.empty() ) {
+        RCLCPP_WARN( ocs_ns_node_->get_logger(),
+                     "Button %d in config '%s' has new-format mapping but no on_press or "
+                     "on_double_press function. Skipping.",
+                     id, config_name.c_str() );
+        continue;
+      }
+      if ( on_press.empty() && ( !on_hold.empty() || !on_release.empty() ) ) {
+        RCLCPP_WARN( ocs_ns_node_->get_logger(),
+                     "Button %d in config '%s' specifies on_hold/on_release but no on_press "
+                     "to fall back to; those events will not fire on a single press.",
+                     id, config_name.c_str() );
+      }
+
       // Args are stored under one shared blackboard prefix per button, matching the legacy
       // format that built-in plugins read via getConfigValueOr(id, key). All events on a button
       // therefore share one args block — supplied either at top level (`args:`) or, as a
@@ -189,6 +203,12 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
       }
     } else {
       // Legacy flat format: plugin + function at top level → treat as on_press
+      if ( !mapping["function"] ) {
+        RCLCPP_WARN( ocs_ns_node_->get_logger(),
+                     "Button %d in config '%s' has 'plugin' but no 'function'. Skipping.", id,
+                     config_name.c_str() );
+        continue;
+      }
       auto function = mapping["function"].as<std::string>();
       if ( function.empty() )
         continue;
@@ -314,9 +334,21 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
     if ( tracker.awaiting_double_press &&
          ( now - tracker.last_press_time ).seconds() >= double_press_window_sec_ ) {
       tracker.awaiting_double_press = false;
-      tracker.press_dispatched = true;
       const std::string id = active_config_ + "_" + std::to_string( button_id );
       mapping.plugin->handlePress( mapping.on_press, id );
+
+      if ( tracker.pressed ) {
+        // Still held — let subsequent frames drive hold/release through the normal path.
+        tracker.press_dispatched = true;
+      } else {
+        // Quick tap: button was already released while we waited. Pair the delayed press with
+        // an immediate release so plugins that toggle state (velocity on/off, etc.) don't get
+        // stuck with a press that never closes.
+        const std::string &release_fn =
+            mapping.on_release.empty() ? mapping.on_press : mapping.on_release;
+        mapping.plugin->handleRelease( release_fn, id );
+        tracker.press_dispatched = false;
+      }
     }
   }
 

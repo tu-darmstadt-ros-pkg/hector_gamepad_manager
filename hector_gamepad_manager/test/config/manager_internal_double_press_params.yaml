@@ -1,0 +1,8 @@
+/**:
+  ros__parameters:
+    use_sim_time: true
+    config_name: manager_internal_double_press_switches
+    config_directory: test/config
+    robot_namespace: athena
+    ocs_namespace: ocs
+    double_press_window_sec: 0.25

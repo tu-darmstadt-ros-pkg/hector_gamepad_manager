@@ -1,0 +1,47 @@
+# Test-only config that exercises malformed-entry handling. The manager should log warnings
+# and skip the bad entries rather than throwing or registering a broken mapping.
+axes:
+  0: {plugin: '', function: ''}
+  1: {plugin: '', function: ''}
+  2: {plugin: '', function: ''}
+  3: {plugin: '', function: ''}
+  4: {plugin: '', function: ''}
+  5: {plugin: '', function: ''}
+  6: {plugin: '', function: ''}
+  7: {plugin: '', function: ''}
+
+buttons:
+  # Button A: legacy-format entry with plugin: but no function: — must be skipped, not crash.
+  0:
+    plugin: hector_gamepad_manager_plugins::TestProbePlugin
+  # Button B: new-format entry with no on_press and only on_hold/on_release — must be skipped.
+  1:
+    plugin: hector_gamepad_manager_plugins::TestProbePlugin
+    on_hold: {function: probe_hold}
+    on_release: {function: probe_release}
+  # Button X: a valid legacy entry, so the rest of the config still loads.
+  2:
+    plugin: hector_gamepad_manager_plugins::TestProbePlugin
+    function: probe
+  3: {plugin: '', function: ''}
+  4: {plugin: '', function: ''}
+  5: {plugin: '', function: ''}
+  6: {plugin: '', function: ''}
+  7: {plugin: '', function: ''}
+  8: {plugin: '', function: ''}
+  9: {plugin: '', function: ''}
+  10: {plugin: '', function: ''}
+  11: {plugin: '', function: ''}
+  12: {plugin: '', function: ''}
+  13: {plugin: '', function: ''}
+  14: {plugin: '', function: ''}
+  15: {plugin: '', function: ''}
+  16: {plugin: '', function: ''}
+  17: {plugin: '', function: ''}
+  18: {plugin: '', function: ''}
+  19: {plugin: '', function: ''}
+  20: {plugin: '', function: ''}
+  21: {plugin: '', function: ''}
+  22: {plugin: '', function: ''}
+  23: {plugin: '', function: ''}
+  24: {plugin: '', function: ''}

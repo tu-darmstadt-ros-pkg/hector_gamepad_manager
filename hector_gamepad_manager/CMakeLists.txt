@@ -59,8 +59,12 @@ if(BUILD_TESTING)
 
   # 1. Create the GTest/GMock executable
   ament_add_gmock(
-    ${PROJECT_NAME}_test test/main.cpp test/test_hector_gamepad_manager.cpp
-    test/test_hector_gamepad_manager_internal.cpp)
+    ${PROJECT_NAME}_test
+    test/main.cpp
+    test/test_hector_gamepad_manager.cpp
+    test/test_hector_gamepad_manager_internal.cpp
+    test/test_hector_gamepad_manager_double_press.cpp
+    test/test_hector_gamepad_manager_malformed.cpp)
 
   # 1. Link against the Test Doubles
   target_link_libraries(${PROJECT_NAME}_test
