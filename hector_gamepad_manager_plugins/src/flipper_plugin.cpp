@@ -50,6 +50,20 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   flipper_command_publisher_ = node_->create_publisher<std_msgs::msg::Float64MultiArray>(
       "/" + node_->get_parameter( "robot_namespace" ).as_string() + "/" + command_topic, 10 );
 
+  // Action clients for flipper group actions
+  const std::string robot_ns = node_->get_parameter( "robot_namespace" ).as_string();
+  node_->declare_parameter<std::string>(
+      plugin_namespace + ".drive_flipper_action",
+      "/" + robot_ns + "/flipper_velocity_to_position_controller/drive_flipper_group" );
+  node_->declare_parameter<std::string>(
+      plugin_namespace + ".sync_flipper_action",
+      "/" + robot_ns + "/flipper_velocity_to_position_controller/sync_flipper_group" );
+
+  drive_flipper_client_ = rclcpp_action::create_client<DriveFlipperGroupAction>(
+      node_, node_->get_parameter( plugin_namespace + ".drive_flipper_action" ).as_string() );
+  sync_flipper_client_ = rclcpp_action::create_client<SyncFlipperGroupAction>(
+      node_, node_->get_parameter( plugin_namespace + ".sync_flipper_action" ).as_string() );
+
   active_ = true;
 }
 
@@ -63,6 +77,19 @@ void FlipperPlugin::handlePress( const std::string &function, const std::string 
 
   if ( function == "individual_back_flipper_control_mode" ) {
     individual_back_flipper_mode_ = !individual_front_flipper_mode_;
+    return;
+  }
+
+  // Move flipper pair to upright position (triggered by double-press)
+  if ( function == "flipper_front_upright" || function == "flipper_back_upright" ) {
+    handleFlipperUpright( function );
+    return;
+  }
+
+  // Sync flipper pairs (triggered by double-press)
+  if ( function == "sync_front_flippers" || function == "sync_back_flippers" ||
+       function == "sync_all_flippers" ) {
+    handleFlipperSync( function );
     return;
   }
 
@@ -228,6 +255,115 @@ void FlipperPlugin::handleIndividualFlipperControlInput( const double base_speed
         axis_vel_commands_[2] = vel * flipper_back_factor_;
     }
   }
+}
+
+void FlipperPlugin::handleFlipperUpright( const std::string &function )
+{
+  if ( !active_ )
+    return;
+
+  if ( !drive_flipper_client_->action_server_is_ready() ) {
+    RCLCPP_WARN( node_->get_logger(), "Drive flipper action server not available" );
+    return;
+  }
+
+  if ( drive_in_flight_ ) {
+    RCLCPP_WARN( node_->get_logger(),
+                 "Drive flipper goal already in flight; dropping new request for %s",
+                 function.c_str() );
+    return;
+  }
+
+  auto goal = DriveFlipperGroupAction::Goal();
+  // target_position = 0 means use the upright_position parameter on the controller side
+  goal.target_position = 0.0;
+  goal.max_velocity = 0.0;     // use controller default
+  goal.max_acceleration = 0.0; // use controller default
+
+  if ( function == "flipper_front_upright" ) {
+    goal.group_name = "flipper_front";
+  } else if ( function == "flipper_back_upright" ) {
+    goal.group_name = "flipper_back";
+  } else {
+    RCLCPP_WARN( node_->get_logger(), "Unknown flipper upright function: %s", function.c_str() );
+    return;
+  }
+
+  RCLCPP_INFO( node_->get_logger(), "Driving %s to upright position", goal.group_name.c_str() );
+
+  auto send_goal_options = rclcpp_action::Client<DriveFlipperGroupAction>::SendGoalOptions();
+  send_goal_options.goal_response_callback =
+      [this]( const rclcpp_action::ClientGoalHandle<DriveFlipperGroupAction>::SharedPtr &handle ) {
+        if ( handle )
+          drive_in_flight_ = handle;
+      };
+  send_goal_options.result_callback =
+      [this, group = goal.group_name](
+          const rclcpp_action::ClientGoalHandle<DriveFlipperGroupAction>::WrappedResult &result ) {
+        drive_in_flight_.reset();
+        const char *msg = result.result ? result.result->message.c_str() : "(no result payload)";
+        if ( result.code == rclcpp_action::ResultCode::SUCCEEDED ) {
+          RCLCPP_INFO( node_->get_logger(), "Drive %s upright: %s", group.c_str(), msg );
+        } else {
+          RCLCPP_WARN( node_->get_logger(), "Drive %s upright failed: %s", group.c_str(), msg );
+        }
+      };
+
+  drive_flipper_client_->async_send_goal( goal, send_goal_options );
+}
+
+void FlipperPlugin::handleFlipperSync( const std::string &function )
+{
+  if ( !active_ )
+    return;
+
+  if ( !sync_flipper_client_->action_server_is_ready() ) {
+    RCLCPP_WARN( node_->get_logger(), "Sync flipper action server not available" );
+    return;
+  }
+
+  if ( sync_in_flight_ ) {
+    RCLCPP_WARN( node_->get_logger(),
+                 "Sync flipper goal already in flight; dropping new request for %s",
+                 function.c_str() );
+    return;
+  }
+
+  auto goal = SyncFlipperGroupAction::Goal();
+  goal.max_velocity = 0.0;     // use controller default
+  goal.max_acceleration = 0.0; // use controller default
+
+  if ( function == "sync_front_flippers" ) {
+    goal.group_names = { "flipper_front" };
+  } else if ( function == "sync_back_flippers" ) {
+    goal.group_names = { "flipper_back" };
+  } else if ( function == "sync_all_flippers" ) {
+    goal.group_names = {}; // empty = sync all groups
+  } else {
+    RCLCPP_WARN( node_->get_logger(), "Unknown flipper sync function: %s", function.c_str() );
+    return;
+  }
+
+  RCLCPP_INFO( node_->get_logger(), "Syncing flippers: %s", function.c_str() );
+
+  auto send_goal_options = rclcpp_action::Client<SyncFlipperGroupAction>::SendGoalOptions();
+  send_goal_options.goal_response_callback =
+      [this]( const rclcpp_action::ClientGoalHandle<SyncFlipperGroupAction>::SharedPtr &handle ) {
+        if ( handle )
+          sync_in_flight_ = handle;
+      };
+  send_goal_options.result_callback =
+      [this]( const rclcpp_action::ClientGoalHandle<SyncFlipperGroupAction>::WrappedResult &result ) {
+        sync_in_flight_.reset();
+        const char *msg = result.result ? result.result->message.c_str() : "(no result payload)";
+        if ( result.code == rclcpp_action::ResultCode::SUCCEEDED ) {
+          RCLCPP_INFO( node_->get_logger(), "Flipper sync: %s", msg );
+        } else {
+          RCLCPP_WARN( node_->get_logger(), "Flipper sync failed: %s", msg );
+        }
+      };
+
+  sync_flipper_client_->async_send_goal( goal, send_goal_options );
 }
 
 void FlipperPlugin::resetCommands()

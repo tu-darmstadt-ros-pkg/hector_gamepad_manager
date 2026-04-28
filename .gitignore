@@ -1,5 +1,9 @@
 .idea/
 .vscode/
 build/
+install/
+log/
+.codex
+.codex/
 cmake-build-*/
 **/__pycache__/

@@ -34,27 +34,39 @@ axes:
 buttons:
   0: # Button A
     plugin: hector_gamepad_manager_plugins::DrivePlugin
-    function: fast
+    function: slow
 
   1: # Button B
     plugin: hector_gamepad_manager_plugins::FlipperPlugin
-    function: individual_back_flipper_control_mode
+    on_press:
+      function: individual_front_flipper_control_mode
+    on_double_press:
+      function: sync_front_flippers
 
   2: # Button X
-    plugin: hector_gamepad_manager_plugins::DrivePlugin
-    function: slow
+    plugin: hector_gamepad_manager_plugins::FlipperPlugin
+    on_press:
+      function: individual_back_flipper_control_mode
+    on_double_press:
+      function: sync_back_flippers
 
   3: # Button Y
-    plugin: hector_gamepad_manager_plugins::FlipperPlugin
-    function: individual_front_flipper_control_mode
+    plugin: hector_gamepad_manager_plugins::DrivePlugin
+    function: fast
 
   4: # Button LB
     plugin: hector_gamepad_manager_plugins::FlipperPlugin
-    function: flipper_back_up
+    on_press:
+      function: flipper_back_up
+    on_double_press:
+      function: flipper_back_upright
 
   5: # Button RB
     plugin: hector_gamepad_manager_plugins::FlipperPlugin
-    function: flipper_front_up
+    on_press:
+      function: flipper_front_up
+    on_double_press:
+      function: flipper_front_upright
 
   6: # Button Back
     plugin: ''
