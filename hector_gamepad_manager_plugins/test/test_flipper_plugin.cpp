@@ -38,9 +38,9 @@ protected:
                                nullptr );
 
     drive_mock_ = rtest::experimental::findActionClient<DriveAction>(
-        node_, "/athena/vel_to_pos_controller/drive_flipper_group" );
+        node_, "/athena/flipper_velocity_to_position_controller/drive_flipper_group" );
     sync_mock_ = rtest::experimental::findActionClient<SyncAction>(
-        node_, "/athena/vel_to_pos_controller/sync_flipper_group" );
+        node_, "/athena/flipper_velocity_to_position_controller/sync_flipper_group" );
 
     ASSERT_TRUE( drive_mock_ );
     ASSERT_TRUE( sync_mock_ );

@@ -146,7 +146,7 @@ This plugin is used to drive the robot using a gamepad.
 
 ## FlipperPlugin
 
-This plugin is used to steer the robot flippers using a gamepad. It sends velocity commands for manual control and uses action clients to trigger drive-to-upright and sync operations on the `vel_to_pos_controller`.
+This plugin is used to steer the robot flippers using a gamepad. It sends velocity commands for manual control and uses action clients to trigger drive-to-upright and sync operations on the `flipper_velocity_to_position_controller`.
 
 ### Functions
 
@@ -165,7 +165,7 @@ This plugin is used to steer the robot flippers using a gamepad. It sends veloci
 - `sync_back_flippers`: Sync back flipper pair to their average position. Default trigger: double-press (X)
 - `sync_all_flippers`: Sync all flipper groups simultaneously. (Not mapped by default)
 
-Running drive-to-upright and sync actions are **automatically pre-empted on the controller side** as soon as a manual velocity command arrives for the affected flipper group (e.g., pressing LB/RB or moving LT/RT). The plugin itself does not cancel goals; the `vel_to_pos_controller` aborts the active action when it sees an incoming velocity command.
+Running drive-to-upright and sync actions are **automatically pre-empted on the controller side** as soon as a manual velocity command arrives for the affected flipper group (e.g., pressing LB/RB or moving LT/RT). The plugin itself does not cancel goals; the `flipper_velocity_to_position_controller` aborts the active action when it sees an incoming velocity command.
 
 #### Individual Control Modes
 - `individual_front_flipper_control_mode`: Hold to enable individual front flipper steering; release to return to paired control. Default button: (B, single-press)
@@ -176,8 +176,8 @@ Running drive-to-upright and sync actions are **automatically pre-empted on the 
 ### Parameters
 
 - `command_topic` (string): Topic to publish velocity commands. Default: `flipper_velocity_controller/commands`
-- `drive_flipper_action` (string): Action server for drive-to-target. Default: `/<robot_ns>/vel_to_pos_controller/drive_flipper_group`
-- `sync_flipper_action` (string): Action server for sync. Default: `/<robot_ns>/vel_to_pos_controller/sync_flipper_group`
+- `drive_flipper_action` (string): Action server for drive-to-target. Default: `/<robot_ns>/flipper_velocity_to_position_controller/drive_flipper_group`
+- `sync_flipper_action` (string): Action server for sync. Default: `/<robot_ns>/flipper_velocity_to_position_controller/sync_flipper_group`
 
 ## Manipulation Plugin
 

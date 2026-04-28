@@ -52,12 +52,12 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
 
   // Action clients for flipper group actions
   const std::string robot_ns = node_->get_parameter( "robot_namespace" ).as_string();
-  node_->declare_parameter<std::string>( plugin_namespace + ".drive_flipper_action",
-                                         "/" + robot_ns +
-                                             "/vel_to_pos_controller/drive_flipper_group" );
-  node_->declare_parameter<std::string>( plugin_namespace + ".sync_flipper_action",
-                                         "/" + robot_ns +
-                                             "/vel_to_pos_controller/sync_flipper_group" );
+  node_->declare_parameter<std::string>(
+      plugin_namespace + ".drive_flipper_action",
+      "/" + robot_ns + "/flipper_velocity_to_position_controller/drive_flipper_group" );
+  node_->declare_parameter<std::string>(
+      plugin_namespace + ".sync_flipper_action",
+      "/" + robot_ns + "/flipper_velocity_to_position_controller/sync_flipper_group" );
 
   drive_flipper_client_ = rclcpp_action::create_client<DriveFlipperGroupAction>(
       node_, node_->get_parameter( plugin_namespace + ".drive_flipper_action" ).as_string() );
