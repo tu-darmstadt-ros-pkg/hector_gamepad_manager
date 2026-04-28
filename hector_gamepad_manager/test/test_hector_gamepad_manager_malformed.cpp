@@ -21,8 +21,7 @@ using ::testing::HasSubstr;
 constexpr int MAX_BUTTONS = 25;
 constexpr int MAX_AXES = 8;
 
-// Verifies that malformed YAML entries (missing function: in legacy format, missing on_press
-// in new format) are skipped with a warning instead of throwing or registering broken mappings.
+// Verifies malformed YAML entries are skipped with a warning rather than throwing or registering broken mappings.
 class HectorGamepadManagerMalformedConfigTest : public ::testing::Test
 {
 protected:
@@ -69,6 +68,8 @@ protected:
                                "are malformed.";
     ASSERT_TRUE( pub_config_ );
     ASSERT_TRUE( pub_probe_press_ );
+    ASSERT_TRUE( pub_probe_hold_ );
+    ASSERT_TRUE( pub_probe_release_ );
 
     EXPECT_CALL( *pub_config_, publish( _ ) ).Times( AnyNumber() );
 
@@ -88,8 +89,7 @@ protected:
   void sendJoy() { sub_joy_->handle_message( joy_msg_ ); }
 };
 
-// Test E — Pressing the buttons whose mappings were malformed must not dispatch anything (the
-// mappings should have been skipped at load time, not registered with empty function names).
+// Pressing buttons with malformed mappings must not dispatch anything.
 TEST_F( HectorGamepadManagerMalformedConfigTest, MalformedMappingsAreSkipped )
 {
   EXPECT_CALL( *pub_probe_press_, publish( _ ) ).Times( 0 );
@@ -108,8 +108,7 @@ TEST_F( HectorGamepadManagerMalformedConfigTest, MalformedMappingsAreSkipped )
   setButton( 1, 0 );
   sendJoy();
 
-  // Button 3: new format with on_double_press but no on_press — must be skipped. Without
-  // the strict check, the timeout-flush path would dispatch handlePress("") on this single tap.
+  // Button 3: new format with on_double_press but no on_press — must be skipped.
   setButton( 3, 1 );
   sendJoy();
   setButton( 3, 0 );

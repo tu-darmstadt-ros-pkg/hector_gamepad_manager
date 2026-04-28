@@ -30,7 +30,7 @@ private:
     std::string function_name;
   };
 
-  // Struct to store the mapping of a button to plugin functions per event type
+  // For double-press buttons the manager bypasses handleButton and dispatches handlePress / handleHold / handleRelease directly, so plugins must not rely on button_states_ for them.
   struct ButtonFunctionMapping {
     std::shared_ptr<GamepadFunctionPlugin> plugin;
 
@@ -39,7 +39,7 @@ private:
     std::string on_hold;         // function called while held (empty = uses on_press)
     std::string on_release;      // function called on release (empty = uses on_press)
 
-    bool hasDoublePress() const { return !on_double_press.empty(); }
+    bool has_double_press() const { return !on_double_press.empty(); }
   };
 
   // Per-button state for double-press detection
@@ -112,8 +112,7 @@ private:
   // Per-button trackers for double-press detection
   std::unordered_map<int, ButtonTracker> button_trackers_;
 
-  // Time window for double-press detection (seconds), set from the
-  // `double_press_window_sec` ROS parameter (default 0.25).
+  // Double-press window in seconds (ROS param `double_press_window_sec`, default 0.25).
   double double_press_window_sec_;
 
   // Deadzone to consider an axis as pressed
@@ -177,6 +176,9 @@ private:
    * @brief Deactivates all plugins
    */
   void deactivatePlugins();
+
+  // Synthesize the events needed to bring plugins back to a "no button held" state for double-press buttons before a config switch or shutdown.
+  void flushPendingButtonState();
 
   /**
    * @brief Callback function for the joy topic.

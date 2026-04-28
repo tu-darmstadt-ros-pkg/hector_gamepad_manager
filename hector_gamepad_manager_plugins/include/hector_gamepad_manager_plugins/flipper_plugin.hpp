@@ -80,6 +80,10 @@ private:
 
   rclcpp_action::Client<DriveFlipperGroupAction>::SharedPtr drive_flipper_client_;
   rclcpp_action::Client<SyncFlipperGroupAction>::SharedPtr sync_flipper_client_;
+
+  // Non-null while a goal is accepted and pending; duplicate requests are dropped.
+  rclcpp_action::ClientGoalHandle<DriveFlipperGroupAction>::SharedPtr drive_in_flight_;
+  rclcpp_action::ClientGoalHandle<SyncFlipperGroupAction>::SharedPtr sync_in_flight_;
 };
 } // namespace hector_gamepad_manager_plugins
 

@@ -93,6 +93,13 @@ Args are placed at the top level of the button entry (not under individual event
 > **Note:** Buttons without `on_double_press` are dispatched immediately with zero added latency.
 > The basic format (`plugin` + `function`) is still fully supported and behaves identically to before.
 
+#### Caveats
+
+- **Latency on double-press buttons.** Configuring `on_double_press` delays single-press dispatch by up to `double_press_window_sec` (default 0.25s) so the manager can wait for a possible second press. Avoid `on_double_press` on time-critical actions (e.g. emergency stops).
+- **Per-event args are not supported.** A button has one `args:` block shared by all events. `args:` placed under `on_double_press`, `on_hold`, or `on_release` are ignored with a warning at load time.
+- **`double_press_window_sec` is read once at startup**, not dynamically reconfigurable.
+- **Plugin state contract.** For buttons with `on_double_press`, the manager dispatches `handlePress`/`handleHold`/`handleRelease` directly and bypasses the base class's `handleButton`. Plugin subclasses must not assume `GamepadFunctionPlugin::button_states_` reflects the physical state of double-press-configured buttons.
+
 ---
 
 ## Joy Callback
@@ -160,11 +167,11 @@ This plugin is used to steer the robot flippers using a gamepad. It sends veloci
 
 Running drive-to-upright and sync actions are **automatically pre-empted on the controller side** as soon as a manual velocity command arrives for the affected flipper group (e.g., pressing LB/RB or moving LT/RT). The plugin itself does not cancel goals; the `vel_to_pos_controller` aborts the active action when it sees an incoming velocity command.
 
-#### Mode Toggles
-- `individual_front_flipper_control_mode`: Toggle individual front flipper steering. Default button: (B, single-press)
-- `individual_back_flipper_control_mode`: Toggle individual back flipper steering. Default button: (X, single-press)
+#### Individual Control Modes
+- `individual_front_flipper_control_mode`: Hold to enable individual front flipper steering; release to return to paired control. Default button: (B, single-press)
+- `individual_back_flipper_control_mode`: Hold to enable individual back flipper steering; release to return to paired control. Default button: (X, single-press)
 
-> **Note on B/X and LB/RB:** these buttons each serve two functions via the per-event format. A single press toggles individual front/back control mode (B/X) or starts a velocity command (LB/RB); a double press triggers the corresponding sync or drive-to-upright action. Because `on_double_press` is configured on these buttons, single presses incur a small dispatch delay equal to `double_press_window_sec` (default 0.25s).
+> **Note on B/X and LB/RB:** these buttons each serve two functions via the per-event format. Holding B/X enables individual front/back control mode until released; pressing and holding LB/RB drives a velocity command. A double press triggers the corresponding sync or drive-to-upright action. Because `on_double_press` is configured on these buttons, single-press dispatch is delayed by `double_press_window_sec` (default 0.25s) — a quick tap therefore enables the mode (or velocity command) only briefly before its paired release fires.
 
 ### Parameters
 

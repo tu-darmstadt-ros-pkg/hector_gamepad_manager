@@ -267,6 +267,13 @@ void FlipperPlugin::handleFlipperUpright( const std::string &function )
     return;
   }
 
+  if ( drive_in_flight_ ) {
+    RCLCPP_WARN( node_->get_logger(),
+                 "Drive flipper goal already in flight; dropping new request for %s",
+                 function.c_str() );
+    return;
+  }
+
   auto goal = DriveFlipperGroupAction::Goal();
   // target_position = 0 means use the upright_position parameter on the controller side
   goal.target_position = 0.0;
@@ -285,9 +292,15 @@ void FlipperPlugin::handleFlipperUpright( const std::string &function )
   RCLCPP_INFO( node_->get_logger(), "Driving %s to upright position", goal.group_name.c_str() );
 
   auto send_goal_options = rclcpp_action::Client<DriveFlipperGroupAction>::SendGoalOptions();
+  send_goal_options.goal_response_callback =
+      [this]( const rclcpp_action::ClientGoalHandle<DriveFlipperGroupAction>::SharedPtr &handle ) {
+        if ( handle )
+          drive_in_flight_ = handle;
+      };
   send_goal_options.result_callback =
       [this, group = goal.group_name](
           const rclcpp_action::ClientGoalHandle<DriveFlipperGroupAction>::WrappedResult &result ) {
+        drive_in_flight_.reset();
         const char *msg = result.result ? result.result->message.c_str() : "(no result payload)";
         if ( result.code == rclcpp_action::ResultCode::SUCCEEDED ) {
           RCLCPP_INFO( node_->get_logger(), "Drive %s upright: %s", group.c_str(), msg );
@@ -309,6 +322,13 @@ void FlipperPlugin::handleFlipperSync( const std::string &function )
     return;
   }
 
+  if ( sync_in_flight_ ) {
+    RCLCPP_WARN( node_->get_logger(),
+                 "Sync flipper goal already in flight; dropping new request for %s",
+                 function.c_str() );
+    return;
+  }
+
   auto goal = SyncFlipperGroupAction::Goal();
   goal.max_velocity = 0.0;     // use controller default
   goal.max_acceleration = 0.0; // use controller default
@@ -327,8 +347,14 @@ void FlipperPlugin::handleFlipperSync( const std::string &function )
   RCLCPP_INFO( node_->get_logger(), "Syncing flippers: %s", function.c_str() );
 
   auto send_goal_options = rclcpp_action::Client<SyncFlipperGroupAction>::SendGoalOptions();
+  send_goal_options.goal_response_callback =
+      [this]( const rclcpp_action::ClientGoalHandle<SyncFlipperGroupAction>::SharedPtr &handle ) {
+        if ( handle )
+          sync_in_flight_ = handle;
+      };
   send_goal_options.result_callback =
       [this]( const rclcpp_action::ClientGoalHandle<SyncFlipperGroupAction>::WrappedResult &result ) {
+        sync_in_flight_.reset();
         const char *msg = result.result ? result.result->message.c_str() : "(no result payload)";
         if ( result.code == rclcpp_action::ResultCode::SUCCEEDED ) {
           RCLCPP_INFO( node_->get_logger(), "Flipper sync: %s", msg );

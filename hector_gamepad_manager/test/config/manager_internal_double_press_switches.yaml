@@ -7,8 +7,8 @@ buttons:
   3: {package: '', config: ''}
   4: {package: '', config: ''}
   5: {package: '', config: ''}
-  6: {package: '', config: ''}
-  7: {package: hector_gamepad_manager, config: manager_internal_double_press}
+  6: {package: hector_gamepad_manager, config: manager_internal_double_press}
+  7: {package: hector_gamepad_manager, config: manager_internal_double_press_alt}
   8: {package: '', config: ''}
   9: {package: '', config: ''}
   10: {package: '', config: ''}

@@ -17,10 +17,7 @@ using ::testing::SaveArg;
 using DriveAction = hector_ros_controllers_msgs::action::DriveFlipperGroup;
 using SyncAction = hector_ros_controllers_msgs::action::SyncFlipperGroup;
 
-// Direct unit tests for FlipperPlugin's action-client paths. The plugin is exercised
-// without going through pluginlib so we can attach rtest's action_client_mock without
-// dragging in BatteryMonitorPlugin's babel_fish dependency, which is incompatible
-// with the mocked rclcpp_action::Client class.
+// Direct unit tests for FlipperPlugin's action-client paths; bypasses pluginlib to attach action_client_mock without pulling in BatteryMonitorPlugin's babel_fish dependency.
 class FlipperPluginTest : public ::testing::Test
 {
 protected:
@@ -50,8 +47,7 @@ protected:
   }
 };
 
-// flipper_front_upright sends a goal with group_name="flipper_front" when the action
-// server is ready. target_position 0 lets the controller pick its configured upright pose.
+// flipper_front_upright sends a goal with group_name="flipper_front" and target_position 0.
 TEST_F( FlipperPluginTest, FrontUprightSendsGoalWithFrontGroup )
 {
   EXPECT_CALL( *drive_mock_, action_server_is_ready() ).WillRepeatedly( Return( true ) );
@@ -110,8 +106,7 @@ TEST_F( FlipperPluginTest, SyncFrontSendsGoalWithFrontGroup )
   EXPECT_EQ( sent_goal.group_names[0], "flipper_front" );
 }
 
-// sync_all_flippers sends an empty group_names list, which the controller interprets as
-// "every group I know about". Verifying the empty list is the contract.
+// sync_all_flippers sends an empty group_names list — the contract for "all groups".
 TEST_F( FlipperPluginTest, SyncAllSendsGoalWithEmptyGroupList )
 {
   EXPECT_CALL( *sync_mock_, action_server_is_ready() ).WillRepeatedly( Return( true ) );
@@ -127,9 +122,7 @@ TEST_F( FlipperPluginTest, SyncAllSendsGoalWithEmptyGroupList )
   EXPECT_TRUE( sent_goal.group_names.empty() );
 }
 
-// Regression test for the null-result-payload defensive check. A SUCCEEDED result with a
-// null result pointer must not crash the result callback. This used to dereference
-// result.result->message unconditionally.
+// Regression: a SUCCEEDED result with a null result pointer must not crash the callback.
 TEST_F( FlipperPluginTest, UprightResultCallbackHandlesNullResultPayload )
 {
   EXPECT_CALL( *drive_mock_, action_server_is_ready() ).WillRepeatedly( Return( true ) );
@@ -169,6 +162,36 @@ TEST_F( FlipperPluginTest, SyncResultCallbackHandlesNullResultPayload )
   result.code = rclcpp_action::ResultCode::ABORTED;
   result.result = nullptr;
   EXPECT_NO_THROW( captured_opts.result_callback( result ) );
+}
+
+// A second upright press while a goal is in flight must be dropped; clears after result.
+TEST_F( FlipperPluginTest, UprightDropsRequestWhileGoalInFlight )
+{
+  EXPECT_CALL( *drive_mock_, action_server_is_ready() ).WillRepeatedly( Return( true ) );
+
+  rclcpp_action::Client<DriveAction>::SendGoalOptions captured_opts;
+  auto goal_handle = drive_mock_->makeClientGoalHandle();
+  EXPECT_CALL( *drive_mock_, async_send_goal( _, _ ) )
+      .WillOnce( DoAll( SaveArg<1>( &captured_opts ),
+                        rtest::experimental::ReturnGoalHandleFuture( goal_handle ) ) );
+
+  plugin_->handlePress( "flipper_front_upright", "test_id" );
+  ASSERT_NE( captured_opts.goal_response_callback, nullptr );
+  captured_opts.goal_response_callback( goal_handle );
+
+  EXPECT_CALL( *drive_mock_, async_send_goal( _, _ ) ).Times( 0 );
+  plugin_->handlePress( "flipper_front_upright", "test_id" );
+
+  ASSERT_NE( captured_opts.result_callback, nullptr );
+  rclcpp_action::ClientGoalHandle<DriveAction>::WrappedResult result;
+  result.code = rclcpp_action::ResultCode::SUCCEEDED;
+  result.result = nullptr;
+  captured_opts.result_callback( result );
+
+  EXPECT_CALL( *drive_mock_, async_send_goal( _, _ ) )
+      .WillOnce( rtest::experimental::ReturnGoalHandleFuture(
+          rclcpp_action::ClientGoalHandle<DriveAction>::SharedPtr{} ) );
+  plugin_->handlePress( "flipper_front_upright", "test_id" );
 }
 
 int main( int argc, char **argv )

@@ -91,9 +91,7 @@ protected:
   void advanceMs( int64_t ms ) { clock_->advanceMs( ms ); }
 };
 
-// Test A — Quick tap with on_double_press configured: a press immediately followed by a release
-// must, after the double-press window expires, dispatch on_press AND a paired on_release.
-// Without the fix, on_release is never sent, leaving plugins stuck in the "pressed" state.
+// A quick tap on a double-press button must flush as press+release after the window expires.
 TEST_F( HectorGamepadManagerDoublePressTest, QuickTapWithDoublePressDispatchesPressAndRelease )
 {
   // No press/release/hold should fire while we are still inside the window.
@@ -146,8 +144,7 @@ TEST_F( HectorGamepadManagerDoublePressTest, DoublePressDispatchesDoublePressFun
   sendJoy();
 }
 
-// Test C — A press flushed by timeout, then a second fresh press: each should fire as a single
-// press, never as a double-press.
+// Two presses separated by a timeout each fire as single presses, never as double-press.
 TEST_F( HectorGamepadManagerDoublePressTest, TwoPressesSeparatedByTimeoutAreBothSinglePresses )
 {
   EXPECT_CALL( *pub_probe_press_,
@@ -174,8 +171,7 @@ TEST_F( HectorGamepadManagerDoublePressTest, TwoPressesSeparatedByTimeoutAreBoth
   sendJoy();
 }
 
-// Test D — Holding the button across the window boundary: timeout flushes the press, subsequent
-// frames dispatch on_hold, and finally a release fires when the button goes up.
+// Holding across the window: timeout flushes the press, then holds, then release on button-up.
 TEST_F( HectorGamepadManagerDoublePressTest, HeldButtonAfterTimeoutGeneratesHoldsAndRelease )
 {
   EXPECT_CALL( *pub_probe_press_, publish( _ ) ).Times( 0 );
@@ -195,8 +191,7 @@ TEST_F( HectorGamepadManagerDoublePressTest, HeldButtonAfterTimeoutGeneratesHold
   ::testing::Mock::VerifyAndClearExpectations( pub_probe_release_.get() );
   ::testing::Mock::VerifyAndClearExpectations( pub_probe_hold_.get() );
 
-  // Subsequent frames with the button still held → hold (button 0 has no on_hold, so it falls
-  // back to on_press's function name "probe").
+  // Button 0 has no on_hold so it falls back to on_press ("probe").
   EXPECT_CALL( *pub_probe_hold_,
                publish( Field( &std_msgs::msg::String::data, HasSubstr( "hold:probe:" ) ) ) )
       .Times( 2 );
@@ -212,8 +207,7 @@ TEST_F( HectorGamepadManagerDoublePressTest, HeldButtonAfterTimeoutGeneratesHold
   sendJoy();
 }
 
-// Test D2 — Same as D, but on a button with explicit on_hold/on_release function names. Verifies
-// the dispatched function name comes from the per-event YAML keys, not from on_press fallback.
+// Verifies hold/release dispatch uses per-event YAML function names, not the on_press fallback.
 TEST_F( HectorGamepadManagerDoublePressTest, CustomHoldAndReleaseFunctionNamesAreDispatched )
 {
   setButton( 1, 1 );
@@ -239,14 +233,10 @@ TEST_F( HectorGamepadManagerDoublePressTest, CustomHoldAndReleaseFunctionNamesAr
   sendJoy();
 }
 
-// Test G — Two buttons that both have on_double_press are pressed in interleaved fashion.
-// Button 0 and button 2 each have independent trackers; a press on one must not flush or
-// double-trigger the other.
+// Per-button trackers are independent: a press on one button must not flush the other.
 TEST_F( HectorGamepadManagerDoublePressTest, InterleavedDoublePressButtonsTrackIndependently )
 {
-  // Press button 0 (probe), then press button 2 (probe2) inside button 0's window. Neither
-  // should fire on_press yet (still inside their respective windows), and neither should ever
-  // fire on_double_press because each button has only seen a single press.
+  // Press button 0, then button 2 inside button 0's window. Neither fires yet.
   EXPECT_CALL( *pub_probe_press_, publish( _ ) ).Times( 0 );
   EXPECT_CALL( *pub_probe_release_, publish( _ ) ).Times( 0 );
 
@@ -264,8 +254,7 @@ TEST_F( HectorGamepadManagerDoublePressTest, InterleavedDoublePressButtonsTrackI
   ::testing::Mock::VerifyAndClearExpectations( pub_probe_press_.get() );
   ::testing::Mock::VerifyAndClearExpectations( pub_probe_release_.get() );
 
-  // Advance past button 0's window (total 300ms since button 0's first press) but still inside
-  // button 2's window. Button 0 should flush as a single press+release; button 2 should not.
+  // Past button 0's window but inside button 2's: button 0 flushes, button 2 does not.
   EXPECT_CALL( *pub_probe_press_,
                publish( Field( &std_msgs::msg::String::data, HasSubstr( "press:probe:" ) ) ) )
       .Times( 1 );
@@ -280,8 +269,7 @@ TEST_F( HectorGamepadManagerDoublePressTest, InterleavedDoublePressButtonsTrackI
   ::testing::Mock::VerifyAndClearExpectations( pub_probe_press_.get() );
   ::testing::Mock::VerifyAndClearExpectations( pub_probe_release_.get() );
 
-  // Now finish button 2 with a second press inside its window — must dispatch probe2_double, and
-  // must NOT re-dispatch any probe events on button 0.
+  // Second press on button 2 dispatches probe2_double; button 0 must not re-dispatch.
   EXPECT_CALL( *pub_probe_press_, publish( Field( &std_msgs::msg::String::data,
                                                   HasSubstr( "press:probe2_double:" ) ) ) )
       .Times( 1 );
@@ -292,10 +280,93 @@ TEST_F( HectorGamepadManagerDoublePressTest, InterleavedDoublePressButtonsTrackI
   sendJoy();
 }
 
-// Test H — Edge case: double_press_window_sec = 0 should disable buffering entirely. Buttons
-// configured with on_double_press still load, but on_press fires on the same frame as the
-// physical press (no waiting), and a second quick press just fires on_press again. on_double_press
-// is effectively unreachable when the window is 0 — but we must not deadlock or stuck-press.
+// Config switch while a double-press button is pressed must synthesize a release.
+TEST_F( HectorGamepadManagerDoublePressTest, ConfigSwitchWhileHeldFlushesRelease )
+{
+  // Drive button 0 into press_dispatched=true via timeout flush while still held.
+  setButton( 0, 1 );
+  sendJoy();
+  EXPECT_CALL( *pub_probe_press_,
+               publish( Field( &std_msgs::msg::String::data, HasSubstr( "press:probe:" ) ) ) )
+      .Times( 1 );
+  advanceMs( 300 );
+  sendJoy();
+  ::testing::Mock::VerifyAndClearExpectations( pub_probe_press_.get() );
+
+  // Trigger config switch via button 7; the outgoing config's button 0 must receive a synthesized release.
+  EXPECT_CALL( *pub_probe_release_,
+               publish( Field( &std_msgs::msg::String::data, HasSubstr( "release:probe:" ) ) ) )
+      .Times( 1 );
+  EXPECT_CALL( *pub_probe_press_, publish( _ ) ).Times( 0 );
+  EXPECT_CALL( *pub_probe_hold_, publish( _ ) ).Times( 0 );
+
+  // Release button 0 first so handleConfigurationSwitches doesn't race it.
+  setButton( 0, 0 );
+  setButton( 7, 1 );
+  sendJoy();
+}
+
+// A backward clock jump must not strand a buffered press; negative deltas count as expired.
+TEST_F( HectorGamepadManagerDoublePressTest, BackwardClockJumpDoesNotStickBufferedPress )
+{
+  advanceMs( 10000 );
+
+  setButton( 0, 1 );
+  sendJoy();
+  setButton( 0, 0 );
+  sendJoy();
+  clock_->resetClock( 5000000000L ); // 5.0s, below the 10s anchor
+
+  EXPECT_CALL( *pub_probe_press_,
+               publish( Field( &std_msgs::msg::String::data, HasSubstr( "press:probe:" ) ) ) )
+      .Times( 1 );
+  EXPECT_CALL( *pub_probe_release_,
+               publish( Field( &std_msgs::msg::String::data, HasSubstr( "release:probe:" ) ) ) )
+      .Times( 1 );
+  sendJoy();
+}
+
+// A buffered tap must flush before the next rising edge overwrites last_press_time.
+TEST_F( HectorGamepadManagerDoublePressTest, ExpiredBufferedPressFlushesOnNextRisingEdge )
+{
+  setButton( 0, 1 );
+  sendJoy();
+  setButton( 0, 0 );
+  sendJoy();
+
+  // Wait long past the window without any joy callback.
+  advanceMs( 1000 );
+
+  // Fresh press: the original tap flushes as press+release before the new press buffers.
+  EXPECT_CALL( *pub_probe_press_,
+               publish( Field( &std_msgs::msg::String::data, HasSubstr( "press:probe:" ) ) ) )
+      .Times( 1 );
+  EXPECT_CALL( *pub_probe_release_,
+               publish( Field( &std_msgs::msg::String::data, HasSubstr( "release:probe:" ) ) ) )
+      .Times( 1 );
+  setButton( 0, 1 );
+  sendJoy();
+  ::testing::Mock::VerifyAndClearExpectations( pub_probe_press_.get() );
+  ::testing::Mock::VerifyAndClearExpectations( pub_probe_release_.get() );
+
+  // Confirm the new press is buffered: until its window expires, no press fires.
+  EXPECT_CALL( *pub_probe_press_, publish( _ ) ).Times( 0 );
+  setButton( 0, 0 );
+  sendJoy();
+  ::testing::Mock::VerifyAndClearExpectations( pub_probe_press_.get() );
+
+  // Once the new window expires, the second tap also flushes as a single press+release.
+  EXPECT_CALL( *pub_probe_press_,
+               publish( Field( &std_msgs::msg::String::data, HasSubstr( "press:probe:" ) ) ) )
+      .Times( 1 );
+  EXPECT_CALL( *pub_probe_release_,
+               publish( Field( &std_msgs::msg::String::data, HasSubstr( "release:probe:" ) ) ) )
+      .Times( 1 );
+  advanceMs( 300 );
+  sendJoy();
+}
+
+// double_press_window_sec = 0 disables buffering entirely; on_double_press becomes unreachable.
 class HectorGamepadManagerZeroWindowTest : public ::testing::Test
 {
 protected:
@@ -355,13 +426,10 @@ protected:
   void sendJoy() { sub_joy_->handle_message( joy_msg_ ); }
 };
 
-// With a zero window, a press of a double-press-configured button does not stick: on the same
-// frame the press is registered, the timeout already expired, so the press flushes immediately,
-// and a release on the next frame (after the button goes up) closes the cycle cleanly.
+// A zero-window press flushes immediately and pairs cleanly with a release on button-up.
 TEST_F( HectorGamepadManagerZeroWindowTest, ZeroWindowFlushesPressImmediately )
 {
-  // Press → immediate flush (window already expired). The button is still held, so the timeout
-  // path leaves press_dispatched=true and no release fires yet.
+  // Press flushes immediately; button still held leaves press_dispatched=true.
   EXPECT_CALL( *pub_probe_press_,
                publish( Field( &std_msgs::msg::String::data, HasSubstr( "press:probe:" ) ) ) )
       .Times( 1 );

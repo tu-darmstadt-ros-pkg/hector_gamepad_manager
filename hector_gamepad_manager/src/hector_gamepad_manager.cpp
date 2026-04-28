@@ -105,6 +105,8 @@ bool HectorGamepadManager::switchConfig( const std::string &config_name )
     return true;
   RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Switching from config %s to config: %s",
                 active_config_.c_str(), config_name.c_str() );
+  // Must run before deactivatePlugins() and before active_config_ is reassigned.
+  flushPendingButtonState();
   deactivatePlugins();
   button_trackers_.clear();
   active_config_publisher_->publish( std_msgs::msg::String().set__data( config_name ) );
@@ -168,10 +170,7 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
       if ( mapping["on_release"] && mapping["on_release"]["function"] )
         on_release = mapping["on_release"]["function"].as<std::string>();
 
-      // on_press is required: it is the dispatch target for the timeout-flush path
-      // (and the fallback for on_hold/on_release). Without it, a single press of a
-      // double-press-configured button would dispatch handlePress/handleRelease with
-      // an empty function name.
+      // on_press is required as the timeout-flush dispatch target and on_hold/on_release fallback.
       if ( on_press.empty() ) {
         RCLCPP_WARN( ocs_ns_node_->get_logger(),
                      "Button %d in config '%s' has new-format mapping but no on_press "
@@ -181,11 +180,7 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
         continue;
       }
 
-      // Args are stored under one shared blackboard prefix per button, matching the legacy
-      // format that built-in plugins read via getConfigValueOr(id, key). All events on a button
-      // therefore share one args block — supplied either at top level (`args:`) or, as a
-      // convenience, under `on_press: { args: ... }`. Per-event args are not currently
-      // distinguishable on the read side; if both are given, top-level wins.
+      // All events on a button share one args block; per-event args are not distinguishable on the read side. Top-level wins over on_press/args fallback.
       const std::string blackboard_prefix = plugin_name + "_" + function_id;
       if ( mapping["args"] ) {
         blackboard_->set_from_yaml( mapping["args"], blackboard_prefix );
@@ -236,7 +231,9 @@ bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::st
       auto plugin_name = mapping["plugin"].as<std::string>();
       auto function = mapping["function"].as<std::string>();
       const std::string function_id = config_name + "_" + std::to_string( id );
-      blackboard_->set_from_yaml( mapping["args"], plugin_name + std::string( "_" ) + function_id );
+      if ( mapping["args"] ) {
+        blackboard_->set_from_yaml( mapping["args"], plugin_name + std::string( "_" ) + function_id );
+      }
 
       if ( !plugin_name.empty() && !function.empty() ) {
         if ( !ensurePluginLoaded( plugin_name ) )
@@ -280,7 +277,7 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
     auto &tracker = button_trackers_[button_id];
     const bool was_pressed = tracker.pressed;
 
-    if ( !mapping.hasDoublePress() ) {
+    if ( !mapping.has_double_press() ) {
       // No double-press configured → dispatch immediately via handleButton (original behavior)
       const std::string &function = mapping.on_press;
       mapping.plugin->handleButton( function, id, pressed );
@@ -289,14 +286,24 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
       const bool rising_edge = pressed && !was_pressed;
       const bool falling_edge = !pressed && was_pressed;
 
+      // Backward clock jumps (sim-time replay/reset) are treated as "window expired" so the press doesn't stay buffered forever.
+      const double raw_elapsed = ( now - tracker.last_press_time ).seconds();
+      const bool window_expired = raw_elapsed < 0.0 || raw_elapsed >= double_press_window_sec_;
+
       if ( rising_edge ) {
-        if ( tracker.awaiting_double_press &&
-             ( now - tracker.last_press_time ).seconds() < double_press_window_sec_ ) {
+        if ( tracker.awaiting_double_press && !window_expired ) {
           // Second press within window → double press detected
           tracker.awaiting_double_press = false;
           tracker.press_dispatched = true;
           mapping.plugin->handlePress( mapping.on_double_press, id );
         } else {
+          // Flush a stale buffered tap before overwriting last_press_time, otherwise the original press is silently dropped when no callback fired during the wait window.
+          if ( tracker.awaiting_double_press && window_expired ) {
+            mapping.plugin->handlePress( mapping.on_press, id );
+            const std::string &release_fn =
+                mapping.on_release.empty() ? mapping.on_press : mapping.on_release;
+            mapping.plugin->handleRelease( release_fn, id );
+          }
           // First press → start waiting for potential second press
           tracker.awaiting_double_press = true;
           tracker.last_press_time = now;
@@ -315,23 +322,22 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
           mapping.plugin->handleRelease( release_fn, id );
           tracker.press_dispatched = false;
         }
-        // Note: if awaiting_double_press, we keep waiting — the second press
-        // can arrive after the button is released
+        // If awaiting_double_press, keep waiting — the second press can still arrive after release.
       }
     }
 
     tracker.pressed = pressed;
   }
 
-  // Check for double-press timeouts: if we waited long enough without a second press,
-  // dispatch the buffered single press
+  // Flush buffered single presses whose double-press window has expired.
   for ( const auto &[button_id, mapping] : configs_[active_config_].button_mappings ) {
-    if ( !mapping.hasDoublePress() )
+    if ( !mapping.has_double_press() )
       continue;
 
     auto &tracker = button_trackers_[button_id];
-    if ( tracker.awaiting_double_press &&
-         ( now - tracker.last_press_time ).seconds() >= double_press_window_sec_ ) {
+    const double raw_elapsed = ( now - tracker.last_press_time ).seconds();
+    const bool window_expired = raw_elapsed < 0.0 || raw_elapsed >= double_press_window_sec_;
+    if ( tracker.awaiting_double_press && window_expired ) {
       tracker.awaiting_double_press = false;
       const std::string id = active_config_ + "_" + std::to_string( button_id );
       mapping.plugin->handlePress( mapping.on_press, id );
@@ -340,9 +346,7 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
         // Still held — let subsequent frames drive hold/release through the normal path.
         tracker.press_dispatched = true;
       } else {
-        // Quick tap: button was already released while we waited. Pair the delayed press with
-        // an immediate release so plugins that toggle state (velocity on/off, etc.) don't get
-        // stuck with a press that never closes.
+        // Quick tap: pair the delayed press with an immediate release so the plugin doesn't get stuck.
         const std::string &release_fn =
             mapping.on_release.empty() ? mapping.on_press : mapping.on_release;
         mapping.plugin->handleRelease( release_fn, id );
@@ -400,6 +404,40 @@ void HectorGamepadManager::deactivatePlugins()
     }
   }
   active_plugins_.clear();
+}
+
+void HectorGamepadManager::flushPendingButtonState()
+{
+  // Operates on the OUTGOING config — must run before active_config_ is reassigned.
+  if ( active_config_.empty() )
+    return;
+  auto config_it = configs_.find( active_config_ );
+  if ( config_it == configs_.end() )
+    return;
+  const auto &button_mappings = config_it->second.button_mappings;
+
+  for ( auto &[button_id, tracker] : button_trackers_ ) {
+    auto mapping_it = button_mappings.find( button_id );
+    if ( mapping_it == button_mappings.end() )
+      continue;
+    const auto &mapping = mapping_it->second;
+    if ( !mapping.has_double_press() )
+      continue;
+
+    const std::string id = active_config_ + "_" + std::to_string( button_id );
+    const std::string &release_fn =
+        mapping.on_release.empty() ? mapping.on_press : mapping.on_release;
+
+    if ( tracker.press_dispatched ) {
+      mapping.plugin->handleRelease( release_fn, id );
+      tracker.press_dispatched = false;
+    } else if ( tracker.awaiting_double_press ) {
+      // Emit the same press+release pair the timeout-quick-tap path would have produced.
+      mapping.plugin->handlePress( mapping.on_press, id );
+      mapping.plugin->handleRelease( release_fn, id );
+    }
+    tracker.awaiting_double_press = false;
+  }
 }
 
 HectorGamepadManager::GamepadInputs
