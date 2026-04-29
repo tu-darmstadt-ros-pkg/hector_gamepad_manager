@@ -43,7 +43,7 @@ Then the test uses rtest to get:
 - `/ocs/joy` subscription to inject joystick input
 - `/ocs/active_config` publisher to assert config switching
 - `/athena/cmd_vel`, `/athena/moveit_twist_controller/eef_cmd`,
-  `/athena/moveit_twist_controller/gripper_vel_cmd`, and
+  `/athena/gripper_position_controller/velocity_command`, and
   `/athena/flipper_velocity_controller/commands` publishers to assert output
   topics from plugins.
 

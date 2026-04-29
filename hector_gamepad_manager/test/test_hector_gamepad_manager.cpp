@@ -71,7 +71,7 @@ protected:
     pub_twist_eef_ = rtest::findPublisher<geometry_msgs::msg::TwistStamped>(
         node_, "/athena/moveit_twist_controller/eef_cmd" );
     pub_gripper_ = rtest::findPublisher<std_msgs::msg::Float64>(
-        node_, "/athena/moveit_twist_controller/gripper_vel_cmd" );
+        node_, "/athena/gripper_position_controller/velocity_command" );
     pub_flipper_ = rtest::findPublisher<std_msgs::msg::Float64MultiArray>(
         node_, "/athena/flipper_velocity_controller/commands" );
 
