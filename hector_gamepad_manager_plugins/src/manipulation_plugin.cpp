@@ -73,6 +73,7 @@ void ManipulationPlugin::handlePress( const std::string &function, const std::st
   } else if ( function == "rotate_roll_counter_clockwise" ) {
     rotate_roll_counter_clockwise_ = -1;
   } else if ( function == "gripper_open" ) {
+    // Gripper joint convention: position increases when opening (0 = closed).
     open_gripper_ = 1;
   } else if ( function == "gripper_close" ) {
     close_gripper_ = -1;
