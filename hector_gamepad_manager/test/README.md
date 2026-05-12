@@ -41,7 +41,7 @@ The file `test/test_hector_gamepad_manager.cpp` creates a single node:
 
 Then the test uses rtest to get:
 - `/ocs/joy` subscription to inject joystick input
-- `/ocs/active_config` publisher to assert config switching
+- `/ocs/joy_teleop_profile` publisher to assert config switching
 - `/athena/cmd_vel`, `/athena/moveit_twist_controller/eef_cmd`,
   `/athena/gripper_position_controller/velocity_command`, and
   `/athena/flipper_velocity_controller/commands` publishers to assert output
@@ -80,11 +80,11 @@ Why this is reliable:
 
 Goal:
 Verify the active configuration changes are published on
-`/ocs/active_config` in the expected sequence.
+`/ocs/joy_teleop_profile` in the expected sequence.
 
 Mechanics:
-1) The test fetches the `active_config` publisher mock:
-   - `auto pub_config = rtest::findPublisher<std_msgs::msg::String>(node, "/ocs/active_config");`
+1) The test fetches the `joy_teleop_profile` publisher mock:
+   - `auto pub_config = rtest::findPublisher<std_msgs::msg::String>(node, "/ocs/joy_teleop_profile");`
 2) It also fetches the `/ocs/joy` subscription for input injection.
 3) It sets an ordered sequence of expectations:
    - First a publish with `"manipulation"`, then a publish with `"driving"`.
