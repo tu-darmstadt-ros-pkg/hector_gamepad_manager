@@ -44,6 +44,10 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
                                          "moveit_twist_controller" );
   twist_controller_name_ =
       node_->get_parameter( plugin_namespace + ".twist_controller_name" ).as_string();
+  node_->declare_parameter<std::string>( plugin_namespace + ".gripper_controller_name",
+                                         "gripper_position_controller" );
+  gripper_controller_name_ =
+      node_->get_parameter( plugin_namespace + ".gripper_controller_name" ).as_string();
   node_->declare_parameter<bool>( plugin_namespace + ".enable_drive_cmd", true );
   enable_drive_cmd_ = node_->get_parameter( plugin_namespace + ".enable_drive_cmd" ).as_bool();
 
@@ -54,7 +58,7 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
     drive_cmd_pub_ = node_->create_publisher<geometry_msgs::msg::TwistStamped>( "cmd_vel", 10 );
   }
   gripper_cmd_pub_ = node_->create_publisher<std_msgs::msg::Float64>(
-      twist_controller_name_ + "/gripper_vel_cmd", 10 );
+      gripper_controller_name_ + "/velocity_command", 10 );
   hold_mode_client_ =
       node_->create_client<std_srvs::srv::SetBool>( twist_controller_name_ + "/hold_mode" );
 }
@@ -69,6 +73,7 @@ void ManipulationPlugin::handlePress( const std::string &function, const std::st
   } else if ( function == "rotate_roll_counter_clockwise" ) {
     rotate_roll_counter_clockwise_ = -1;
   } else if ( function == "gripper_open" ) {
+    // Gripper joint convention: position increases when opening (0 = closed).
     open_gripper_ = 1;
   } else if ( function == "gripper_close" ) {
     close_gripper_ = -1;
@@ -140,7 +145,7 @@ void ManipulationPlugin::update()
   const bool is_zero_cmd = isZeroCmd();
   // make sure controllers are active
   if ( last_eef_cmd_zero_ && !is_zero_cmd ) {
-    activateControllers( { twist_controller_name_ } );
+    activateControllers( { twist_controller_name_, gripper_controller_name_ } );
   }
   // avoid repeatedly sending zero commands
   if ( !( last_eef_cmd_zero_ && is_zero_cmd ) ) {
@@ -156,7 +161,7 @@ void ManipulationPlugin::update()
 void ManipulationPlugin::activate()
 {
   active_ = true;
-  activateControllers( { twist_controller_name_ } );
+  activateControllers( { twist_controller_name_, gripper_controller_name_ } );
 }
 
 void ManipulationPlugin::deactivate()

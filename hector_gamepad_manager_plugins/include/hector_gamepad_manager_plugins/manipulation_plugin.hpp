@@ -81,6 +81,7 @@ private:
   double close_gripper_ = 0.0;
 
   std::string twist_controller_name_;
+  std::string gripper_controller_name_;
   geometry_msgs::msg::TwistStamped eef_cmd_;
   geometry_msgs::msg::TwistStamped drive_cmd_;
   std_msgs::msg::Float64 gripper_cmd_;
