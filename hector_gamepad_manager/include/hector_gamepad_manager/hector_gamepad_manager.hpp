@@ -17,8 +17,30 @@ class HectorGamepadManager
 {
 public:
   using GamepadFunctionPlugin = hector_gamepad_plugin_interface::GamepadFunctionPlugin;
+
+  // Parameter defaults, shared with the node executable so both sites agree.
+  static constexpr const char *DEFAULT_CONFIG_NAME = "athena";
+  static constexpr const char *DEFAULT_CONFIG_DIRECTORY = "config";
+  static constexpr const char *DEFAULT_PLUGIN_PARAMS = "athena";
+
   // Constructor
   explicit HectorGamepadManager( const rclcpp::Node::SharedPtr &node );
+
+  /**
+   * @brief Apply a named plugin-param set to the loaded plugins at runtime.
+   *
+   * Before switching, the current (possibly runtime-modified) values of the active set are
+   * snapshotted so they can be restored on reselection. The applied values are then:
+   *   - @p reset == true  -> the set's YAML defaults (config/plugin_params/<name>.yaml), or
+   *   - @p reset == false -> the snapshotted last values if the set was applied before,
+   *                          else the YAML defaults.
+   * Only parameters whose plugin is currently loaded (declared) are set; the rest are skipped.
+   *
+   * @note Parameter values reach plugins via reconfigurable-parameter callbacks, so this does
+   *       not re-initialize plugins. Switching the robot *namespace* (which rebinds publishers)
+   *       is a separate, not-yet-implemented concern; see setupRobot().
+   */
+  void applyPluginParamSet( const std::string &name, bool reset );
 
 private:
   // Struct to store the mapping of an axis to a function of a plugin
@@ -94,6 +116,15 @@ private:
   // namespace for the operator station
   std::string ocs_namespace_;
 
+  // Name of the currently applied plugin-param set (config/plugin_params/<name>.yaml).
+  std::string active_plugin_params_name_;
+
+  // Parameter names belonging to the active set, used to snapshot before switching sets.
+  std::vector<std::string> active_plugin_param_names_;
+
+  // Last known values per plugin-param set, captured on switch-away to support restore.
+  std::unordered_map<std::string, std::vector<rclcpp::Parameter>> plugin_params_cache_;
+
   // Map of loaded plugins
   std::unordered_map<std::string, std::shared_ptr<GamepadFunctionPlugin>> plugins_;
 
@@ -165,6 +196,21 @@ private:
 
   // Load the named plugin into plugins_ if not already present. Returns false on failure.
   bool ensurePluginLoaded( const std::string &plugin_name );
+
+  /**
+   * @brief Create the robot/OCS sub-nodes and load the active configuration.
+   *
+   * NOTE (future multi-robot switching): switching the robot namespace at runtime will re-run
+   * this against a freshly created node carrying the new namespace and the selected plugin-param
+   * overrides, then re-initialize all plugins. Plugins bind the namespace into publisher /
+   * subscription / action names at initialize() time, and create_sub_node() shares the parent's
+   * parameter interface (so re-declaring on the same node would collide) -- a new node is
+   * required. Out of scope for now; the parameter-only switch is applyPluginParamSet().
+   */
+  void setupRobot( const rclcpp::Node::SharedPtr &node );
+
+  // Record the parameter names of the active plugin-param set (read from its YAML file).
+  void recordActivePluginParamNames();
 
   /**
    * @brief Activates all plugins present in the given config

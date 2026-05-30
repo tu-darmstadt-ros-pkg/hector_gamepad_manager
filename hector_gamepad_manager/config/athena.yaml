@@ -2,6 +2,9 @@
 # If a button is pressed, the corresponding config will be loaded
 # The buttons used here will block the button mappings for these buttons in ALL other configs
 default_config: driving   # config used at startup
+
+# Plugin parameters live in config/plugin_params/<name>.yaml and are selected by the
+# `plugin_params` launch/ROS parameter (see launch/hector_gamepad_manager.launch.yaml).
 buttons:
   0: # Button A
     package: ''

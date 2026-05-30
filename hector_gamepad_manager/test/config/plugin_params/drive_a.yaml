@@ -1,0 +1,6 @@
+# Test-only plugin-param set "drive_a" (see plugin-param tests).
+drive_plugin:
+  max_linear_speed: 1.0
+  max_angular_speed: 1.0
+  slow_factor: 0.5
+  fast_factor: 1.5

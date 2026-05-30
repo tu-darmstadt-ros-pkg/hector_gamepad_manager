@@ -15,8 +15,6 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 from std_msgs.msg import String
 from sensor_msgs.msg import Joy
 
-from ament_index_python.packages import get_package_share_directory
-
 # Import the Python class directly so we can drive it via API
 from hector_gamepad_testing_tools.fake_joy_publisher import (
     FakeJoyPublisher,
@@ -33,17 +31,12 @@ def generate_test_description():
     robot_ns = "test_robot"
     config_name = "athena"
 
-    gpm_share = get_package_share_directory("hector_gamepad_manager")
-    plugin_cfg = os.path.join(gpm_share, "config", f"{config_name}_plugin_config.yaml")
-    if not os.path.isfile(plugin_cfg):
-        raise FileNotFoundError(f"Missing plugin config: {plugin_cfg}")
     gamepad_manager = launch_ros.actions.Node(
         package="hector_gamepad_manager",
         executable="hector_gamepad_manager_node",
         name="hector_gamepad_manager",
         output="screen",
         parameters=[
-            plugin_cfg,
             {"config_name": config_name},
             {"ocs_namespace": ocs_ns},
             {"robot_namespace": robot_ns},

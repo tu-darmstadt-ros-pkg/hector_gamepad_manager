@@ -1,5 +1,7 @@
 #include "hector_gamepad_manager/hector_gamepad_manager.hpp"
 
+#include "hector_gamepad_manager/plugin_param_loader.hpp"
+
 #include <filesystem>
 
 namespace hector_gamepad_manager
@@ -11,18 +13,24 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
       feedback_manager_( std::make_shared<hector_gamepad_plugin_interface::FeedbackManager>() )
 {
   // declare & get parameters
-  node->declare_parameter<std::string>( "config_name", "athena" );
-  node->declare_parameter<std::string>( "config_directory", "config" );
+  node->declare_parameter<std::string>( "config_name", DEFAULT_CONFIG_NAME );
+  node->declare_parameter<std::string>( "config_directory", DEFAULT_CONFIG_DIRECTORY );
+  node->declare_parameter<std::string>( "plugin_params", DEFAULT_PLUGIN_PARAMS );
   node->declare_parameter<std::string>( "robot_namespace", "athena" );
   node->declare_parameter<std::string>( "ocs_namespace", "ocs" );
   node->declare_parameter<double>( "double_press_window_sec", 0.25 );
-  const std::string config_switches_filename = node->get_parameter( "config_name" ).as_string();
 
   robot_namespace_ = node->get_parameter( "robot_namespace" ).as_string();
   ocs_namespace_ = node->get_parameter( "ocs_namespace" ).as_string();
   config_directory_ = node->get_parameter( "config_directory" ).as_string();
   double_press_window_sec_ = node->get_parameter( "double_press_window_sec" ).as_double();
+  active_plugin_params_name_ = node->get_parameter( "plugin_params" ).as_string();
 
+  setupRobot( node );
+}
+
+void HectorGamepadManager::setupRobot( const rclcpp::Node::SharedPtr &node )
+{
   // create subnodes: one for the OCS and one for the robot
   ocs_ns_node_ = node->create_sub_node( ocs_namespace_ );
   robot_ns_node_ = node->create_sub_node( robot_namespace_ );
@@ -36,7 +44,14 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
   feedback_manager_->initialize( ocs_ns_node_ );
   controller_orchestrator_ =
       std::make_shared<controller_orchestrator::ControllerOrchestrator>( robot_ns_node_ );
+
+  // The active plugin-param set was already injected as node parameter overrides at startup
+  // (see hector_gamepad_manager_node.cpp). Record its parameter names so they can be
+  // snapshotted before switching to another set at runtime.
+  recordActivePluginParamNames();
+
   // load meta switch config and all referenced config files
+  const std::string config_switches_filename = node->get_parameter( "config_name" ).as_string();
   if ( loadConfigSwitchesConfig( config_switches_filename ) ) {
     switchConfig( default_config_ );
 
@@ -498,4 +513,63 @@ std::string HectorGamepadManager::getPath( const std::string &pkg_name, const st
   }
   return path.string();
 }
+void HectorGamepadManager::recordActivePluginParamNames()
+{
+  active_plugin_param_names_.clear();
+  for ( const auto &param : loadPluginParamSet( config_directory_, active_plugin_params_name_ ) )
+    active_plugin_param_names_.push_back( param.get_name() );
+}
+
+void HectorGamepadManager::applyPluginParamSet( const std::string &name, bool reset )
+{
+  // 1. Snapshot the active set's current (possibly runtime-modified) values so they can be
+  //    restored if it is reselected without reset.
+  if ( !active_plugin_params_name_.empty() ) {
+    std::vector<rclcpp::Parameter> snapshot;
+    for ( const auto &param_name : active_plugin_param_names_ ) {
+      if ( robot_ns_node_->has_parameter( param_name ) )
+        snapshot.push_back( robot_ns_node_->get_parameter( param_name ) );
+    }
+    plugin_params_cache_[active_plugin_params_name_] = std::move( snapshot );
+  }
+
+  // 2. Determine the target values: YAML defaults on reset, otherwise the last cached values if
+  //    this set was applied before (restore), else the YAML defaults.
+  std::vector<rclcpp::Parameter> target;
+  const auto cached = plugin_params_cache_.find( name );
+  if ( !reset && cached != plugin_params_cache_.end() ) {
+    target = cached->second;
+  } else {
+    target = loadPluginParamSet( config_directory_, name );
+  }
+
+  // 3. Apply only parameters whose plugin is loaded (declared); record the full set of names so
+  //    the next switch-away can snapshot them.
+  std::vector<rclcpp::Parameter> to_set;
+  active_plugin_param_names_.clear();
+  for ( const auto &param : target ) {
+    active_plugin_param_names_.push_back( param.get_name() );
+    if ( robot_ns_node_->has_parameter( param.get_name() ) ) {
+      to_set.push_back( param );
+    } else {
+      RCLCPP_DEBUG( ocs_ns_node_->get_logger(),
+                    "Plugin param '%s' from set '%s' is not declared (plugin not loaded?); "
+                    "skipping",
+                    param.get_name().c_str(), name.c_str() );
+    }
+  }
+
+  if ( !to_set.empty() ) {
+    const auto results = robot_ns_node_->set_parameters( to_set );
+    for ( size_t i = 0; i < results.size(); ++i ) {
+      if ( !results[i].successful ) {
+        RCLCPP_WARN( ocs_ns_node_->get_logger(), "Failed to set plugin param '%s': %s",
+                     to_set[i].get_name().c_str(), results[i].reason.c_str() );
+      }
+    }
+  }
+
+  active_plugin_params_name_ = name;
+}
+
 } // namespace hector_gamepad_manager

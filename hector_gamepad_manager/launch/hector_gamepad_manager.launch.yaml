@@ -9,6 +9,10 @@ launch:
 - arg:
     name: ocs_namespace
     default: ocs
+- arg:
+    # Name of the plugin-param set in config/plugin_params/<plugin_params>.yaml
+    name: plugin_params
+    default: $(var config_name)
 
 - node:
     pkg: hector_gamepad_manager
@@ -22,4 +26,5 @@ launch:
       value: $(var robot_namespace)
     - name: ocs_namespace
       value: $(var ocs_namespace)
-    - from: $(find-pkg-share hector_gamepad_manager)/config/$(var config_name)_plugin_config.yaml
+    - name: plugin_params
+      value: $(var plugin_params)

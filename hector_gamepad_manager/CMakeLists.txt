@@ -24,9 +24,10 @@ foreach(dependency IN LISTS DEPENDENCIES)
   find_package(${dependency} REQUIRED)
 endforeach()
 
-set(HEADERS include/hector_gamepad_manager/hector_gamepad_manager.hpp)
+set(HEADERS include/hector_gamepad_manager/hector_gamepad_manager.hpp
+            include/hector_gamepad_manager/plugin_param_loader.hpp)
 
-set(SOURCES src/hector_gamepad_manager.cpp)
+set(SOURCES src/hector_gamepad_manager.cpp src/plugin_param_loader.cpp)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES} ${HEADERS})
 target_include_directories(
@@ -64,7 +65,9 @@ if(BUILD_TESTING)
     test/test_hector_gamepad_manager.cpp
     test/test_hector_gamepad_manager_internal.cpp
     test/test_hector_gamepad_manager_double_press.cpp
-    test/test_hector_gamepad_manager_malformed.cpp)
+    test/test_hector_gamepad_manager_malformed.cpp
+    test/test_plugin_param_loader.cpp
+    test/test_hector_gamepad_manager_plugin_params.cpp)
 
   # 1. Link against the Test Doubles
   target_link_libraries(${PROJECT_NAME}_test
