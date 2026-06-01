@@ -59,11 +59,11 @@ protected:
     sub_joy_ = rtest::findSubscription<sensor_msgs::msg::Joy>( node_, "/ocs/joy" );
     pub_config_ = rtest::findPublisher<std_msgs::msg::String>( node_, "/ocs/joy_teleop_profile" );
     pub_probe_press_ =
-        rtest::findPublisher<std_msgs::msg::String>( node_, "/athena/test_probe/press" );
+        rtest::findPublisher<std_msgs::msg::String>( manager_->robotNode(), "/athena/test_probe/press" );
     pub_probe_hold_ =
-        rtest::findPublisher<std_msgs::msg::String>( node_, "/athena/test_probe/hold" );
+        rtest::findPublisher<std_msgs::msg::String>( manager_->robotNode(), "/athena/test_probe/hold" );
     pub_probe_release_ =
-        rtest::findPublisher<std_msgs::msg::String>( node_, "/athena/test_probe/release" );
+        rtest::findPublisher<std_msgs::msg::String>( manager_->robotNode(), "/athena/test_probe/release" );
 
     ASSERT_TRUE( sub_joy_ );
     ASSERT_TRUE( pub_config_ );
@@ -402,11 +402,11 @@ protected:
     sub_joy_ = rtest::findSubscription<sensor_msgs::msg::Joy>( node_, "/ocs/joy" );
     pub_config_ = rtest::findPublisher<std_msgs::msg::String>( node_, "/ocs/joy_teleop_profile" );
     pub_probe_press_ =
-        rtest::findPublisher<std_msgs::msg::String>( node_, "/athena/test_probe/press" );
+        rtest::findPublisher<std_msgs::msg::String>( manager_->robotNode(), "/athena/test_probe/press" );
     pub_probe_release_ =
-        rtest::findPublisher<std_msgs::msg::String>( node_, "/athena/test_probe/release" );
+        rtest::findPublisher<std_msgs::msg::String>( manager_->robotNode(), "/athena/test_probe/release" );
     pub_probe_hold_ =
-        rtest::findPublisher<std_msgs::msg::String>( node_, "/athena/test_probe/hold" );
+        rtest::findPublisher<std_msgs::msg::String>( manager_->robotNode(), "/athena/test_probe/hold" );
 
     ASSERT_TRUE( sub_joy_ );
     ASSERT_TRUE( pub_config_ );

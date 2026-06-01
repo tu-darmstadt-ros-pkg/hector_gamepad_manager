@@ -67,13 +67,13 @@ protected:
     sub_joy_ = rtest::findSubscription<sensor_msgs::msg::Joy>( node_, "/ocs/joy" );
     pub_config_ = rtest::findPublisher<std_msgs::msg::String>( node_, "/ocs/joy_teleop_profile" );
     pub_cmd_vel_ =
-        rtest::findPublisher<geometry_msgs::msg::TwistStamped>( node_, "/athena/cmd_vel" );
+        rtest::findPublisher<geometry_msgs::msg::TwistStamped>( manager_->robotNode(), "/athena/cmd_vel" );
     pub_twist_eef_ = rtest::findPublisher<geometry_msgs::msg::TwistStamped>(
-        node_, "/athena/moveit_twist_controller/eef_cmd" );
+        manager_->robotNode(), "/athena/moveit_twist_controller/eef_cmd" );
     pub_gripper_ = rtest::findPublisher<std_msgs::msg::Float64>(
-        node_, "/athena/gripper_position_controller/velocity_command" );
+        manager_->robotNode(), "/athena/gripper_position_controller/velocity_command" );
     pub_flipper_ = rtest::findPublisher<std_msgs::msg::Float64MultiArray>(
-        node_, "/athena/flipper_velocity_controller/commands" );
+        manager_->robotNode(), "/athena/flipper_velocity_controller/commands" );
 
     ASSERT_TRUE( sub_joy_ );
     ASSERT_TRUE( pub_config_ );
@@ -626,7 +626,7 @@ TEST_F( HectorGamepadManagerTest, BlackboardEstopTogglePublishes )
   setButton( "right_joy", 1, true );
   sendJoy();
 
-  auto pub_estop = rtest::findPublisher<std_msgs::msg::Bool>( node_, "/athena/gamepad_e_stop" );
+  auto pub_estop = rtest::findPublisher<std_msgs::msg::Bool>( manager_->robotNode(), "/athena/gamepad_e_stop" );
   ASSERT_TRUE( pub_estop );
 
   setButton( "right_joy", 0, true );

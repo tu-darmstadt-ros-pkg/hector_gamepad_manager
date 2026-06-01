@@ -47,8 +47,8 @@ TEST( PluginParamsIntegration, OverrideReachesPluginParameter )
   const auto node = makeNode( "drive_a" );
   const auto manager = std::make_shared<HectorGamepadManager>( node );
 
-  ASSERT_TRUE( node->has_parameter( kSpeedParam ) );
-  EXPECT_DOUBLE_EQ( node->get_parameter( kSpeedParam ).as_double(), 1.0 );
+  ASSERT_TRUE( manager->robotNode()->has_parameter( kSpeedParam ) );
+  EXPECT_DOUBLE_EQ( manager->robotNode()->get_parameter( kSpeedParam ).as_double(), 1.0 );
 }
 
 // Snapshot / restore / reset semantics of applyPluginParamSet.
@@ -56,22 +56,22 @@ TEST( PluginParamsIntegration, SnapshotRestoreAndReset )
 {
   const auto node = makeNode( "drive_a" );
   const auto manager = std::make_shared<HectorGamepadManager>( node );
-  ASSERT_TRUE( node->has_parameter( kSpeedParam ) );
-  ASSERT_DOUBLE_EQ( node->get_parameter( kSpeedParam ).as_double(), 1.0 );
+  ASSERT_TRUE( manager->robotNode()->has_parameter( kSpeedParam ) );
+  ASSERT_DOUBLE_EQ( manager->robotNode()->get_parameter( kSpeedParam ).as_double(), 1.0 );
 
   // Simulate a runtime change while set "drive_a" is active.
-  node->set_parameter( rclcpp::Parameter( kSpeedParam, 9.0 ) );
-  ASSERT_DOUBLE_EQ( node->get_parameter( kSpeedParam ).as_double(), 9.0 );
+  manager->robotNode()->set_parameter( rclcpp::Parameter( kSpeedParam, 9.0 ) );
+  ASSERT_DOUBLE_EQ( manager->robotNode()->get_parameter( kSpeedParam ).as_double(), 9.0 );
 
   // Switch to "drive_b": its YAML default applies, the "drive_a" runtime value is snapshotted.
   manager->applyPluginParamSet( "drive_b", false );
-  EXPECT_DOUBLE_EQ( node->get_parameter( kSpeedParam ).as_double(), 2.0 );
+  EXPECT_DOUBLE_EQ( manager->robotNode()->get_parameter( kSpeedParam ).as_double(), 2.0 );
 
   // Back to "drive_a" without reset: the snapshotted runtime value (9.0) is restored.
   manager->applyPluginParamSet( "drive_a", false );
-  EXPECT_DOUBLE_EQ( node->get_parameter( kSpeedParam ).as_double(), 9.0 );
+  EXPECT_DOUBLE_EQ( manager->robotNode()->get_parameter( kSpeedParam ).as_double(), 9.0 );
 
   // "drive_a" with reset: reload the YAML defaults (1.0).
   manager->applyPluginParamSet( "drive_a", true );
-  EXPECT_DOUBLE_EQ( node->get_parameter( kSpeedParam ).as_double(), 1.0 );
+  EXPECT_DOUBLE_EQ( manager->robotNode()->get_parameter( kSpeedParam ).as_double(), 1.0 );
 }

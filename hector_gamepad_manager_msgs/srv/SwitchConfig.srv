@@ -1,0 +1,6 @@
+string robot_namespace   # empty = keep current
+string config_name       # button/axis config-switches file; empty = keep current
+string plugin_params     # config/plugin_params/<name>.yaml set; empty = keep current
+---
+bool success
+string message

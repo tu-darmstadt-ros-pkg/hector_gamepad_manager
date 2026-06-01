@@ -52,6 +52,12 @@ public:
                    "FeedbackManager not yet initialized" );
       return;
     }
+    // This manager is shared OCS-side across robots (one physical gamepad). Plugins of the same
+    // type on different robots register the same pattern id; reuse the existing pattern instead of
+    // re-declaring its ROS parameters (which would throw "already declared").
+    if ( vibration_patterns_.find( id ) != vibration_patterns_.end() ) {
+      return;
+    }
     vibration_patterns_[id] = std::make_unique<VibrationPattern>();
     vibration_patterns_[id]->configure( node_, id, defaults );
   }

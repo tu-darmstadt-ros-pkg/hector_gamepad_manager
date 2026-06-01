@@ -6,11 +6,38 @@
 
 namespace hector_gamepad_manager
 {
+using hector_gamepad_plugin_interface::Blackboard;
+using hector_gamepad_plugin_interface::FeedbackManager;
+
+namespace
+{
+// Strip leading/trailing '/' and collapse internal repeats so a robot namespace given as
+// "/ec_swift", "ec_swift/" or "//ec_swift" all yield the bare token "ec_swift". The robot node is
+// built with namespace "/" + robot_namespace and plugins prepend "/" themselves, so a leading slash
+// here would produce an invalid "//ec_swift" (rclcpp::exceptions::InvalidNamespaceError).
+std::string normalizeRobotNamespace( const std::string &ns )
+{
+  std::string result;
+  result.reserve( ns.size() );
+  bool prev_slash = false;
+  for ( const char c : ns ) {
+    if ( c == '/' ) {
+      prev_slash = true;
+      continue;
+    }
+    if ( prev_slash && !result.empty() )
+      result.push_back( '/' );
+    prev_slash = false;
+    result.push_back( c );
+  }
+  return result;
+}
+} // namespace
+
 HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node )
     : plugin_loader_( "hector_gamepad_manager",
                       "hector_gamepad_plugin_interface::GamepadFunctionPlugin" ),
-      blackboard_( std::make_shared<hector_gamepad_plugin_interface::Blackboard>() ),
-      feedback_manager_( std::make_shared<hector_gamepad_plugin_interface::FeedbackManager>() )
+      feedback_manager_( std::make_shared<FeedbackManager>() )
 {
   // declare & get parameters
   node->declare_parameter<std::string>( "config_name", DEFAULT_CONFIG_NAME );
@@ -20,53 +47,249 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
   node->declare_parameter<std::string>( "ocs_namespace", "ocs" );
   node->declare_parameter<double>( "double_press_window_sec", 0.25 );
 
-  robot_namespace_ = node->get_parameter( "robot_namespace" ).as_string();
-  ocs_namespace_ = node->get_parameter( "ocs_namespace" ).as_string();
   config_directory_ = node->get_parameter( "config_directory" ).as_string();
+  ocs_namespace_ = node->get_parameter( "ocs_namespace" ).as_string();
   double_press_window_sec_ = node->get_parameter( "double_press_window_sec" ).as_double();
-  active_plugin_params_name_ = node->get_parameter( "plugin_params" ).as_string();
 
-  setupRobot( node );
+  base_node_ = node;
+  executor_ = std::make_shared<rclcpp::executors::SingleThreadedExecutor>();
+  executor_->add_node( node );
+
+  setupOcs( node );
 }
 
-void HectorGamepadManager::setupRobot( const rclcpp::Node::SharedPtr &node )
-{
-  // create subnodes: one for the OCS and one for the robot
-  ocs_ns_node_ = node->create_sub_node( ocs_namespace_ );
-  robot_ns_node_ = node->create_sub_node( robot_namespace_ );
+void HectorGamepadManager::spin() { executor_->spin(); }
 
-  // setup config publisher
+void HectorGamepadManager::setupOcs( const rclcpp::Node::SharedPtr &node )
+{
+  // OCS sub-node carries the operator-station namespace. Created once; survives robot switches.
+  ocs_ns_node_ = node->create_sub_node( ocs_namespace_ );
+
   rclcpp::QoS qos_profile( 1 );
   qos_profile.reliability( RMW_QOS_POLICY_RELIABILITY_RELIABLE );
   qos_profile.durability( RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL );
   active_config_publisher_ =
       ocs_ns_node_->create_publisher<std_msgs::msg::String>( "joy_teleop_profile", qos_profile );
+  active_robot_publisher_ =
+      ocs_ns_node_->create_publisher<std_msgs::msg::String>( "active_robot", qos_profile );
+
   feedback_manager_->initialize( ocs_ns_node_ );
-  controller_orchestrator_ =
-      std::make_shared<controller_orchestrator::ControllerOrchestrator>( robot_ns_node_ );
 
-  // The active plugin-param set was already injected as node parameter overrides at startup
-  // (see hector_gamepad_manager_node.cpp). Record its parameter names so they can be
-  // snapshotted before switching to another set at runtime.
-  recordActivePluginParamNames();
+  switch_config_service_ = ocs_ns_node_->create_service<SwitchConfig>(
+      "switch_config", std::bind( &HectorGamepadManager::handleSwitchConfig, this,
+                                  std::placeholders::_1, std::placeholders::_2 ) );
 
-  // load meta switch config and all referenced config files
-  const std::string config_switches_filename = node->get_parameter( "config_name" ).as_string();
-  if ( loadConfigSwitchesConfig( config_switches_filename ) ) {
-    switchConfig( default_config_ );
+  // Build and activate the startup robot from the base node's parameters.
+  const std::string robot_namespace =
+      normalizeRobotNamespace( node->get_parameter( "robot_namespace" ).as_string() );
+  const std::string config_switches = node->get_parameter( "config_name" ).as_string();
+  const std::string plugin_params = node->get_parameter( "plugin_params" ).as_string();
 
-    joy_subscription_ = ocs_ns_node_->create_subscription<sensor_msgs::msg::Joy>(
-        "joy", 1, std::bind( &HectorGamepadManager::joyCallback, this, std::placeholders::_1 ) );
+  // OCS-side joy subscription: created once, independent of startup-build success. joyCallback
+  // no-ops while there is no active robot, so if the startup build fails (bad default config) a
+  // later switch_config recovery routes input without needing to create the subscription itself.
+  joy_subscription_ = ocs_ns_node_->create_subscription<sensor_msgs::msg::Joy>(
+      "joy", 1, std::bind( &HectorGamepadManager::joyCallback, this, std::placeholders::_1 ) );
+
+  // An empty startup config means "start idle": build no robot, just wait for a switch_config
+  // call. The joy subscription above already no-ops while there is no active robot.
+  if ( config_switches.empty() ) {
+    RCLCPP_INFO( ocs_ns_node_->get_logger(),
+                 "No startup config_name set; waiting for a switch_config service call." );
+    return;
+  }
+
+  active_ = buildControl( robot_namespace, config_switches, plugin_params );
+  if ( active_ ) {
+    activateControl( *active_ );
+    publishActiveRobot( robot_namespace );
   }
 }
 
-bool HectorGamepadManager::loadConfigSwitchesConfig( const std::string &file_name )
+std::shared_ptr<HectorGamepadManager::RobotControl>
+HectorGamepadManager::buildControl( const std::string &robot_namespace,
+                                    const std::string &config_switches_name,
+                                    const std::string &plugin_params,
+                                    std::shared_ptr<Blackboard> reuse_blackboard )
 {
+  auto rc = std::make_shared<RobotControl>();
+  rc->robot_namespace = robot_namespace;
+  rc->config_switches_name = config_switches_name;
+  rc->plugin_params_name = plugin_params;
 
+  // Plugin-param overrides for the robot node. Plugins read their parameters at declare time and
+  // some are required with no default, so the set must be present at node construction.
+  std::vector<rclcpp::Parameter> overrides = loadPluginParamSet( config_directory_, plugin_params );
+  // Record the plugin-param names from the loaded set (before appending non-plugin overrides
+  // below) so a later switch-away can snapshot exactly this set without reloading the YAML.
+  rc->active_plugin_param_names.clear();
+  rc->active_plugin_param_names.reserve( overrides.size() );
+  for ( const auto &param : overrides ) rc->active_plugin_param_names.push_back( param.get_name() );
+  // Match the robot node's clock source to the base node (sim time in tests / simulation).
+  if ( base_node_->has_parameter( "use_sim_time" ) )
+    overrides.emplace_back( "use_sim_time", base_node_->get_parameter( "use_sim_time" ).as_bool() );
+
+  rclcpp::NodeOptions options;
+  options.parameter_overrides( overrides );
+  // Do not reapply the base/OCS node's --params-file or remaps (e.g. the joy remap) to robot nodes.
+  options.use_global_arguments( false );
+
+  rc->node = std::make_shared<rclcpp::Node>( ocs_namespace_ + "_gamepad_robot_control",
+                                             "/" + robot_namespace, options );
+  // Plugins read the robot namespace from this parameter to build absolute topic/action names
+  // (e.g. FlipperPlugin). On the old shared sub-node it came from the base node; declare it here.
+  rc->node->declare_parameter<std::string>( "robot_namespace", robot_namespace );
+  rc->blackboard = reuse_blackboard ? reuse_blackboard : std::make_shared<Blackboard>();
+  rc->controller_orchestrator =
+      std::make_shared<controller_orchestrator::ControllerOrchestrator>( rc->node );
+
+  executor_->add_node( rc->node );
+
+  // Load the config-switches file and every referenced config; this lazily instantiates and
+  // initializes the plugins (binding the robot namespace into their topic/action names) but does
+  // NOT activate them.
+  if ( !loadConfigSwitchesConfig( *rc, config_switches_name ) ) {
+    RCLCPP_ERROR( ocs_ns_node_->get_logger(),
+                  "Failed to build control for robot '%s' with config '%s'",
+                  robot_namespace.c_str(), config_switches_name.c_str() );
+    executor_->remove_node( rc->node );
+    return nullptr;
+  }
+
+  // Some plugins leave themselves active after initialize() (e.g. FlipperPlugin). Normalize to a
+  // clean inactive baseline so activateControl()/activatePlugins() activates exactly the active
+  // config's plugins (mirrors the historic switchConfig deactivate-then-activate flow).
+  deactivatePlugins( *rc );
+
+  robots_[robot_namespace] = rc;
+  return rc;
+}
+
+void HectorGamepadManager::handleSwitchConfig( const std::shared_ptr<SwitchConfig::Request> request,
+                                               std::shared_ptr<SwitchConfig::Response> response )
+try {
+  const std::string requested_ns = normalizeRobotNamespace( request->robot_namespace );
+  const std::string target_ns =
+      requested_ns.empty() ? ( active_ ? active_->robot_namespace : std::string() ) : requested_ns;
+  if ( target_ns.empty() ) {
+    response->success = false;
+    response->message = "No active robot and no robot_namespace given.";
+    return;
+  }
+
+  auto it = robots_.find( target_ns );
+  std::shared_ptr<RobotControl> rc = it != robots_.end() ? it->second : nullptr;
+
+  if ( !rc ) {
+    // New robot: config_name and plugin_params are required (no robot to inherit them from).
+    if ( request->config_name.empty() || request->plugin_params.empty() ) {
+      response->success = false;
+      response->message =
+          "New robot '" + target_ns + "' requires both config_name and plugin_params.";
+      return;
+    }
+    rc = buildControl( target_ns, request->config_name, request->plugin_params );
+    if ( !rc ) {
+      response->success = false;
+      response->message = "Failed to build control for robot '" + target_ns + "'.";
+      return;
+    }
+  } else {
+    const bool cfg_change =
+        !request->config_name.empty() && request->config_name != rc->config_switches_name;
+    const bool param_change =
+        !request->plugin_params.empty() && request->plugin_params != rc->plugin_params_name;
+    if ( cfg_change || param_change ) {
+      // A different config-switches file or plugin-param set needs a fresh node so plugins
+      // re-declare with the new overrides (not all plugins read parameters at runtime). Carry the
+      // blackboard over so soft-e-stop and other runtime values survive the rebuild.
+      auto old_rc = rc;
+      const std::string new_cfg =
+          request->config_name.empty() ? old_rc->config_switches_name : request->config_name;
+      const std::string new_params =
+          request->plugin_params.empty() ? old_rc->plugin_params_name : request->plugin_params;
+      const std::string prev_active_config = old_rc->active_config;
+      // Build the replacement BEFORE tearing the old one down so a failed rebuild (e.g. a config
+      // typo) leaves the working robot untouched instead of bricking it. buildControl caches the
+      // new control in robots_[target_ns] only on success and returns nullptr without side effects
+      // otherwise, so on failure robots_ and active_ still point at the old control.
+      rc = buildControl( target_ns, new_cfg, new_params, old_rc->blackboard );
+      if ( !rc ) {
+        rc = old_rc; // restore the local handle; robots_/active_ were left untouched
+        response->success = false;
+        response->message = "Failed to rebuild control for robot '" + target_ns + "'.";
+        return;
+      }
+      // Preserve the within-robot config across the rebuild when it still exists (a plugin-param-
+      // only change keeps the same config set); otherwise activateControl falls back to default.
+      if ( rc->configs.count( prev_active_config ) )
+        rc->active_config = prev_active_config;
+      // Tear down the old control. buildControl already replaced robots_[target_ns] with the new
+      // control, so discard the old one directly rather than via namespace lookup.
+      flushPendingButtonState( *old_rc );
+      deactivatePlugins( *old_rc );
+      if ( old_rc->node )
+        executor_->remove_node( old_rc->node );
+      if ( active_ == old_rc )
+        active_ = nullptr;
+    }
+  }
+
+  if ( active_ != rc ) {
+    // Quiesce the outgoing robot: it stays alive but inert (drive/gripper/flippers -> zero,
+    // vibration off, moveit cancel), publishers/subscribers and blackboard intact.
+    if ( active_ ) {
+      flushPendingButtonState( *active_ );
+      deactivatePlugins( *active_ );
+      active_->button_trackers.clear();
+    }
+    active_ = rc;
+    activateControl( *rc );
+    RCLCPP_INFO( ocs_ns_node_->get_logger(),
+                 "Switched gamepad control to robot '%s' (config file '%s', config '%s', "
+                 "plugin_params '%s')",
+                 rc->robot_namespace.c_str(), rc->config_switches_name.c_str(),
+                 rc->active_config.c_str(), rc->plugin_params_name.c_str() );
+  }
+
+  publishActiveRobot( target_ns );
+  response->success = true;
+  response->message = "";
+} catch ( const std::exception &e ) {
+  // Never let a switch fault terminate the manager node; report it through the service response.
+  RCLCPP_ERROR( ocs_ns_node_->get_logger(), "switch_config failed: %s", e.what() );
+  response->success = false;
+  response->message = std::string( "switch_config failed: " ) + e.what();
+}
+
+void HectorGamepadManager::activateControl( RobotControl &rc )
+{
+  // Re-activate the robot's last within-robot config (or its default on a fresh build). Bypasses
+  // switchConfig()'s same-config early return, which would otherwise skip activation when the
+  // plugins were deactivated on switch-away but rc.active_config was left unchanged.
+  const std::string cfg = rc.active_config.empty() ? rc.default_config : rc.active_config;
+  rc.active_config = cfg;
+  active_config_publisher_->publish( std_msgs::msg::String().set__data( cfg ) );
+  activatePlugins( rc, cfg );
+}
+
+void HectorGamepadManager::publishActiveRobot( const std::string &robot_namespace )
+{
+  active_robot_publisher_->publish( std_msgs::msg::String().set__data( robot_namespace ) );
+}
+
+bool HectorGamepadManager::loadConfigSwitchesConfig( RobotControl &rc, const std::string &file_name )
+{
   try {
     const YAML::Node config = YAML::LoadFile( getPath( "hector_gamepad_manager", file_name ) );
     for ( const auto &entry : config["buttons"] ) {
       const int id = entry.first.as<int>();
+      if ( id < 0 || id >= NUM_BUTTONS ) {
+        RCLCPP_WARN( ocs_ns_node_->get_logger(),
+                     "Config-switch button id %d in '%s' is out of range [0,%d); skipping.", id,
+                     file_name.c_str(), NUM_BUTTONS );
+        continue;
+      }
       YAML::Node mapping = entry.second;
       auto config_name = mapping["config"].as<std::string>();
       auto pkg_name = mapping["package"].as<std::string>();
@@ -74,14 +297,14 @@ bool HectorGamepadManager::loadConfigSwitchesConfig( const std::string &file_nam
         continue; // skip empty mappings
 
       RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Loading config file %s", config_name.c_str() );
-      if ( !loadConfig( pkg_name, config_name ) ) {
+      if ( !loadConfig( rc, pkg_name, config_name ) ) {
         RCLCPP_ERROR( ocs_ns_node_->get_logger(), "Failed to load config file %s",
                       config_name.c_str() );
         return false;
       }
-      config_switch_button_mapping_[id] = config_name;
+      rc.config_switch_button_mapping[id] = config_name;
     }
-    default_config_ = config["default_config"].as<std::string>();
+    rc.default_config = config["default_config"].as<std::string>();
   } catch ( const std::exception &e ) {
     RCLCPP_ERROR( ocs_ns_node_->get_logger(), "Error loading Config Switch YAML file: %s", e.what() );
     return false;
@@ -89,16 +312,17 @@ bool HectorGamepadManager::loadConfigSwitchesConfig( const std::string &file_nam
   return true;
 }
 
-bool HectorGamepadManager::loadConfig( const std::string &pkg_name, const std::string &file_name )
+bool HectorGamepadManager::loadConfig( RobotControl &rc, const std::string &pkg_name,
+                                       const std::string &file_name )
 {
   try {
     const YAML::Node config = YAML::LoadFile( getPath( pkg_name, file_name ) );
 
     // Add empty mappings for the filename
-    configs_[file_name] = GamepadConfig();
+    rc.configs[file_name] = GamepadConfig();
 
-    if ( !initButtonMappings( config, file_name, configs_[file_name].button_mappings ) ||
-         !initMappings( config, "axes", file_name, configs_[file_name].axis_mappings ) ) {
+    if ( !initButtonMappings( rc, config, file_name, rc.configs[file_name].button_mappings ) ||
+         !initMappings( rc, config, "axes", file_name, rc.configs[file_name].axis_mappings ) ) {
       return false;
     }
 
@@ -109,37 +333,37 @@ bool HectorGamepadManager::loadConfig( const std::string &pkg_name, const std::s
   }
 }
 
-bool HectorGamepadManager::switchConfig( const std::string &config_name )
+bool HectorGamepadManager::switchConfig( RobotControl &rc, const std::string &config_name )
 {
-  if ( configs_.count( config_name ) == 0 ) {
+  if ( rc.configs.count( config_name ) == 0 ) {
     RCLCPP_ERROR( ocs_ns_node_->get_logger(),
                   "Config %s not found. Cannot switch the gamepad config", config_name.c_str() );
     return false;
   }
-  if ( config_name == active_config_ )
+  if ( config_name == rc.active_config )
     return true;
-  RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Switching from config %s to config: %s",
-                active_config_.c_str(), config_name.c_str() );
-  // Must run before deactivatePlugins() and before active_config_ is reassigned.
-  flushPendingButtonState();
-  deactivatePlugins();
-  button_trackers_.clear();
+  RCLCPP_INFO( ocs_ns_node_->get_logger(), "Robot '%s': switching config '%s' -> '%s'",
+               rc.robot_namespace.c_str(), rc.active_config.c_str(), config_name.c_str() );
+  // Must run before deactivatePlugins() and before rc.active_config is reassigned.
+  flushPendingButtonState( rc );
+  deactivatePlugins( rc );
+  rc.button_trackers.clear();
   active_config_publisher_->publish( std_msgs::msg::String().set__data( config_name ) );
-  active_config_ = config_name;
-  activatePlugins( config_name );
+  rc.active_config = config_name;
+  activatePlugins( rc, config_name );
   return true;
 }
 
-bool HectorGamepadManager::ensurePluginLoaded( const std::string &plugin_name )
+bool HectorGamepadManager::ensurePluginLoaded( RobotControl &rc, const std::string &plugin_name )
 {
-  if ( plugins_.count( plugin_name ) != 0 )
+  if ( rc.plugins.count( plugin_name ) != 0 )
     return true;
   try {
     std::shared_ptr<GamepadFunctionPlugin> plugin =
         plugin_loader_.createSharedInstance( plugin_name );
-    plugin->initializePlugin( robot_ns_node_, ocs_ns_node_, plugin_name, blackboard_,
-                              feedback_manager_, controller_orchestrator_ );
-    plugins_[plugin_name] = plugin;
+    plugin->initializePlugin( rc.node, ocs_ns_node_, plugin_name, rc.blackboard, feedback_manager_,
+                              rc.controller_orchestrator );
+    rc.plugins[plugin_name] = plugin;
     RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Loaded plugin: %s", plugin_name.c_str() );
     return true;
   } catch ( const std::exception &e ) {
@@ -149,7 +373,7 @@ bool HectorGamepadManager::ensurePluginLoaded( const std::string &plugin_name )
   }
 }
 
-bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
+bool HectorGamepadManager::initButtonMappings( RobotControl &rc, const YAML::Node &config,
                                                const std::string &config_name,
                                                std::unordered_map<int, ButtonFunctionMapping> &mappings )
 {
@@ -160,6 +384,12 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
 
   for ( const auto &entry : config["buttons"] ) {
     const int id = entry.first.as<int>();
+    if ( id < 0 || id >= NUM_BUTTONS ) {
+      RCLCPP_WARN( ocs_ns_node_->get_logger(),
+                   "Button id %d in config '%s' is out of range [0,%d); skipping.", id,
+                   config_name.c_str(), NUM_BUTTONS );
+      continue;
+    }
     const YAML::Node mapping = entry.second;
 
     if ( !mapping["plugin"] )
@@ -198,9 +428,9 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
       // All events on a button share one args block; per-event args are not distinguishable on the read side. Top-level wins over on_press/args fallback.
       const std::string blackboard_prefix = plugin_name + "_" + function_id;
       if ( mapping["args"] ) {
-        blackboard_->set_from_yaml( mapping["args"], blackboard_prefix );
+        rc.blackboard->set_from_yaml( mapping["args"], blackboard_prefix );
       } else if ( mapping["on_press"] && mapping["on_press"]["args"] ) {
-        blackboard_->set_from_yaml( mapping["on_press"]["args"], blackboard_prefix );
+        rc.blackboard->set_from_yaml( mapping["on_press"]["args"], blackboard_prefix );
       }
       for ( const auto &event_key : { "on_double_press", "on_hold", "on_release" } ) {
         if ( mapping[event_key] && mapping[event_key]["args"] ) {
@@ -222,24 +452,31 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
       if ( function.empty() )
         continue;
       on_press = function;
-      blackboard_->set_from_yaml( mapping["args"], plugin_name + "_" + function_id );
+      rc.blackboard->set_from_yaml( mapping["args"], plugin_name + "_" + function_id );
     }
 
-    if ( !ensurePluginLoaded( plugin_name ) )
+    if ( !ensurePluginLoaded( rc, plugin_name ) )
       return false;
 
-    mappings[id] = { plugins_[plugin_name], on_press, on_double_press, on_hold, on_release };
+    mappings[id] = { rc.plugins[plugin_name], on_press, on_double_press, on_hold, on_release };
   }
   return true;
 }
 
-bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::string &type,
-                                         const std::string &config_name,
+bool HectorGamepadManager::initMappings( RobotControl &rc, const YAML::Node &config,
+                                         const std::string &type, const std::string &config_name,
                                          std::unordered_map<int, FunctionMapping> &mappings )
 {
   if ( config[type] ) {
     for ( const auto &entry : config[type] ) {
       int id = entry.first.as<int>();
+      // These ids index the fixed-size axes input array (this path only handles axes).
+      if ( id < 0 || id >= NUM_AXES ) {
+        RCLCPP_WARN( ocs_ns_node_->get_logger(),
+                     "%s id %d in config '%s' is out of range [0,%d); skipping.", type.c_str(), id,
+                     config_name.c_str(), NUM_AXES );
+        continue;
+      }
       const YAML::Node mapping = entry.second;
       if ( !mapping["plugin"] || !mapping["function"] )
         continue;
@@ -247,13 +484,13 @@ bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::st
       auto function = mapping["function"].as<std::string>();
       const std::string function_id = config_name + "_" + std::to_string( id );
       if ( mapping["args"] ) {
-        blackboard_->set_from_yaml( mapping["args"], plugin_name + std::string( "_" ) + function_id );
+        rc.blackboard->set_from_yaml( mapping["args"], plugin_name + std::string( "_" ) + function_id );
       }
 
       if ( !plugin_name.empty() && !function.empty() ) {
-        if ( !ensurePluginLoaded( plugin_name ) )
+        if ( !ensurePluginLoaded( rc, plugin_name ) )
           return false;
-        mappings[id] = { plugins_[plugin_name], function };
+        mappings[id] = { rc.plugins[plugin_name], function };
       }
     }
   } else {
@@ -263,13 +500,12 @@ bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::st
   return true;
 }
 
-bool HectorGamepadManager::handleConfigurationSwitches( const GamepadInputs &inputs )
+bool HectorGamepadManager::handleConfigurationSwitches( RobotControl &rc, const GamepadInputs &inputs )
 {
-
   // test if a button is pressed that is mapped to a config switch
-  for ( size_t i = 0; i < config_switch_button_mapping_.size(); i++ ) {
-    if ( inputs.buttons[i] && !config_switch_button_mapping_[i].empty() ) {
-      switchConfig( config_switch_button_mapping_[i] );
+  for ( size_t i = 0; i < rc.config_switch_button_mapping.size(); i++ ) {
+    if ( inputs.buttons[i] && !rc.config_switch_button_mapping[i].empty() ) {
+      switchConfig( rc, rc.config_switch_button_mapping[i] );
       return true;
     }
   }
@@ -278,18 +514,22 @@ bool HectorGamepadManager::handleConfigurationSwitches( const GamepadInputs &inp
 
 void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr msg )
 {
+  if ( !active_ )
+    return;
+  RobotControl &rc = *active_;
+
   const auto inputs = convertJoyToGamepadInputs( msg );
   // ignore normal button / axis behavior if configuration switching is in progress
-  if ( handleConfigurationSwitches( inputs ) )
+  if ( handleConfigurationSwitches( rc, inputs ) )
     return;
 
   const auto now = ocs_ns_node_->now();
 
   // Handle buttons with double-press detection
-  for ( const auto &[button_id, mapping] : configs_[active_config_].button_mappings ) {
+  for ( const auto &[button_id, mapping] : rc.configs[rc.active_config].button_mappings ) {
     const bool pressed = inputs.buttons[button_id];
-    const std::string id = active_config_ + "_" + std::to_string( button_id );
-    auto &tracker = button_trackers_[button_id];
+    const std::string id = rc.active_config + "_" + std::to_string( button_id );
+    auto &tracker = rc.button_trackers[button_id];
     const bool was_pressed = tracker.pressed;
 
     if ( !mapping.has_double_press() ) {
@@ -345,16 +585,16 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
   }
 
   // Flush buffered single presses whose double-press window has expired.
-  for ( const auto &[button_id, mapping] : configs_[active_config_].button_mappings ) {
+  for ( const auto &[button_id, mapping] : rc.configs[rc.active_config].button_mappings ) {
     if ( !mapping.has_double_press() )
       continue;
 
-    auto &tracker = button_trackers_[button_id];
+    auto &tracker = rc.button_trackers[button_id];
     const double raw_elapsed = ( now - tracker.last_press_time ).seconds();
     const bool window_expired = raw_elapsed < 0.0 || raw_elapsed >= double_press_window_sec_;
     if ( tracker.awaiting_double_press && window_expired ) {
       tracker.awaiting_double_press = false;
-      const std::string id = active_config_ + "_" + std::to_string( button_id );
+      const std::string id = rc.active_config + "_" + std::to_string( button_id );
       mapping.plugin->handlePress( mapping.on_press, id );
 
       if ( tracker.pressed ) {
@@ -371,67 +611,67 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
   }
 
   // Handle axes
-  for ( const auto &axis_mapping : configs_[active_config_].axis_mappings ) {
+  for ( const auto &axis_mapping : rc.configs[rc.active_config].axis_mappings ) {
     const float value = inputs.axes[axis_mapping.first];
     const auto &action = axis_mapping.second;
-    const std::string id = active_config_ + "_" + std::to_string( axis_mapping.first );
+    const std::string id = rc.active_config + "_" + std::to_string( axis_mapping.first );
     axis_mapping.second.plugin->handleAxis( action.function_name, id, value );
   }
 
   // Update all active plugins
-  for ( const auto &plugin : active_plugins_ ) { plugin->update(); }
+  for ( const auto &plugin : rc.active_plugins ) { plugin->update(); }
 }
 
-void HectorGamepadManager::activatePlugins( const std::string &config_name )
+void HectorGamepadManager::activatePlugins( RobotControl &rc, const std::string &config_name )
 {
-  // activate all  plugins present in the button_mappings_ and axis_mappings_ of the given config
-  if ( configs_.count( config_name ) == 0 ) {
+  // activate all plugins present in the button_mappings and axis_mappings of the given config
+  if ( rc.configs.count( config_name ) == 0 ) {
     RCLCPP_ERROR( ocs_ns_node_->get_logger(),
                   "Config %s not found. Cannot activate the gamepad config", config_name.c_str() );
     return;
   }
-  // activate all plugins present in the button_mappings_
-  for ( const auto &button_mapping : configs_[config_name].button_mappings ) {
+  // activate all plugins present in the button_mappings
+  for ( const auto &button_mapping : rc.configs[config_name].button_mappings ) {
     if ( !button_mapping.second.plugin->isActive() ) {
       button_mapping.second.plugin->activate();
       RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Activated plugin: %s",
                     button_mapping.second.plugin->getPluginName().c_str() );
-      active_plugins_.push_back( button_mapping.second.plugin );
+      rc.active_plugins.push_back( button_mapping.second.plugin );
     }
   }
-  // activate all plugins present in the axis_mappings_
-  for ( const auto &axis_mapping : configs_[config_name].axis_mappings ) {
+  // activate all plugins present in the axis_mappings
+  for ( const auto &axis_mapping : rc.configs[config_name].axis_mappings ) {
     if ( !axis_mapping.second.plugin->isActive() ) {
       axis_mapping.second.plugin->activate();
       RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Activated plugin: %s",
                     axis_mapping.second.plugin->getPluginName().c_str() );
-      active_plugins_.push_back( axis_mapping.second.plugin );
+      rc.active_plugins.push_back( axis_mapping.second.plugin );
     }
   }
 }
 
-void HectorGamepadManager::deactivatePlugins()
+void HectorGamepadManager::deactivatePlugins( RobotControl &rc )
 {
-  for ( const auto &plugin : plugins_ ) {
+  for ( const auto &plugin : rc.plugins ) {
     if ( plugin.second->isActive() ) {
       plugin.second->deactivate();
       RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Deactivated plugin: %s", plugin.first.c_str() );
     }
   }
-  active_plugins_.clear();
+  rc.active_plugins.clear();
 }
 
-void HectorGamepadManager::flushPendingButtonState()
+void HectorGamepadManager::flushPendingButtonState( RobotControl &rc )
 {
-  // Operates on the OUTGOING config — must run before active_config_ is reassigned.
-  if ( active_config_.empty() )
+  // Operates on the OUTGOING config — must run before rc.active_config is reassigned.
+  if ( rc.active_config.empty() )
     return;
-  auto config_it = configs_.find( active_config_ );
-  if ( config_it == configs_.end() )
+  auto config_it = rc.configs.find( rc.active_config );
+  if ( config_it == rc.configs.end() )
     return;
   const auto &button_mappings = config_it->second.button_mappings;
 
-  for ( auto &[button_id, tracker] : button_trackers_ ) {
+  for ( auto &[button_id, tracker] : rc.button_trackers ) {
     auto mapping_it = button_mappings.find( button_id );
     if ( mapping_it == button_mappings.end() )
       continue;
@@ -439,7 +679,7 @@ void HectorGamepadManager::flushPendingButtonState()
     if ( !mapping.has_double_press() )
       continue;
 
-    const std::string id = active_config_ + "_" + std::to_string( button_id );
+    const std::string id = rc.active_config + "_" + std::to_string( button_id );
     const std::string &release_fn =
         mapping.on_release.empty() ? mapping.on_press : mapping.on_release;
 
@@ -459,28 +699,37 @@ HectorGamepadManager::GamepadInputs
 HectorGamepadManager::convertJoyToGamepadInputs( const sensor_msgs::msg::Joy::SharedPtr &msg )
 {
   GamepadInputs inputs;
+  // A joy source may publish fewer axes/buttons than expected (controller variant, driver quirk);
+  // read missing entries as neutral (0 / released) instead of indexing out of bounds.
+  const auto axis = [&msg]( size_t i ) -> float { return i < msg->axes.size() ? msg->axes[i] : 0.0f; };
+  const auto trigger = [&msg]( size_t i ) -> float {
+    // Change range from [1, -1] to [0, 1]; a missing trigger reads as released (0).
+    return i < msg->axes.size() ? -0.5f * ( msg->axes[i] - 1.0f ) : 0.0f;
+  };
+  const auto button = [&msg]( size_t i ) -> bool { return i < msg->buttons.size() && msg->buttons[i]; };
+
   // Axes
-  inputs.axes[0] = msg->axes[0];                    // Left joystick left/right
-  inputs.axes[1] = msg->axes[1];                    // Left joystick up/down
-  inputs.axes[2] = -0.5f * ( msg->axes[2] - 1.0f ); // LT: Change range from [1, -1] to [0, 1]
-  inputs.axes[3] = msg->axes[3];                    // Right joystick left/right
-  inputs.axes[4] = msg->axes[4];                    // Right joystick up/down
-  inputs.axes[5] = -0.5f * ( msg->axes[5] - 1.0f ); // RT: Change range from [1, -1] to [0, 1]
-  inputs.axes[6] = msg->axes[6];                    // Cross left/right
-  inputs.axes[7] = msg->axes[7];                    // Cross up/down
+  inputs.axes[0] = axis( 0 );    // Left joystick left/right
+  inputs.axes[1] = axis( 1 );    // Left joystick up/down
+  inputs.axes[2] = trigger( 2 ); // LT
+  inputs.axes[3] = axis( 3 );    // Right joystick left/right
+  inputs.axes[4] = axis( 4 );    // Right joystick up/down
+  inputs.axes[5] = trigger( 5 ); // RT
+  inputs.axes[6] = axis( 6 );    // Cross left/right
+  inputs.axes[7] = axis( 7 );    // Cross up/down
 
   // Buttons
-  inputs.buttons[0] = msg->buttons[0];   // Button A
-  inputs.buttons[1] = msg->buttons[1];   // Button B
-  inputs.buttons[2] = msg->buttons[2];   // Button X
-  inputs.buttons[3] = msg->buttons[3];   // Button Y
-  inputs.buttons[4] = msg->buttons[4];   // Button LB
-  inputs.buttons[5] = msg->buttons[5];   // Button RB
-  inputs.buttons[6] = msg->buttons[6];   // Button Back
-  inputs.buttons[7] = msg->buttons[7];   // Button Start
-  inputs.buttons[8] = msg->buttons[8];   // Button Guide -> Reserved for config switches
-  inputs.buttons[9] = msg->buttons[9];   // Left joystick pressed
-  inputs.buttons[10] = msg->buttons[10]; // Right joystick pressed
+  inputs.buttons[0] = button( 0 );   // Button A
+  inputs.buttons[1] = button( 1 );   // Button B
+  inputs.buttons[2] = button( 2 );   // Button X
+  inputs.buttons[3] = button( 3 );   // Button Y
+  inputs.buttons[4] = button( 4 );   // Button LB
+  inputs.buttons[5] = button( 5 );   // Button RB
+  inputs.buttons[6] = button( 6 );   // Button Back
+  inputs.buttons[7] = button( 7 );   // Button Start
+  inputs.buttons[8] = button( 8 );   // Button Guide -> Reserved for config switches
+  inputs.buttons[9] = button( 9 );   // Left joystick pressed
+  inputs.buttons[10] = button( 10 ); // Right joystick pressed
   inputs.buttons[11] = inputs.axes[0] > AXIS_DEADZONE;  // Left joystick left
   inputs.buttons[12] = inputs.axes[0] < -AXIS_DEADZONE; // Left joystick right
   inputs.buttons[13] = inputs.axes[1] > AXIS_DEADZONE;  // Left joystick up
@@ -513,31 +762,31 @@ std::string HectorGamepadManager::getPath( const std::string &pkg_name, const st
   }
   return path.string();
 }
-void HectorGamepadManager::recordActivePluginParamNames()
-{
-  active_plugin_param_names_.clear();
-  for ( const auto &param : loadPluginParamSet( config_directory_, active_plugin_params_name_ ) )
-    active_plugin_param_names_.push_back( param.get_name() );
-}
 
 void HectorGamepadManager::applyPluginParamSet( const std::string &name, bool reset )
 {
+  if ( active_ )
+    applyPluginParamSet( *active_, name, reset );
+}
+
+void HectorGamepadManager::applyPluginParamSet( RobotControl &rc, const std::string &name, bool reset )
+{
   // 1. Snapshot the active set's current (possibly runtime-modified) values so they can be
   //    restored if it is reselected without reset.
-  if ( !active_plugin_params_name_.empty() ) {
+  if ( !rc.plugin_params_name.empty() ) {
     std::vector<rclcpp::Parameter> snapshot;
-    for ( const auto &param_name : active_plugin_param_names_ ) {
-      if ( robot_ns_node_->has_parameter( param_name ) )
-        snapshot.push_back( robot_ns_node_->get_parameter( param_name ) );
+    for ( const auto &param_name : rc.active_plugin_param_names ) {
+      if ( rc.node->has_parameter( param_name ) )
+        snapshot.push_back( rc.node->get_parameter( param_name ) );
     }
-    plugin_params_cache_[active_plugin_params_name_] = std::move( snapshot );
+    rc.plugin_params_cache[rc.plugin_params_name] = std::move( snapshot );
   }
 
   // 2. Determine the target values: YAML defaults on reset, otherwise the last cached values if
   //    this set was applied before (restore), else the YAML defaults.
   std::vector<rclcpp::Parameter> target;
-  const auto cached = plugin_params_cache_.find( name );
-  if ( !reset && cached != plugin_params_cache_.end() ) {
+  const auto cached = rc.plugin_params_cache.find( name );
+  if ( !reset && cached != rc.plugin_params_cache.end() ) {
     target = cached->second;
   } else {
     target = loadPluginParamSet( config_directory_, name );
@@ -546,10 +795,10 @@ void HectorGamepadManager::applyPluginParamSet( const std::string &name, bool re
   // 3. Apply only parameters whose plugin is loaded (declared); record the full set of names so
   //    the next switch-away can snapshot them.
   std::vector<rclcpp::Parameter> to_set;
-  active_plugin_param_names_.clear();
+  rc.active_plugin_param_names.clear();
   for ( const auto &param : target ) {
-    active_plugin_param_names_.push_back( param.get_name() );
-    if ( robot_ns_node_->has_parameter( param.get_name() ) ) {
+    rc.active_plugin_param_names.push_back( param.get_name() );
+    if ( rc.node->has_parameter( param.get_name() ) ) {
       to_set.push_back( param );
     } else {
       RCLCPP_DEBUG( ocs_ns_node_->get_logger(),
@@ -560,16 +809,24 @@ void HectorGamepadManager::applyPluginParamSet( const std::string &name, bool re
   }
 
   if ( !to_set.empty() ) {
-    const auto results = robot_ns_node_->set_parameters( to_set );
-    for ( size_t i = 0; i < results.size(); ++i ) {
-      if ( !results[i].successful ) {
-        RCLCPP_WARN( ocs_ns_node_->get_logger(), "Failed to set plugin param '%s': %s",
-                     to_set[i].get_name().c_str(), results[i].reason.c_str() );
+    try {
+      const auto results = rc.node->set_parameters( to_set );
+      for ( size_t i = 0; i < results.size(); ++i ) {
+        if ( !results[i].successful ) {
+          RCLCPP_WARN( ocs_ns_node_->get_logger(), "Failed to set plugin param '%s': %s",
+                       to_set[i].get_name().c_str(), results[i].reason.c_str() );
+        }
       }
+    } catch ( const std::exception &e ) {
+      // set_parameters throws (e.g. InvalidParameterTypeException) when a YAML value's type does
+      // not match a statically-typed declared parameter; has_parameter() above only checks that the
+      // parameter exists, not its type. Degrade to a soft failure instead of propagating.
+      RCLCPP_WARN( ocs_ns_node_->get_logger(), "Failed to apply plugin param set '%s': %s",
+                   name.c_str(), e.what() );
     }
   }
 
-  active_plugin_params_name_ = name;
+  rc.plugin_params_name = name;
 }
 
 } // namespace hector_gamepad_manager

@@ -18,7 +18,8 @@ endif()
 
 find_package(ament_cmake REQUIRED)
 set(DEPENDENCIES pluginlib rclcpp sensor_msgs yaml-cpp
-                 hector_gamepad_plugin_interface controller_orchestrator)
+                 hector_gamepad_plugin_interface controller_orchestrator
+                 hector_gamepad_manager_msgs)
 
 foreach(dependency IN LISTS DEPENDENCIES)
   find_package(${dependency} REQUIRED)
@@ -67,7 +68,8 @@ if(BUILD_TESTING)
     test/test_hector_gamepad_manager_double_press.cpp
     test/test_hector_gamepad_manager_malformed.cpp
     test/test_plugin_param_loader.cpp
-    test/test_hector_gamepad_manager_plugin_params.cpp)
+    test/test_hector_gamepad_manager_plugin_params.cpp
+    test/test_hector_gamepad_manager_switch_config.cpp)
 
   # 1. Link against the Test Doubles
   target_link_libraries(${PROJECT_NAME}_test

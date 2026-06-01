@@ -10,6 +10,7 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>controller_orchestrator</depend>
+  <depend>hector_gamepad_manager_msgs</depend>
   <depend>hector_gamepad_plugin_interface</depend>
   <depend>pluginlib</depend>
   <depend>rclcpp</depend>

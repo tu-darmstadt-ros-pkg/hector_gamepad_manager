@@ -53,13 +53,13 @@ protected:
     sub_joy_ = rtest::findSubscription<sensor_msgs::msg::Joy>( node_, "/ocs/joy" );
     pub_config_ = rtest::findPublisher<std_msgs::msg::String>( node_, "/ocs/joy_teleop_profile" );
     pub_probe_press_ =
-        rtest::findPublisher<std_msgs::msg::String>( node_, "/athena/test_probe/press" );
+        rtest::findPublisher<std_msgs::msg::String>( manager_->robotNode(), "/athena/test_probe/press" );
     pub_probe_hold_ =
-        rtest::findPublisher<std_msgs::msg::String>( node_, "/athena/test_probe/hold" );
+        rtest::findPublisher<std_msgs::msg::String>( manager_->robotNode(), "/athena/test_probe/hold" );
     pub_probe_release_ =
-        rtest::findPublisher<std_msgs::msg::String>( node_, "/athena/test_probe/release" );
+        rtest::findPublisher<std_msgs::msg::String>( manager_->robotNode(), "/athena/test_probe/release" );
     pub_probe_axis_ =
-        rtest::findPublisher<std_msgs::msg::String>( node_, "/athena/test_probe/axis" );
+        rtest::findPublisher<std_msgs::msg::String>( manager_->robotNode(), "/athena/test_probe/axis" );
 
     ASSERT_TRUE( sub_joy_ );
     ASSERT_TRUE( pub_config_ );
@@ -171,4 +171,40 @@ TEST_F( HectorGamepadManagerInternalTest, AxisDeadzoneMapsToVirtualButton )
       .Times( 1 );
   setAxis( "left_stick_left_right", 0.0f, true );
   sendJoy();
+}
+
+// Out-of-range button/axis ids in a config must be skipped rather than indexed into the fixed-size
+// input arrays. Regression for unchecked operator[] on the std::array gamepad inputs (a malformed
+// config could otherwise cause an out-of-bounds read/write on the first joy message).
+TEST( HectorGamepadManagerOutOfRangeIds, SkippedWithoutCrash )
+{
+  rclcpp::NodeOptions opts;
+  opts.arguments(
+      { "--ros-args", "--params-file",
+        ( std::filesystem::path( __FILE__ ).parent_path() / "config" / "manager_internal_oob_params.yaml" )
+            .string() } );
+  auto node = std::make_shared<rclcpp::Node>( "hector_gamepad_manager_oob_test", opts );
+  auto manager = std::make_shared<hector_gamepad_manager::HectorGamepadManager>( node );
+
+  // The build must succeed despite the out-of-range entries (they are skipped, not fatal).
+  ASSERT_TRUE( manager->robotNode() );
+
+  auto sub_joy = rtest::findSubscription<sensor_msgs::msg::Joy>( node, "/ocs/joy" );
+  auto pub_press =
+      rtest::findPublisher<std_msgs::msg::String>( manager->robotNode(), "/athena/test_probe/press" );
+  ASSERT_TRUE( sub_joy );
+  ASSERT_TRUE( pub_press );
+
+  // The in-range button-0 mapping still dispatches; routing the input must not read OOB and crash.
+  EXPECT_CALL( *pub_press, publish( ::testing::Field( &std_msgs::msg::String::data,
+                                                      ::testing::HasSubstr( "press:probe" ) ) ) )
+      .Times( ::testing::AtLeast( 1 ) );
+
+  sensor_msgs::msg::Joy joy;
+  joy.axes = std::vector<float>( MAX_AXES, 0.0f );
+  joy.buttons = std::vector<int>( MAX_BUTTONS, 0 );
+  joy.axes[2] = 1.0f;
+  joy.axes[5] = 1.0f;
+  joy.buttons[0] = 1;
+  sub_joy->handle_message( joy );
 }

@@ -1,0 +1,12 @@
+# Test-only config with out-of-range axis/button ids. The in-range ids (axis 0, button 0) must map
+# normally; the out-of-range ids (>= NUM_AXES / NUM_BUTTONS) must be skipped so they never index the
+# fixed-size input arrays in joyCallback.
+axes:
+  0: {plugin: hector_gamepad_manager_plugins::TestProbePlugin, function: axis}
+  8: {plugin: hector_gamepad_manager_plugins::TestProbePlugin, function: axis}
+  99: {plugin: hector_gamepad_manager_plugins::TestProbePlugin, function: axis}
+
+buttons:
+  0: {plugin: hector_gamepad_manager_plugins::TestProbePlugin, function: probe}
+  25: {plugin: hector_gamepad_manager_plugins::TestProbePlugin, function: probe}
+  99: {plugin: hector_gamepad_manager_plugins::TestProbePlugin, function: probe}
