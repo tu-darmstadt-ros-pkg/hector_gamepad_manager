@@ -125,13 +125,10 @@ void VirtualCameraPlugin::handleRelease( const std::string &function, const std:
 
 void VirtualCameraPlugin::loadCameras()
 {
-  std::string back_topic_name = node_->get_effective_namespace() + "/" + back_camera_topic_name_;
-  std::string front_topic_name = node_->get_effective_namespace() + "/" + front_camera_topic_name_;
-
   front_transform_publisher_ =
-      node_->create_publisher<geometry_msgs::msg::Transform>( front_topic_name, 1 );
+      node_->create_publisher<geometry_msgs::msg::Transform>( front_camera_topic_name_, 1 );
   back_transform_publisher_ =
-      node_->create_publisher<geometry_msgs::msg::Transform>( back_topic_name, 1 );
+      node_->create_publisher<geometry_msgs::msg::Transform>( back_camera_topic_name_, 1 );
 }
 
 void VirtualCameraPlugin::update()

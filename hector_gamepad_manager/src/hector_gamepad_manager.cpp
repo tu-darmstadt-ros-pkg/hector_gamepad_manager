@@ -5,42 +5,36 @@
 namespace hector_gamepad_manager
 {
 HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node )
-    : plugin_loader_( "hector_gamepad_manager",
+    : node_( node ),
+      plugin_loader_( "hector_gamepad_manager",
                       "hector_gamepad_plugin_interface::GamepadFunctionPlugin" ),
       blackboard_( std::make_shared<hector_gamepad_plugin_interface::Blackboard>() ),
       feedback_manager_( std::make_shared<hector_gamepad_plugin_interface::FeedbackManager>() )
 {
   // declare & get parameters
-  node->declare_parameter<std::string>( "config_name", "athena" );
-  node->declare_parameter<std::string>( "config_directory", "config" );
-  node->declare_parameter<std::string>( "robot_namespace", "athena" );
-  node->declare_parameter<std::string>( "ocs_namespace", "ocs" );
-  node->declare_parameter<double>( "double_press_window_sec", 0.25 );
-  const std::string config_switches_filename = node->get_parameter( "config_name" ).as_string();
+  node_->declare_parameter<std::string>( "config_name", "athena" );
+  node_->declare_parameter<std::string>( "config_directory", "config" );
+  node_->declare_parameter<double>( "double_press_window_sec", 0.25 );
+  const std::string config_switches_filename = node_->get_parameter( "config_name" ).as_string();
 
-  robot_namespace_ = node->get_parameter( "robot_namespace" ).as_string();
-  ocs_namespace_ = node->get_parameter( "ocs_namespace" ).as_string();
-  config_directory_ = node->get_parameter( "config_directory" ).as_string();
-  double_press_window_sec_ = node->get_parameter( "double_press_window_sec" ).as_double();
+  config_directory_ = node_->get_parameter( "config_directory" ).as_string();
+  double_press_window_sec_ = node_->get_parameter( "double_press_window_sec" ).as_double();
 
-  // create subnodes: one for the OCS and one for the robot
-  ocs_ns_node_ = node->create_sub_node( ocs_namespace_ );
-  robot_ns_node_ = node->create_sub_node( robot_namespace_ );
-
+  // The node is launched into the robot namespace, so all topics below are robot-namespaced.
   // setup config publisher
   rclcpp::QoS qos_profile( 1 );
   qos_profile.reliability( RMW_QOS_POLICY_RELIABILITY_RELIABLE );
   qos_profile.durability( RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL );
   active_config_publisher_ =
-      ocs_ns_node_->create_publisher<std_msgs::msg::String>( "joy_teleop_profile", qos_profile );
-  feedback_manager_->initialize( ocs_ns_node_ );
+      node_->create_publisher<std_msgs::msg::String>( "joy_teleop_profile", qos_profile );
+  feedback_manager_->initialize( node_, "joy_feedback" );
   controller_orchestrator_ =
-      std::make_shared<controller_orchestrator::ControllerOrchestrator>( robot_ns_node_ );
+      std::make_shared<controller_orchestrator::ControllerOrchestrator>( node_ );
   // load meta switch config and all referenced config files
   if ( loadConfigSwitchesConfig( config_switches_filename ) ) {
     switchConfig( default_config_ );
 
-    joy_subscription_ = ocs_ns_node_->create_subscription<sensor_msgs::msg::Joy>(
+    joy_subscription_ = node_->create_subscription<sensor_msgs::msg::Joy>(
         "joy", 1, std::bind( &HectorGamepadManager::joyCallback, this, std::placeholders::_1 ) );
   }
 }
@@ -58,9 +52,9 @@ bool HectorGamepadManager::loadConfigSwitchesConfig( const std::string &file_nam
       if ( config_name.empty() || pkg_name.empty() )
         continue; // skip empty mappings
 
-      RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Loading config file %s", config_name.c_str() );
+      RCLCPP_DEBUG( node_->get_logger(), "Loading config file %s", config_name.c_str() );
       if ( !loadConfig( pkg_name, config_name ) ) {
-        RCLCPP_ERROR( ocs_ns_node_->get_logger(), "Failed to load config file %s",
+        RCLCPP_ERROR( node_->get_logger(), "Failed to load config file %s",
                       config_name.c_str() );
         return false;
       }
@@ -68,7 +62,7 @@ bool HectorGamepadManager::loadConfigSwitchesConfig( const std::string &file_nam
     }
     default_config_ = config["default_config"].as<std::string>();
   } catch ( const std::exception &e ) {
-    RCLCPP_ERROR( ocs_ns_node_->get_logger(), "Error loading Config Switch YAML file: %s", e.what() );
+    RCLCPP_ERROR( node_->get_logger(), "Error loading Config Switch YAML file: %s", e.what() );
     return false;
   }
   return true;
@@ -89,7 +83,7 @@ bool HectorGamepadManager::loadConfig( const std::string &pkg_name, const std::s
 
     return true;
   } catch ( const std::exception &e ) {
-    RCLCPP_ERROR( ocs_ns_node_->get_logger(), "Error loading YAML file: %s", e.what() );
+    RCLCPP_ERROR( node_->get_logger(), "Error loading YAML file: %s", e.what() );
     return false;
   }
 }
@@ -97,13 +91,13 @@ bool HectorGamepadManager::loadConfig( const std::string &pkg_name, const std::s
 bool HectorGamepadManager::switchConfig( const std::string &config_name )
 {
   if ( configs_.count( config_name ) == 0 ) {
-    RCLCPP_ERROR( ocs_ns_node_->get_logger(),
+    RCLCPP_ERROR( node_->get_logger(),
                   "Config %s not found. Cannot switch the gamepad config", config_name.c_str() );
     return false;
   }
   if ( config_name == active_config_ )
     return true;
-  RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Switching from config %s to config: %s",
+  RCLCPP_DEBUG( node_->get_logger(), "Switching from config %s to config: %s",
                 active_config_.c_str(), config_name.c_str() );
   // Must run before deactivatePlugins() and before active_config_ is reassigned.
   flushPendingButtonState();
@@ -122,13 +116,13 @@ bool HectorGamepadManager::ensurePluginLoaded( const std::string &plugin_name )
   try {
     std::shared_ptr<GamepadFunctionPlugin> plugin =
         plugin_loader_.createSharedInstance( plugin_name );
-    plugin->initializePlugin( robot_ns_node_, ocs_ns_node_, plugin_name, blackboard_,
-                              feedback_manager_, controller_orchestrator_ );
+    plugin->initializePlugin( node_, plugin_name, blackboard_, feedback_manager_,
+                              controller_orchestrator_ );
     plugins_[plugin_name] = plugin;
-    RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Loaded plugin: %s", plugin_name.c_str() );
+    RCLCPP_DEBUG( node_->get_logger(), "Loaded plugin: %s", plugin_name.c_str() );
     return true;
   } catch ( const std::exception &e ) {
-    RCLCPP_ERROR( ocs_ns_node_->get_logger(), "Failed to load plugin %s: %s", plugin_name.c_str(),
+    RCLCPP_ERROR( node_->get_logger(), "Failed to load plugin %s: %s", plugin_name.c_str(),
                   e.what() );
     return false;
   }
@@ -139,7 +133,7 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
                                                std::unordered_map<int, ButtonFunctionMapping> &mappings )
 {
   if ( !config["buttons"] ) {
-    RCLCPP_ERROR( ocs_ns_node_->get_logger(), "No buttons found in config file" );
+    RCLCPP_ERROR( node_->get_logger(), "No buttons found in config file" );
     return false;
   }
 
@@ -172,7 +166,7 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
 
       // on_press is required as the timeout-flush dispatch target and on_hold/on_release fallback.
       if ( on_press.empty() ) {
-        RCLCPP_WARN( ocs_ns_node_->get_logger(),
+        RCLCPP_WARN( node_->get_logger(),
                      "Button %d in config '%s' has new-format mapping but no on_press "
                      "function. on_press is required (it is the fallback for on_hold/"
                      "on_release and the dispatch target on a single press). Skipping.",
@@ -189,7 +183,7 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
       }
       for ( const auto &event_key : { "on_double_press", "on_hold", "on_release" } ) {
         if ( mapping[event_key] && mapping[event_key]["args"] ) {
-          RCLCPP_WARN( ocs_ns_node_->get_logger(),
+          RCLCPP_WARN( node_->get_logger(),
                        "Per-event args under '%s' on button %d are not supported and will be "
                        "ignored. Move them to a top-level 'args:' block.",
                        event_key, id );
@@ -198,7 +192,7 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
     } else {
       // Legacy flat format: plugin + function at top level → treat as on_press
       if ( !mapping["function"] ) {
-        RCLCPP_WARN( ocs_ns_node_->get_logger(),
+        RCLCPP_WARN( node_->get_logger(),
                      "Button %d in config '%s' has 'plugin' but no 'function'. Skipping.", id,
                      config_name.c_str() );
         continue;
@@ -242,7 +236,7 @@ bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::st
       }
     }
   } else {
-    RCLCPP_ERROR( ocs_ns_node_->get_logger(), "No %s found in config file", type.c_str() );
+    RCLCPP_ERROR( node_->get_logger(), "No %s found in config file", type.c_str() );
     return false;
   }
   return true;
@@ -268,7 +262,7 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
   if ( handleConfigurationSwitches( inputs ) )
     return;
 
-  const auto now = ocs_ns_node_->now();
+  const auto now = node_->now();
 
   // Handle buttons with double-press detection
   for ( const auto &[button_id, mapping] : configs_[active_config_].button_mappings ) {
@@ -371,7 +365,7 @@ void HectorGamepadManager::activatePlugins( const std::string &config_name )
 {
   // activate all  plugins present in the button_mappings_ and axis_mappings_ of the given config
   if ( configs_.count( config_name ) == 0 ) {
-    RCLCPP_ERROR( ocs_ns_node_->get_logger(),
+    RCLCPP_ERROR( node_->get_logger(),
                   "Config %s not found. Cannot activate the gamepad config", config_name.c_str() );
     return;
   }
@@ -379,7 +373,7 @@ void HectorGamepadManager::activatePlugins( const std::string &config_name )
   for ( const auto &button_mapping : configs_[config_name].button_mappings ) {
     if ( !button_mapping.second.plugin->isActive() ) {
       button_mapping.second.plugin->activate();
-      RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Activated plugin: %s",
+      RCLCPP_DEBUG( node_->get_logger(), "Activated plugin: %s",
                     button_mapping.second.plugin->getPluginName().c_str() );
       active_plugins_.push_back( button_mapping.second.plugin );
     }
@@ -388,7 +382,7 @@ void HectorGamepadManager::activatePlugins( const std::string &config_name )
   for ( const auto &axis_mapping : configs_[config_name].axis_mappings ) {
     if ( !axis_mapping.second.plugin->isActive() ) {
       axis_mapping.second.plugin->activate();
-      RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Activated plugin: %s",
+      RCLCPP_DEBUG( node_->get_logger(), "Activated plugin: %s",
                     axis_mapping.second.plugin->getPluginName().c_str() );
       active_plugins_.push_back( axis_mapping.second.plugin );
     }
@@ -400,7 +394,7 @@ void HectorGamepadManager::deactivatePlugins()
   for ( const auto &plugin : plugins_ ) {
     if ( plugin.second->isActive() ) {
       plugin.second->deactivate();
-      RCLCPP_DEBUG( ocs_ns_node_->get_logger(), "Deactivated plugin: %s", plugin.first.c_str() );
+      RCLCPP_DEBUG( node_->get_logger(), "Deactivated plugin: %s", plugin.first.c_str() );
     }
   }
   active_plugins_.clear();

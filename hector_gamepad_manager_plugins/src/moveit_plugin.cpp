@@ -35,8 +35,8 @@ void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   // setup action client
   node_->declare_parameter<std::string>( plugin_name + ".action_topic", "move_action" );
   const auto action_topic = node_->get_parameter( plugin_name + ".action_topic" ).as_string();
-  action_client_ = rclcpp_action::create_client<moveit_msgs::action::MoveGroup>(
-      node_, node_->get_effective_namespace() + "/" + action_topic );
+  action_client_ =
+      rclcpp_action::create_client<moveit_msgs::action::MoveGroup>( node_, action_topic );
 
   // setup vibration feedback patterns
   const std::string success_pattern_ns = plugin_name + ".vibration_success";

@@ -1,0 +1,6 @@
+# Retarget the joy satellite to forward gamepad input to a different robot namespace.
+# Set to "" to disable forwarding.
+string robot_namespace
+---
+bool success
+string message

@@ -1,0 +1,26 @@
+launch:
+- arg:
+    # Robot namespace that initially receives the forwarded gamepad input.
+    name: target_robot
+    default: ""
+- arg:
+    # Local joy topic published by the operator-station gamepad driver (relative to ocs_namespace).
+    name: input_topic
+    default: joy
+- arg:
+    # Local feedback topic the operator-station gamepad driver subscribes to for rumble.
+    name: feedback_topic
+    default: joy/set_feedback
+
+- node:
+    pkg: hector_gamepad_manager
+    exec: joy_satellite_node
+    name: joy_satellite_node
+    output: screen
+    param:
+    - name: target_robot
+      value: $(var target_robot)
+    - name: input_topic
+      value: $(var input_topic)
+    - name: feedback_topic
+      value: $(var feedback_topic)

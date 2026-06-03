@@ -206,14 +206,14 @@ class FakeJoyPublisher(Node):
         # ---- Find the actual manager node FQN (handles random suffixes) ----
         manager_fqn = _find_manager_fqn(self, manager_node_basename)
 
-        # ---- Pull config_name & ocs_namespace from that node ----
-        params = _request_params_sync(
-            self, manager_fqn, ("config_name", "ocs_namespace")
-        )
+        # ---- Pull config_name from that node ----
+        params = _request_params_sync(self, manager_fqn, ("config_name",))
         config_name = params.get("config_name") or "athena"
-        ocs_ns = params.get("ocs_namespace") or "ocs"
+        # The manager runs in the robot namespace; joy and joy_teleop_profile live there. Derive
+        # that namespace from the manager node's FQN ('/<robot_ns>/<node_name>').
+        robot_ns = manager_fqn.rsplit("/", 1)[0] or "/"
         self.get_logger().info(
-            f"Using manager '{manager_fqn}' with config_name='{config_name}', ocs_namespace='{ocs_ns}'"
+            f"Using manager '{manager_fqn}' with config_name='{config_name}', robot_namespace='{robot_ns}'"
         )
 
         # ---- Load meta-config & modes ----
@@ -265,7 +265,7 @@ class FakeJoyPublisher(Node):
         qos_cfg.durability = DurabilityPolicy.TRANSIENT_LOCAL
         self._active_config_sub = self.create_subscription(
             String,
-            f"{ocs_ns.strip('/')}/joy_teleop_profile",
+            f"{robot_ns.strip('/')}/joy_teleop_profile",
             self._active_config_cb,
             qos_cfg,
         )
@@ -284,7 +284,7 @@ class FakeJoyPublisher(Node):
         self._pending_one_shot_keys: Set[Key] = set()
 
         # Publisher
-        topic = f"{ocs_ns.strip('/')}/joy"
+        topic = f"{robot_ns.strip('/')}/joy"
         self._pub = self.create_publisher(Joy, topic, 10)
         self.get_logger().info(f"Publishing Joy on '{topic}' at {self._joy_rate_hz} Hz")
 

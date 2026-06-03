@@ -51,8 +51,7 @@ private:
   void onHoldRelease( const std::string &var ) const;
   void onSetString( const std::string &var, const std::string &value ) const;
 
-  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr
-  getOrCreatePublisher( const std::string &topic, const rclcpp::Node::SharedPtr &node );
+  rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr getOrCreatePublisher( const std::string &topic );
 
   bool active_{ false };
   std::unordered_map<std::string, rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr> publishers_;

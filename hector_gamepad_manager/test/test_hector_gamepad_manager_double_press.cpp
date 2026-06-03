@@ -52,12 +52,12 @@ protected:
     opts_ = rclcpp::NodeOptions();
     opts_.arguments( { "--ros-args", "--params-file", paramsFilePath() } );
 
-    node_ = std::make_shared<rclcpp::Node>( "hector_gamepad_manager_double_press_test", opts_ );
+    node_ = std::make_shared<rclcpp::Node>( "hector_gamepad_manager_double_press_test", "athena", opts_ );
     clock_ = std::make_unique<rtest::TestClock>( node_ );
     manager_ = std::make_shared<hector_gamepad_manager::HectorGamepadManager>( node_ );
 
-    sub_joy_ = rtest::findSubscription<sensor_msgs::msg::Joy>( node_, "/ocs/joy" );
-    pub_config_ = rtest::findPublisher<std_msgs::msg::String>( node_, "/ocs/joy_teleop_profile" );
+    sub_joy_ = rtest::findSubscription<sensor_msgs::msg::Joy>( node_, "/athena/joy" );
+    pub_config_ = rtest::findPublisher<std_msgs::msg::String>( node_, "/athena/joy_teleop_profile" );
     pub_probe_press_ =
         rtest::findPublisher<std_msgs::msg::String>( node_, "/athena/test_probe/press" );
     pub_probe_hold_ =
@@ -395,12 +395,12 @@ protected:
     opts_ = rclcpp::NodeOptions();
     opts_.arguments( { "--ros-args", "--params-file", paramsFilePath() } );
 
-    node_ = std::make_shared<rclcpp::Node>( "hector_gamepad_manager_zero_window_test", opts_ );
+    node_ = std::make_shared<rclcpp::Node>( "hector_gamepad_manager_zero_window_test", "athena", opts_ );
     clock_ = std::make_unique<rtest::TestClock>( node_ );
     manager_ = std::make_shared<hector_gamepad_manager::HectorGamepadManager>( node_ );
 
-    sub_joy_ = rtest::findSubscription<sensor_msgs::msg::Joy>( node_, "/ocs/joy" );
-    pub_config_ = rtest::findPublisher<std_msgs::msg::String>( node_, "/ocs/joy_teleop_profile" );
+    sub_joy_ = rtest::findSubscription<sensor_msgs::msg::Joy>( node_, "/athena/joy" );
+    pub_config_ = rtest::findPublisher<std_msgs::msg::String>( node_, "/athena/joy_teleop_profile" );
     pub_probe_press_ =
         rtest::findPublisher<std_msgs::msg::String>( node_, "/athena/test_probe/press" );
     pub_probe_release_ =
