@@ -115,8 +115,10 @@ void BatteryMonitorPlugin::initialize( const rclcpp::Node::SharedPtr &node )
 
 void BatteryMonitorPlugin::trySubscribe()
 {
-  std::string topic_name = node_->get_effective_namespace();
-  topic_name += "/battery";
+  // "battery" is relative to the node namespace; let rclcpp resolve it to a fully-qualified name so
+  // the graph lookup and the subscription use the same valid name in any namespace.
+  const std::string topic_name =
+      node_->get_node_base_interface()->resolve_topic_or_service_name( "battery", false );
 
   // Check if topic exists in the ROS graph
   const auto topics = node_->get_topic_names_and_types();

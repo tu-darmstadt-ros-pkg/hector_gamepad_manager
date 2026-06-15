@@ -6,6 +6,53 @@ For example, the `DrivePlugin` reacts to joystick movements and sends `cmd_vel` 
 
 ---
 
+## Architecture (on-robot manager + operator-station satellite)
+
+The gamepad manager runs **on the robot**, directly in the robot namespace. All of its topics, services and
+actions are relative to that namespace (e.g. `joy`, `joy_teleop_profile`, `joy_feedback`, `cmd_vel`, …), and
+plugins create their endpoints with relative names that resolve under the robot namespace. The node simply
+inherits the namespace it is launched into.
+
+Because the gamepad is physically connected to the operator station (OCS), a separate **`joy_satellite`** node
+runs on the OCS and bridges the two sides:
+
+- It forwards the local `joy` stream to the selected robot's `<target_robot>/joy` topic, so the on-robot
+  manager sees the gamepad input.
+- It bridges the robot's rumble feedback (`<target_robot>/joy_feedback`) back to the local feedback topic that
+  the OCS joy driver subscribes to, and runs a watchdog that forces the gamepad back to rest if the feedback
+  stream stops while rumbling (e.g. after retargeting to an idle robot, or the robot dropping out).
+- The target robot can be changed at runtime via the `set_target_robot` service
+  (`hector_gamepad_manager_msgs/srv/SetTargetRobot`). `target_robot` may be an absolute namespace (leading `/`)
+  or relative to the satellite's own namespace; setting it to `""` disables forwarding.
+
+This split lets a single operator gamepad drive any of several robots by retargeting the satellite, while each
+robot keeps its own manager and per-robot plugin configuration locally.
+
+```mermaid
+flowchart LR
+    subgraph OCS["Operator station"]
+        driver["joy driver"]
+        satellite["joy_satellite"]
+    end
+    subgraph Robot["Robot (namespace &lt;target_robot&gt;)"]
+        manager["hector_gamepad_manager"]
+        plugins["plugins"]
+    end
+
+    driver -- "joy" --> satellite
+    satellite -- "&lt;target_robot&gt;/joy" --> manager
+    manager --> plugins
+    manager -- "&lt;target_robot&gt;/joy_feedback" --> satellite
+    satellite -- "set_feedback (rumble)" --> driver
+
+    retarget(["set_target_robot service<br/>(retarget at runtime)"]) -.-> satellite
+```
+
+The satellite is provided both as a standalone executable (`joy_satellite_node`) and as a composable component
+(`hector_gamepad_manager::JoySatelliteNode`) for loading into a shared OCS container.
+
+---
+
 ## Configuration
 
 The system supports multiple **configurations** for different capabilities, such as **driving**, **manipulation**, or *
@@ -110,11 +157,28 @@ Plugins can then react to input and send commands to the robot.
 
 ## Launch
 
-The hector_gamepad_manager can be launched with the following command:
+The setup has two parts (see [Architecture](#architecture-on-robot-manager--operator-station-satellite)): the
+manager on the robot and the satellite on the operator station.
+
+On the robot, launch the manager into the robot namespace:
 
 ```bash
-ros2 launch hector_gampepad_manager hector_gamepad_manager.launch.yaml
+ros2 launch hector_gamepad_manager hector_gamepad_manager.launch.yaml config_name:=athena
 ```
+
+`config_name` selects the meta-configuration file. The launch file does not set a namespace itself; push it
+into the robot namespace from the surrounding launch (e.g. via `PushRosNamespace`) so the manager's relative
+topics resolve under the robot.
+
+On the operator station, launch the satellite alongside the joy driver:
+
+```bash
+ros2 launch hector_gamepad_manager joy_satellite.launch.yaml target_robot:=/athena
+```
+
+Arguments: `target_robot` (initial robot namespace to forward to, `''` = none), `input_topic` (local joy topic,
+default `joy`) and `feedback_topic` (local rumble topic the joy driver subscribes to, default `joy/set_feedback`).
+Retarget at runtime by calling the `set_target_robot` service.
 
 ## Blackboard
 

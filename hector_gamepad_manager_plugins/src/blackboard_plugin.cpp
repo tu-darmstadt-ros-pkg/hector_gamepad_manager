@@ -68,11 +68,11 @@ void BlackboardPlugin::handleRelease( const std::string &function, const std::st
 }
 
 rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr
-BlackboardPlugin::getOrCreatePublisher( const std::string &topic, const rclcpp::Node::SharedPtr &node )
+BlackboardPlugin::getOrCreatePublisher( const std::string &topic )
 {
   if ( publishers_.find( topic ) == publishers_.end() ) {
     const auto qos = rclcpp::QoS( rclcpp::KeepLast( 10 ) ).transient_local().reliable();
-    publishers_[topic] = node->create_publisher<std_msgs::msg::Bool>( topic, qos );
+    publishers_[topic] = node_->create_publisher<std_msgs::msg::Bool>( topic, qos );
   }
   return publishers_[topic];
 }
@@ -89,12 +89,12 @@ void BlackboardPlugin::onToggle( const std::string &var, const std::string &topi
 
   // Publish to robot namespace topic if specified
   if ( !topic.empty() ) {
-    getOrCreatePublisher( topic, node_ )->publish( msg );
+    getOrCreatePublisher( topic )->publish( msg );
   }
 
-  // Publish to OCS namespace topic if specified
-  if ( !ocs_topic.empty() ) {
-    getOrCreatePublisher( ocs_topic, ocs_ns_node_ )->publish( msg );
+  // Publish to an optional separate OCS-facing topic if specified
+  if ( !ocs_topic.empty() && ocs_topic != topic ) {
+    getOrCreatePublisher( ocs_topic )->publish( msg );
   }
 
   RCLCPP_DEBUG( node_->get_logger(), "[blackboard_plugin] toggle %s -> %s", var.c_str(),

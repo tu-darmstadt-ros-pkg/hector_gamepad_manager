@@ -63,8 +63,7 @@ private:
     std::unordered_map<int, FunctionMapping> axis_mappings;
   };
 
-  rclcpp::Node::SharedPtr robot_ns_node_;
-  rclcpp::Node::SharedPtr ocs_ns_node_;
+  rclcpp::Node::SharedPtr node_;
 
   rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_subscription_;
 
@@ -87,12 +86,6 @@ private:
 
   // Config directory relative to package share or absolute path override
   std::string config_directory_;
-
-  // used for to prefix the configs
-  std::string robot_namespace_;
-
-  // namespace for the operator station
-  std::string ocs_namespace_;
 
   // Map of loaded plugins
   std::unordered_map<std::string, std::shared_ptr<GamepadFunctionPlugin>> plugins_;

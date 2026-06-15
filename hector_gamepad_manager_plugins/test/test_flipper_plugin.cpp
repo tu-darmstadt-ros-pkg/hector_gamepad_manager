@@ -28,19 +28,20 @@ protected:
 
   void SetUp() override
   {
-    node_ = std::make_shared<rclcpp::Node>( "flipper_plugin_test" );
-    node_->declare_parameter<std::string>( "robot_namespace", "athena" );
+    node_ = std::make_shared<rclcpp::Node>( "flipper_plugin_test", "athena" );
 
     plugin_ = std::make_shared<hector_gamepad_manager_plugins::FlipperPlugin>();
-    plugin_->initializePlugin( node_, node_, "hector_gamepad_manager_plugins::FlipperPlugin",
+    plugin_->initializePlugin( node_, "hector_gamepad_manager_plugins::FlipperPlugin",
                                std::make_shared<hector_gamepad_plugin_interface::Blackboard>(),
                                std::make_shared<hector_gamepad_plugin_interface::FeedbackManager>(),
                                nullptr );
 
+    // The plugin creates the action clients with relative names (resolved under the node namespace
+    // by rclcpp). rtest's action-client mock keys by the unresolved name, so look them up relative.
     drive_mock_ = rtest::experimental::findActionClient<DriveAction>(
-        node_, "/athena/flipper_velocity_to_position_controller/drive_flipper_group" );
+        node_, "flipper_velocity_to_position_controller/drive_flipper_group" );
     sync_mock_ = rtest::experimental::findActionClient<SyncAction>(
-        node_, "/athena/flipper_velocity_to_position_controller/sync_flipper_group" );
+        node_, "flipper_velocity_to_position_controller/sync_flipper_group" );
 
     ASSERT_TRUE( drive_mock_ );
     ASSERT_TRUE( sync_mock_ );

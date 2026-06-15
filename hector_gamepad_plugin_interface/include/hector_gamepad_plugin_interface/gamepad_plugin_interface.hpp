@@ -18,18 +18,16 @@ public:
   virtual ~GamepadFunctionPlugin() = default;
 
   void initializePlugin(
-      const rclcpp::Node::SharedPtr &robot_ns_node, const rclcpp::Node::SharedPtr &ocs_ns_node,
-      const std::string &plugin_id, std::shared_ptr<Blackboard> blackboard,
-      std::shared_ptr<FeedbackManager> feedback_manager,
+      const rclcpp::Node::SharedPtr &node, const std::string &plugin_id,
+      std::shared_ptr<Blackboard> blackboard, std::shared_ptr<FeedbackManager> feedback_manager,
       std::shared_ptr<controller_orchestrator::ControllerOrchestrator> controller_orchestrator )
   {
-    node_ = robot_ns_node;
-    ocs_ns_node_ = ocs_ns_node;
+    node_ = node;
     blackboard_ = blackboard;
     feedback_manager_ = feedback_manager;
     controller_orchestrator_ = controller_orchestrator;
     setPluginId( plugin_id );
-    initialize( robot_ns_node );
+    initialize( node );
   }
 
   /**
@@ -237,9 +235,6 @@ protected:
   }
   // The ROS node in the robot namespace
   rclcpp::Node::SharedPtr node_;
-
-  // The ROS node in the OCS (operator control station) namespace
-  rclcpp::Node::SharedPtr ocs_ns_node_;
 
   // Specifies if the plugin is active.
   bool active_ = false;

@@ -28,8 +28,8 @@ from hector_gamepad_testing_tools.fake_joy_publisher import (
 # Launch the manager only
 # ------------------------
 def generate_test_description():
-    # Configure a clean OCS/robot namespace for the test
-    ocs_ns = "test_ocs"
+    # The manager runs on the robot and is pushed into the robot namespace; all of its topics
+    # (joy, joy_teleop_profile, ...) are scoped under it.
     robot_ns = "test_robot"
     config_name = "athena"
 
@@ -41,12 +41,11 @@ def generate_test_description():
         package="hector_gamepad_manager",
         executable="hector_gamepad_manager_node",
         name="hector_gamepad_manager",
+        namespace=robot_ns,
         output="screen",
         parameters=[
             plugin_cfg,
             {"config_name": config_name},
-            {"ocs_namespace": ocs_ns},
-            {"robot_namespace": robot_ns},
         ],
     )
 
@@ -61,7 +60,6 @@ def generate_test_description():
     )
 
     return ld, {
-        "ocs_ns": ocs_ns,
         "robot_ns": robot_ns,
         "gamepad_manager": gamepad_manager,
     }
@@ -71,9 +69,9 @@ def generate_test_description():
 # Helper test node
 # ------------------------
 class Probe(Node):
-    def __init__(self, ocs_ns: str):
+    def __init__(self, robot_ns: str):
         super().__init__("fake_joy_publisher_test_probe")
-        self.ocs_ns = ocs_ns
+        self.robot_ns = robot_ns
 
         qos_latched = QoSProfile(
             depth=1,
@@ -86,9 +84,11 @@ class Probe(Node):
         self.joy_msgs = deque(maxlen=50)
 
         self.sub_cfg = self.create_subscription(
-            String, f"{ocs_ns}/joy_teleop_profile", self._on_cfg, qos_latched
+            String, f"{robot_ns}/joy_teleop_profile", self._on_cfg, qos_latched
         )
-        self.sub_joy = self.create_subscription(Joy, f"{ocs_ns}/joy", self._on_joy, 10)
+        self.sub_joy = self.create_subscription(
+            Joy, f"{robot_ns}/joy", self._on_joy, 10
+        )
 
     def _on_cfg(self, msg: String):
         self.active_config = msg.data
@@ -132,10 +132,10 @@ class TestFakeJoyPublisher(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         rclpy.init()
-        cls.ocs_ns = "test_ocs"
+        cls.robot_ns = "test_robot"
 
         # Probe to observe /active_config and /joy
-        cls.probe = Probe(cls.ocs_ns)
+        cls.probe = Probe(cls.robot_ns)
 
         # Instantiate the FakeJoyPublisher in-process (so we can call its Python API directly).
         cls.fake = FakeJoyPublisher(joy_rate_hz=40.0)
