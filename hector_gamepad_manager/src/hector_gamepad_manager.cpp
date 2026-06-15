@@ -5,9 +5,8 @@
 namespace hector_gamepad_manager
 {
 HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node )
-    : node_( node ),
-      plugin_loader_( "hector_gamepad_manager",
-                      "hector_gamepad_plugin_interface::GamepadFunctionPlugin" ),
+    : node_( node ), plugin_loader_( "hector_gamepad_manager",
+                                     "hector_gamepad_plugin_interface::GamepadFunctionPlugin" ),
       blackboard_( std::make_shared<hector_gamepad_plugin_interface::Blackboard>() ),
       feedback_manager_( std::make_shared<hector_gamepad_plugin_interface::FeedbackManager>() )
 {
@@ -54,8 +53,7 @@ bool HectorGamepadManager::loadConfigSwitchesConfig( const std::string &file_nam
 
       RCLCPP_DEBUG( node_->get_logger(), "Loading config file %s", config_name.c_str() );
       if ( !loadConfig( pkg_name, config_name ) ) {
-        RCLCPP_ERROR( node_->get_logger(), "Failed to load config file %s",
-                      config_name.c_str() );
+        RCLCPP_ERROR( node_->get_logger(), "Failed to load config file %s", config_name.c_str() );
         return false;
       }
       config_switch_button_mapping_[id] = config_name;
@@ -91,8 +89,8 @@ bool HectorGamepadManager::loadConfig( const std::string &pkg_name, const std::s
 bool HectorGamepadManager::switchConfig( const std::string &config_name )
 {
   if ( configs_.count( config_name ) == 0 ) {
-    RCLCPP_ERROR( node_->get_logger(),
-                  "Config %s not found. Cannot switch the gamepad config", config_name.c_str() );
+    RCLCPP_ERROR( node_->get_logger(), "Config %s not found. Cannot switch the gamepad config",
+                  config_name.c_str() );
     return false;
   }
   if ( config_name == active_config_ )
@@ -122,8 +120,7 @@ bool HectorGamepadManager::ensurePluginLoaded( const std::string &plugin_name )
     RCLCPP_DEBUG( node_->get_logger(), "Loaded plugin: %s", plugin_name.c_str() );
     return true;
   } catch ( const std::exception &e ) {
-    RCLCPP_ERROR( node_->get_logger(), "Failed to load plugin %s: %s", plugin_name.c_str(),
-                  e.what() );
+    RCLCPP_ERROR( node_->get_logger(), "Failed to load plugin %s: %s", plugin_name.c_str(), e.what() );
     return false;
   }
 }
@@ -365,8 +362,8 @@ void HectorGamepadManager::activatePlugins( const std::string &config_name )
 {
   // activate all  plugins present in the button_mappings_ and axis_mappings_ of the given config
   if ( configs_.count( config_name ) == 0 ) {
-    RCLCPP_ERROR( node_->get_logger(),
-                  "Config %s not found. Cannot activate the gamepad config", config_name.c_str() );
+    RCLCPP_ERROR( node_->get_logger(), "Config %s not found. Cannot activate the gamepad config",
+                  config_name.c_str() );
     return;
   }
   // activate all plugins present in the button_mappings_

@@ -89,8 +89,7 @@ TEST_F( JoySatelliteTest, BridgesFeedbackBack )
   sensor_msgs::msg::JoyFeedback fb;
   fb.type = sensor_msgs::msg::JoyFeedback::TYPE_RUMBLE;
   fb.intensity = 0.7f;
-  EXPECT_CALL( *pub_feedback_,
-               publish( Field( &sensor_msgs::msg::JoyFeedback::intensity, 0.7f ) ) )
+  EXPECT_CALL( *pub_feedback_, publish( Field( &sensor_msgs::msg::JoyFeedback::intensity, 0.7f ) ) )
       .Times( 1 );
   sub_feedback_athena_->handle_message( fb );
 }
@@ -105,9 +104,8 @@ TEST_F( JoySatelliteTest, SwitchRetargetsAndNeutralizesOldRobot )
   sub_joy_->handle_message( joy );
 
   // Switching neutralizes the old robot exactly once (all-zero, matching the forwarded layout).
-  EXPECT_CALL( *pub_athena_,
-               publish( AllOf( Field( &sensor_msgs::msg::Joy::axes, Each( 0.0f ) ),
-                               Field( &sensor_msgs::msg::Joy::buttons, Each( 0 ) ) ) ) )
+  EXPECT_CALL( *pub_athena_, publish( AllOf( Field( &sensor_msgs::msg::Joy::axes, Each( 0.0f ) ),
+                                             Field( &sensor_msgs::msg::Joy::buttons, Each( 0 ) ) ) ) )
       .Times( 1 );
 
   const auto response = callSetTarget( "bob" );
@@ -116,8 +114,7 @@ TEST_F( JoySatelliteTest, SwitchRetargetsAndNeutralizesOldRobot )
   // New joy is now routed to the new robot.
   auto pub_bob = rtest::findPublisher<sensor_msgs::msg::Joy>( node_, "/bob/joy" );
   ASSERT_TRUE( pub_bob );
-  EXPECT_CALL( *pub_bob, publish( Field( &sensor_msgs::msg::Joy::buttons, joy.buttons ) ) )
-      .Times( 1 );
+  EXPECT_CALL( *pub_bob, publish( Field( &sensor_msgs::msg::Joy::buttons, joy.buttons ) ) ).Times( 1 );
   sub_joy_->handle_message( joy );
 }
 
@@ -132,9 +129,8 @@ TEST_F( JoySatelliteTest, EmptyNamespaceDetaches )
   sub_joy_->handle_message( joy );
 
   // Detaching succeeds and neutralizes the previously selected robot exactly once.
-  EXPECT_CALL( *pub_athena_,
-               publish( AllOf( Field( &sensor_msgs::msg::Joy::axes, Each( 0.0f ) ),
-                               Field( &sensor_msgs::msg::Joy::buttons, Each( 0 ) ) ) ) )
+  EXPECT_CALL( *pub_athena_, publish( AllOf( Field( &sensor_msgs::msg::Joy::axes, Each( 0.0f ) ),
+                                             Field( &sensor_msgs::msg::Joy::buttons, Each( 0 ) ) ) ) )
       .Times( 1 );
   const auto response = callSetTarget( "" );
   EXPECT_TRUE( response.success );

@@ -86,7 +86,9 @@ class Probe(Node):
         self.sub_cfg = self.create_subscription(
             String, f"{robot_ns}/joy_teleop_profile", self._on_cfg, qos_latched
         )
-        self.sub_joy = self.create_subscription(Joy, f"{robot_ns}/joy", self._on_joy, 10)
+        self.sub_joy = self.create_subscription(
+            Joy, f"{robot_ns}/joy", self._on_joy, 10
+        )
 
     def _on_cfg(self, msg: String):
         self.active_config = msg.data

@@ -2,7 +2,7 @@ launch:
 - arg:
     # Robot namespace that initially receives the forwarded gamepad input.
     name: target_robot
-    default: ""
+    default: ''
 - arg:
     # Local joy topic published by the operator-station gamepad driver (relative to ocs_namespace).
     name: input_topic

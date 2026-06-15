@@ -47,13 +47,13 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   // Setup Flipper Command Publisher
   const std::string command_topic =
       node_->get_parameter( plugin_namespace + ".command_topic" ).as_string();
-  flipper_command_publisher_ = node_->create_publisher<std_msgs::msg::Float64MultiArray>(
-      command_topic, 10 );
+  flipper_command_publisher_ =
+      node_->create_publisher<std_msgs::msg::Float64MultiArray>( command_topic, 10 );
 
   // Action clients for flipper group actions
   node_->declare_parameter<std::string>(
       plugin_namespace + ".drive_flipper_action",
-       "flipper_velocity_to_position_controller/drive_flipper_group" );
+      "flipper_velocity_to_position_controller/drive_flipper_group" );
   node_->declare_parameter<std::string>(
       plugin_namespace + ".sync_flipper_action",
       "flipper_velocity_to_position_controller/sync_flipper_group" );
