@@ -21,9 +21,10 @@ namespace hector_gamepad_manager_plugins
  *  - hold:   set true on press, set false on release
  *  - set:    write <value> (string) on press
  *
- * Topic options:
- *  - topic: publishes to robot namespace
- *  - ocs_topic: publishes to OCS namespace (e.g., for UI feedback)
+ * Topic options (both are relative to the robot namespace the node runs in):
+ *  - topic: publishes the new value to this topic
+ *  - ocs_topic: optional second topic the new value is also published to (e.g. for UI feedback);
+ *               ignored if empty or equal to topic
  */
 class BlackboardPlugin final : public hector_gamepad_plugin_interface::GamepadFunctionPlugin
 {

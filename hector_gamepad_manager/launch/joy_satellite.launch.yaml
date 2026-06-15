@@ -4,7 +4,7 @@ launch:
     name: target_robot
     default: ''
 - arg:
-    # Local joy topic published by the operator-station gamepad driver (relative to ocs_namespace).
+    # Local joy topic published by the operator-station gamepad driver (relative to this node's namespace).
     name: input_topic
     default: joy
 - arg:
