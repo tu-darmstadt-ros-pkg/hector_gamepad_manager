@@ -272,7 +272,7 @@ void FlipperPlugin::handleFlipperUpright( const std::string &function )
                  function.c_str() );
     return;
   }
-
+  const auto &invert_steering = blackboard_->value_or<bool>( "invert_steering", false );
   auto goal = DriveFlipperGroupAction::Goal();
   // target_position = 0 means use the upright_position parameter on the controller side
   goal.target_position = 0.0;
@@ -280,9 +280,9 @@ void FlipperPlugin::handleFlipperUpright( const std::string &function )
   goal.max_acceleration = 0.0; // use controller default
 
   if ( function == "flipper_front_upright" ) {
-    goal.group_name = "flipper_front";
+    goal.group_name = invert_steering ? "flipper_back" : "flipper_front";
   } else if ( function == "flipper_back_upright" ) {
-    goal.group_name = "flipper_back";
+    goal.group_name = invert_steering ? "flipper_front" : "flipper_back";
   } else {
     RCLCPP_WARN( node_->get_logger(), "Unknown flipper upright function: %s", function.c_str() );
     return;
@@ -328,14 +328,18 @@ void FlipperPlugin::handleFlipperSync( const std::string &function )
     return;
   }
 
+  const auto &invert_steering = blackboard_->value_or<bool>( "invert_steering", false );
+
   auto goal = SyncFlipperGroupAction::Goal();
   goal.max_velocity = 0.0;     // use controller default
   goal.max_acceleration = 0.0; // use controller default
 
   if ( function == "sync_front_flippers" ) {
-    goal.group_names = { "flipper_front" };
+    const auto group_name = invert_steering ? "flipper_back" : "flipper_front";
+    goal.group_names = { group_name };
   } else if ( function == "sync_back_flippers" ) {
-    goal.group_names = { "flipper_back" };
+    const auto group_name = invert_steering ? "flipper_front" : "flipper_back";
+    goal.group_names = { group_name };
   } else if ( function == "sync_all_flippers" ) {
     goal.group_names = {}; // empty = sync all groups
   } else {
