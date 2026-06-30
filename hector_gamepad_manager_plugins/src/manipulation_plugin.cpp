@@ -160,6 +160,9 @@ void ManipulationPlugin::update()
   }
   // Single-joint mode: both joysticks drive the first 4 arm joints directly (no IK).
   if ( single_joint_mode_active_ ) {
+    // Flush any in-flight Cartesian twist so the controller stops integrating it; mark eef as zero
+    // so re-entering eef mode re-activates on the next twist.
+    publishZeroEefCmd();
     publishZeroNullspaceCmd();
     std_msgs::msg::Float64MultiArray joint_cmd;
     joint_cmd.data.assign( num_arm_joints_, 0.0 );
@@ -178,8 +181,6 @@ void ManipulationPlugin::update()
     if ( !( last_joint_cmd_zero_ && is_zero_joint_cmd ) )
       joint_cmd_pub_->publish( joint_cmd );
     last_joint_cmd_zero_ = is_zero_joint_cmd;
-    // Mark the eef command path as zero so re-entering eef mode re-activates on the next twist.
-    last_eef_cmd_zero_ = true;
     sendDriveCommand( 0.0, 0.0 );
     return;
   }
@@ -187,6 +188,9 @@ void ManipulationPlugin::update()
 
   // Nullspace bias mode: the left joystick biases arm joints 1 and 2 while the IK holds the eef pose.
   if ( nullspace_mode_active_ ) {
+    // Flush any in-flight Cartesian twist so the controller stops integrating it; mark eef as zero
+    // so re-entering eef mode re-activates on the next twist.
+    publishZeroEefCmd();
     std_msgs::msg::Float64MultiArray nullspace_cmd;
     nullspace_cmd.data.assign( num_arm_joints_, 0.0 );
     if ( num_arm_joints_ > 0 )
@@ -199,8 +203,6 @@ void ManipulationPlugin::update()
     if ( !( last_nullspace_cmd_zero_ && is_zero_nullspace_cmd ) )
       nullspace_cmd_pub_->publish( nullspace_cmd );
     last_nullspace_cmd_zero_ = is_zero_nullspace_cmd;
-    // Mark the eef command path as zero so re-entering eef mode re-activates on the next twist.
-    last_eef_cmd_zero_ = true;
     sendDriveCommand( 0.0, 0.0 );
     return;
   }
@@ -281,6 +283,16 @@ void ManipulationPlugin::reset()
   publishZeroNullspaceCmd();
   single_joint_mode_active_ = false;
   publishZeroJointCmd();
+}
+
+void ManipulationPlugin::publishZeroEefCmd()
+{
+  if ( last_eef_cmd_zero_ )
+    return;
+  eef_cmd_.twist = geometry_msgs::msg::Twist();
+  eef_cmd_.header.stamp = node_->now();
+  eef_cmd_pub_->publish( eef_cmd_ );
+  last_eef_cmd_zero_ = true;
 }
 
 void ManipulationPlugin::publishZeroNullspaceCmd()

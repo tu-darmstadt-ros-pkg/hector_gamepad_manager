@@ -104,6 +104,11 @@ private:
   geometry_msgs::msg::TwistStamped drive_cmd_;
   std_msgs::msg::Float64 gripper_cmd_;
 
+  /// Publishes a zeroed end-effector twist (used to stop Cartesian motion when entering a
+  /// nullspace/single-joint mode, so the controller does not keep integrating the last twist
+  /// until cmd_timeout expires).
+  void publishZeroEefCmd();
+
   /// Publishes a zeroed nullspace command (used to stop biasing).
   void publishZeroNullspaceCmd();
 
