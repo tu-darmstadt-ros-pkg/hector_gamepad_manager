@@ -160,6 +160,7 @@ void ManipulationPlugin::update()
   }
   // Single-joint mode: both joysticks drive the first 4 arm joints directly (no IK).
   if ( single_joint_mode_active_ ) {
+    publishZeroNullspaceCmd();
     std_msgs::msg::Float64MultiArray joint_cmd;
     joint_cmd.data.assign( num_arm_joints_, 0.0 );
     if ( num_arm_joints_ > 0 )
@@ -172,7 +173,7 @@ void ManipulationPlugin::update()
       joint_cmd.data[3] = rotate_pitch_ * max_joint_speed_;
     const bool is_zero_joint_cmd = move_left_right_ == 0.0 && move_up_down_ == 0.0 &&
                                    rotate_yaw_ == 0.0 && rotate_pitch_ == 0.0;
-    if ( last_eef_cmd_zero_ && !is_zero_joint_cmd )
+    if ( last_joint_cmd_zero_ && !is_zero_joint_cmd )
       activateControllers( { twist_controller_name_ } );
     if ( !( last_joint_cmd_zero_ && is_zero_joint_cmd ) )
       joint_cmd_pub_->publish( joint_cmd );
@@ -193,7 +194,7 @@ void ManipulationPlugin::update()
     if ( num_arm_joints_ > 1 )
       nullspace_cmd.data[1] = move_up_down_ * max_nullspace_joint_speed_;
     const bool is_zero_nullspace_cmd = move_left_right_ == 0.0 && move_up_down_ == 0.0;
-    if ( last_eef_cmd_zero_ && !is_zero_nullspace_cmd )
+    if ( last_nullspace_cmd_zero_ && !is_zero_nullspace_cmd )
       activateControllers( { twist_controller_name_ } );
     if ( !( last_nullspace_cmd_zero_ && is_zero_nullspace_cmd ) )
       nullspace_cmd_pub_->publish( nullspace_cmd );
