@@ -268,6 +268,20 @@ world frame.
 - `close_gripper`: Close the gripper.
 - `hold_mode`: Toggle the hold mode. In hold mode the robot can be driven while the end-effector remains at its current
   position in the world frame.
+- `nullspace_mode`: Hold to bias arm joints 1 and 2 (via the left joystick) while the IK keeps the end-effector pose fixed.
+- `single_joint_mode`: Hold to drive the first 4 arm joints directly via both joysticks (no IK; the end-effector pose is not held).
+
+### Parameters
+
+- `max_eef_linear_speed` / `max_eef_angular_speed` (double): Maximum end-effector linear/angular speed.
+- `max_gripper_speed` (double): Maximum gripper speed.
+- `max_drive_linear_speed` / `max_drive_angular_speed` (double): Maximum base speed in hold mode.
+- `max_nullspace_joint_speed` (double): Maximum joint speed of the nullspace bias (rad/s).
+- `max_joint_speed` (double): Maximum joint speed of direct single-joint jogging (rad/s).
+- `eef_twist_frame` (string): Frame of the end-effector twist command.
+- `num_arm_joints` (int): Number of arm joints; must match the twist controller. Default: `7`.
+- `twist_controller_name` / `gripper_controller_name` (string): Controller names to command.
+- `enable_drive_cmd` (bool): Whether to publish base `cmd_vel`. Default: `true`.
 
 ## BlackboardPlugin
 
