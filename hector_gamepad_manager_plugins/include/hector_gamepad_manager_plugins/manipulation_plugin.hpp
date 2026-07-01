@@ -8,6 +8,7 @@
 #include <hector_gamepad_plugin_interface/gamepad_plugin_interface.hpp>
 #include <hector_ros2_utils/parameters/reconfigurable_parameter.hpp>
 #include <std_msgs/msg/float64.hpp>
+#include <std_msgs/msg/float64_multi_array.hpp>
 #include <std_srvs/srv/set_bool.hpp>
 
 namespace hector_gamepad_manager_plugins
@@ -48,6 +49,8 @@ private:
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr eef_cmd_pub_;
   rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr drive_cmd_pub_;
   rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr gripper_cmd_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr nullspace_cmd_pub_;
+  rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr joint_cmd_pub_;
   rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr hold_mode_client_;
 
   hector::ParameterSubscription max_eef_linear_speed_param_sub_;
@@ -57,13 +60,28 @@ private:
   hector::ParameterSubscription max_drive_angular_speed_param_sub_;
   hector::ParameterSubscription eef_twist_frame_param_sub_;
 
+  hector::ParameterSubscription max_nullspace_joint_speed_param_sub_;
+  hector::ParameterSubscription max_joint_speed_param_sub_;
+
   double max_eef_linear_speed_ = 0.0;
   double max_eef_angular_speed_ = 0.0;
   double max_gripper_speed_ = 0.0;
   double max_drive_linear_speed_ = 0.0;
   double max_drive_angular_speed_ = 0.0;
+  double max_nullspace_joint_speed_ = 0.0;
+  double max_joint_speed_ = 0.0;
 
   bool hold_mode_active_ = false;
+  // While nullspace_mode is held, the left joystick biases arm joints (keeping the eef pose)
+  // instead of commanding eef/base motion.
+  bool nullspace_mode_active_ = false;
+  bool last_nullspace_cmd_zero_ = true;
+  // While single_joint_mode is held, both joysticks drive the first 4 arm joints directly
+  // (left X->j1, left Y->j2, right X->j3, right Y->j4); the eef pose is not held.
+  bool single_joint_mode_active_ = false;
+  bool last_joint_cmd_zero_ = true;
+  // Number of active arm joints (size of the nullspace command vector).
+  int num_arm_joints_ = 0;
   bool hold_mode_change_requested_ = false;
   bool last_drive_cmd_zero_ = false;
   bool last_eef_cmd_zero_ = true;
@@ -85,6 +103,17 @@ private:
   geometry_msgs::msg::TwistStamped eef_cmd_;
   geometry_msgs::msg::TwistStamped drive_cmd_;
   std_msgs::msg::Float64 gripper_cmd_;
+
+  /// Publishes a zeroed end-effector twist (used to stop Cartesian motion when entering a
+  /// nullspace/single-joint mode, so the controller does not keep integrating the last twist
+  /// until cmd_timeout expires).
+  void publishZeroEefCmd();
+
+  /// Publishes a zeroed nullspace command (used to stop biasing).
+  void publishZeroNullspaceCmd();
+
+  /// Publishes a zeroed direct-joint command (used to stop single-joint jogging).
+  void publishZeroJointCmd();
 };
 } // namespace hector_gamepad_manager_plugins
 

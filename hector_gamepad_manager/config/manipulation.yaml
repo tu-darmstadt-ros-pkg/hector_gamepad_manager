@@ -33,8 +33,8 @@ axes:
 
 buttons:
   0: # Button A
-    plugin: ''
-    function: ''
+    plugin: hector_gamepad_manager_plugins::ManipulationPlugin
+    function: nullspace_mode
 
   1: # Button B
     plugin: hector_gamepad_manager_plugins::ManipulationPlugin
@@ -80,8 +80,8 @@ buttons:
       topic: gamepad_e_stop
 
   10: # Right joystick press
-    plugin: ''
-    function: ''
+    plugin: hector_gamepad_manager_plugins::ManipulationPlugin
+    function: single_joint_mode
 
   # -------------------- All the axes can also be used as buttons if specified here --------------------
   11: # Left joystick left

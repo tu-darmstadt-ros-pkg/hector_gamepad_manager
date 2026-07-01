@@ -39,7 +39,26 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
       "Frame of the End Effector Twist",
       hector::ParameterOptions<std::string>().onValidate(
           []( const auto &value ) { return !value.empty(); } ) );
+  max_nullspace_joint_speed_param_sub_ = hector::createReconfigurableParameter(
+      node, plugin_namespace + ".max_nullspace_joint_speed", std::ref( max_nullspace_joint_speed_ ),
+      "Maximum Joint Speed of the Nullspace Bias (rad/s)",
+      hector::ParameterOptions<double>().onValidate(
+          []( const auto &value ) { return value > 0.0; } ) );
+  max_joint_speed_param_sub_ = hector::createReconfigurableParameter(
+      node, plugin_namespace + ".max_joint_speed", std::ref( max_joint_speed_ ),
+      "Maximum Joint Speed of Direct Single-Joint Jogging (rad/s)",
+      hector::ParameterOptions<double>().onValidate(
+          []( const auto &value ) { return value > 0.0; } ) );
   // Setup static parameters
+  node_->declare_parameter<int>( plugin_namespace + ".num_arm_joints", 7 );
+  num_arm_joints_ = node_->get_parameter( plugin_namespace + ".num_arm_joints" ).as_int();
+  if ( num_arm_joints_ < 1 ) {
+    RCLCPP_ERROR( node_->get_logger(),
+                  "num_arm_joints (%d) must be >= 1; clamping to 1. Nullspace bias requires it to "
+                  "match the twist controller's arm joint count.",
+                  num_arm_joints_ );
+    num_arm_joints_ = 1;
+  }
   node_->declare_parameter<std::string>( plugin_namespace + ".twist_controller_name",
                                          "moveit_twist_controller" );
   twist_controller_name_ =
@@ -59,6 +78,10 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   }
   gripper_cmd_pub_ = node_->create_publisher<std_msgs::msg::Float64>(
       gripper_controller_name_ + "/velocity_command", 10 );
+  nullspace_cmd_pub_ = node_->create_publisher<std_msgs::msg::Float64MultiArray>(
+      twist_controller_name_ + "/nullspace_cmd", 10 );
+  joint_cmd_pub_ = node_->create_publisher<std_msgs::msg::Float64MultiArray>(
+      twist_controller_name_ + "/joint_cmd", 10 );
   hold_mode_client_ =
       node_->create_client<std_srvs::srv::SetBool>( twist_controller_name_ + "/hold_mode" );
 }
@@ -68,6 +91,10 @@ void ManipulationPlugin::handlePress( const std::string &function, const std::st
   if ( function == "hold_mode" ) {
     hold_mode_change_requested_ = true;
     hold_mode_active_ = true;
+  } else if ( function == "nullspace_mode" ) {
+    nullspace_mode_active_ = true;
+  } else if ( function == "single_joint_mode" ) {
+    single_joint_mode_active_ = true;
   } else if ( function == "rotate_roll_clockwise" ) {
     rotate_roll_clockwise_ = 1;
   } else if ( function == "rotate_roll_counter_clockwise" ) {
@@ -85,6 +112,10 @@ void ManipulationPlugin::handleRelease( const std::string &function, const std::
   if ( function == "hold_mode" ) {
     hold_mode_change_requested_ = true;
     hold_mode_active_ = false;
+  } else if ( function == "nullspace_mode" ) {
+    nullspace_mode_active_ = false;
+  } else if ( function == "single_joint_mode" ) {
+    single_joint_mode_active_ = false;
   } else if ( function == "rotate_roll_clockwise" ) {
     rotate_roll_clockwise_ = 0.0;
   } else if ( function == "rotate_roll_counter_clockwise" ) {
@@ -127,6 +158,56 @@ void ManipulationPlugin::update()
     // reset cmds when hold mode is toggled
     reset();
   }
+  // Single-joint mode: both joysticks drive the first 4 arm joints directly (no IK).
+  if ( single_joint_mode_active_ ) {
+    // Flush any in-flight Cartesian twist so the controller stops integrating it; mark eef as zero
+    // so re-entering eef mode re-activates on the next twist.
+    publishZeroEefCmd();
+    publishZeroNullspaceCmd();
+    std_msgs::msg::Float64MultiArray joint_cmd;
+    joint_cmd.data.assign( num_arm_joints_, 0.0 );
+    if ( num_arm_joints_ > 0 )
+      joint_cmd.data[0] = move_left_right_ * max_joint_speed_;
+    if ( num_arm_joints_ > 1 )
+      joint_cmd.data[1] = move_up_down_ * max_joint_speed_;
+    if ( num_arm_joints_ > 2 )
+      joint_cmd.data[2] = rotate_yaw_ * max_joint_speed_;
+    if ( num_arm_joints_ > 3 )
+      joint_cmd.data[3] = rotate_pitch_ * max_joint_speed_;
+    const bool is_zero_joint_cmd = move_left_right_ == 0.0 && move_up_down_ == 0.0 &&
+                                   rotate_yaw_ == 0.0 && rotate_pitch_ == 0.0;
+    if ( last_joint_cmd_zero_ && !is_zero_joint_cmd )
+      activateControllers( { twist_controller_name_ } );
+    if ( !( last_joint_cmd_zero_ && is_zero_joint_cmd ) )
+      joint_cmd_pub_->publish( joint_cmd );
+    last_joint_cmd_zero_ = is_zero_joint_cmd;
+    sendDriveCommand( 0.0, 0.0 );
+    return;
+  }
+  publishZeroJointCmd();
+
+  // Nullspace bias mode: the left joystick biases arm joints 1 and 2 while the IK holds the eef pose.
+  if ( nullspace_mode_active_ ) {
+    // Flush any in-flight Cartesian twist so the controller stops integrating it; mark eef as zero
+    // so re-entering eef mode re-activates on the next twist.
+    publishZeroEefCmd();
+    std_msgs::msg::Float64MultiArray nullspace_cmd;
+    nullspace_cmd.data.assign( num_arm_joints_, 0.0 );
+    if ( num_arm_joints_ > 0 )
+      nullspace_cmd.data[0] = move_left_right_ * max_nullspace_joint_speed_;
+    if ( num_arm_joints_ > 1 )
+      nullspace_cmd.data[1] = move_up_down_ * max_nullspace_joint_speed_;
+    const bool is_zero_nullspace_cmd = move_left_right_ == 0.0 && move_up_down_ == 0.0;
+    if ( last_nullspace_cmd_zero_ && !is_zero_nullspace_cmd )
+      activateControllers( { twist_controller_name_ } );
+    if ( !( last_nullspace_cmd_zero_ && is_zero_nullspace_cmd ) )
+      nullspace_cmd_pub_->publish( nullspace_cmd );
+    last_nullspace_cmd_zero_ = is_zero_nullspace_cmd;
+    sendDriveCommand( 0.0, 0.0 );
+    return;
+  }
+  publishZeroNullspaceCmd();
+
   double cmd_vel_linear = 0.0, cmd_vel_angular = 0.0;
   if ( hold_mode_active_ ) {
     // left joystick moves base, ignore all other axis and buttons
@@ -198,6 +279,40 @@ void ManipulationPlugin::reset()
   gripper_cmd_.data = 0.0;
   hold_mode_change_requested_ = false;
   last_eef_cmd_zero_ = false;
+  nullspace_mode_active_ = false;
+  publishZeroNullspaceCmd();
+  single_joint_mode_active_ = false;
+  publishZeroJointCmd();
+}
+
+void ManipulationPlugin::publishZeroEefCmd()
+{
+  if ( last_eef_cmd_zero_ )
+    return;
+  eef_cmd_.twist = geometry_msgs::msg::Twist();
+  eef_cmd_.header.stamp = node_->now();
+  eef_cmd_pub_->publish( eef_cmd_ );
+  last_eef_cmd_zero_ = true;
+}
+
+void ManipulationPlugin::publishZeroNullspaceCmd()
+{
+  if ( last_nullspace_cmd_zero_ )
+    return;
+  std_msgs::msg::Float64MultiArray zero_cmd;
+  zero_cmd.data.assign( num_arm_joints_, 0.0 );
+  nullspace_cmd_pub_->publish( zero_cmd );
+  last_nullspace_cmd_zero_ = true;
+}
+
+void ManipulationPlugin::publishZeroJointCmd()
+{
+  if ( last_joint_cmd_zero_ )
+    return;
+  std_msgs::msg::Float64MultiArray zero_cmd;
+  zero_cmd.data.assign( num_arm_joints_, 0.0 );
+  joint_cmd_pub_->publish( zero_cmd );
+  last_joint_cmd_zero_ = true;
 }
 
 void ManipulationPlugin::sendDriveCommand( const double linear_speed, const double angular_speed )

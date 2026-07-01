@@ -43,6 +43,8 @@ protected:
   std::shared_ptr<rtest::PublisherMock<geometry_msgs::msg::TwistStamped>> pub_twist_eef_;
   std::shared_ptr<rtest::PublisherMock<std_msgs::msg::Float64>> pub_gripper_;
   std::shared_ptr<rtest::PublisherMock<std_msgs::msg::Float64MultiArray>> pub_flipper_;
+  std::shared_ptr<rtest::PublisherMock<std_msgs::msg::Float64MultiArray>> pub_nullspace_;
+  std::shared_ptr<rtest::PublisherMock<std_msgs::msg::Float64MultiArray>> pub_joint_;
 
   sensor_msgs::msg::Joy joy_msg_;
   std::map<std::string, int> button_map_;
@@ -75,6 +77,10 @@ protected:
         node_, "/athena/gripper_position_controller/velocity_command" );
     pub_flipper_ = rtest::findPublisher<std_msgs::msg::Float64MultiArray>(
         node_, "/athena/flipper_velocity_controller/commands" );
+    pub_nullspace_ = rtest::findPublisher<std_msgs::msg::Float64MultiArray>(
+        node_, "/athena/moveit_twist_controller/nullspace_cmd" );
+    pub_joint_ = rtest::findPublisher<std_msgs::msg::Float64MultiArray>(
+        node_, "/athena/moveit_twist_controller/joint_cmd" );
 
     ASSERT_TRUE( sub_joy_ );
     ASSERT_TRUE( pub_config_ );
@@ -82,12 +88,16 @@ protected:
     ASSERT_TRUE( pub_twist_eef_ );
     ASSERT_TRUE( pub_gripper_ );
     ASSERT_TRUE( pub_flipper_ );
+    ASSERT_TRUE( pub_nullspace_ );
+    ASSERT_TRUE( pub_joint_ );
 
     EXPECT_CALL( *pub_config_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
     EXPECT_CALL( *pub_cmd_vel_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
     EXPECT_CALL( *pub_twist_eef_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
     EXPECT_CALL( *pub_gripper_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
     EXPECT_CALL( *pub_flipper_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
+    EXPECT_CALL( *pub_nullspace_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
+    EXPECT_CALL( *pub_joint_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
 
     button_map_ = { { "a", 0 },
                     { "b", 1 },
@@ -459,6 +469,135 @@ TEST_F( HectorGamepadManagerTest, SendZeroEefTwistWhenActivatingDriving )
   sendJoy();
   ::testing::Mock::VerifyAndClearExpectations( pub_twist_eef_.get() );
   ::testing::Mock::VerifyAndClearExpectations( pub_config_.get() );
+}
+
+// Verifies nullspace mode (button A) maps the left stick to the first two joints' bias velocities.
+TEST_F( HectorGamepadManagerTest, NullspaceModePublishesBias )
+{
+  switchToConfig( "manipulation" );
+  constexpr double max_nullspace_speed = 0.3;
+
+  EXPECT_CALL( *pub_nullspace_, publish( ::testing::_ ) )
+      .WillOnce( []( const std_msgs::msg::Float64MultiArray &msg ) {
+        ASSERT_EQ( msg.data.size(), 7u );
+        EXPECT_NEAR( msg.data[0], max_nullspace_speed, 0.01 );
+        EXPECT_NEAR( msg.data[1], max_nullspace_speed, 0.01 );
+        for ( size_t i = 2; i < msg.data.size(); ++i ) EXPECT_EQ( msg.data[i], 0.0 );
+      } );
+  setButton( "a", 1, true );
+  setAxis( "left_stick_left_right", 1.0f );
+  setAxis( "left_stick_up_down", 1.0f );
+  sendJoy();
+  ::testing::Mock::VerifyAndClearExpectations( pub_nullspace_.get() );
+}
+
+// Verifies single-joint mode (right joystick press) maps both sticks to the first four joints.
+TEST_F( HectorGamepadManagerTest, SingleJointModePublishesJointCmd )
+{
+  switchToConfig( "manipulation" );
+  constexpr double max_joint_speed = 0.5;
+
+  EXPECT_CALL( *pub_joint_, publish( ::testing::_ ) )
+      .WillOnce( []( const std_msgs::msg::Float64MultiArray &msg ) {
+        ASSERT_EQ( msg.data.size(), 7u );
+        EXPECT_NEAR( msg.data[0], max_joint_speed, 0.01 ); // move_left_right
+        EXPECT_NEAR( msg.data[1], max_joint_speed, 0.01 ); // move_up_down
+        EXPECT_NEAR( msg.data[2], max_joint_speed, 0.01 ); // rotate_yaw
+        EXPECT_NEAR( msg.data[3], max_joint_speed, 0.01 ); // rotate_pitch
+        for ( size_t i = 4; i < msg.data.size(); ++i ) EXPECT_EQ( msg.data[i], 0.0 );
+      } );
+  setButton( "right_joy", 1, true );
+  setAxis( "left_stick_left_right", 1.0f );
+  setAxis( "left_stick_up_down", 1.0f );
+  setAxis( "right_stick_left_right", 1.0f );
+  setAxis( "right_stick_up_down", 1.0f );
+  sendJoy();
+  ::testing::Mock::VerifyAndClearExpectations( pub_joint_.get() );
+}
+
+// Regression for the stale-twist bug: entering nullspace mode while an EEF twist is in flight must
+// publish a zero EEF twist, otherwise the controller keeps integrating the last twist until timeout.
+TEST_F( HectorGamepadManagerTest, NullspaceModeFlushesEefTwist )
+{
+  switchToConfig( "manipulation" );
+
+  // Move the eef so a non-zero twist is buffered in the controller.
+  EXPECT_CALL( *pub_twist_eef_, publish( ::testing::_ ) )
+      .WillOnce( []( const geometry_msgs::msg::TwistStamped &msg ) {
+        EXPECT_NE( msg.twist.angular.z, 0.0 );
+      } );
+  setAxis( "right_stick_left_right", 1.0f, true );
+  sendJoy();
+  ::testing::Mock::VerifyAndClearExpectations( pub_twist_eef_.get() );
+
+  // Enter nullspace mode: the next tick must flush a zero eef twist.
+  EXPECT_CALL( *pub_twist_eef_, publish( ::testing::_ ) )
+      .WillOnce( []( const geometry_msgs::msg::TwistStamped &msg ) {
+        EXPECT_EQ( msg.twist.linear.x, 0.0 );
+        EXPECT_EQ( msg.twist.linear.y, 0.0 );
+        EXPECT_EQ( msg.twist.linear.z, 0.0 );
+        EXPECT_EQ( msg.twist.angular.x, 0.0 );
+        EXPECT_EQ( msg.twist.angular.y, 0.0 );
+        EXPECT_EQ( msg.twist.angular.z, 0.0 );
+      } );
+  setButton( "a", 1, true );
+  sendJoy();
+  ::testing::Mock::VerifyAndClearExpectations( pub_twist_eef_.get() );
+}
+
+// Regression for the stale-twist bug: entering single-joint mode while an EEF twist is in flight
+// must publish a zero EEF twist.
+TEST_F( HectorGamepadManagerTest, SingleJointModeFlushesEefTwist )
+{
+  switchToConfig( "manipulation" );
+
+  EXPECT_CALL( *pub_twist_eef_, publish( ::testing::_ ) )
+      .WillOnce( []( const geometry_msgs::msg::TwistStamped &msg ) {
+        EXPECT_NE( msg.twist.angular.z, 0.0 );
+      } );
+  setAxis( "right_stick_left_right", 1.0f, true );
+  sendJoy();
+  ::testing::Mock::VerifyAndClearExpectations( pub_twist_eef_.get() );
+
+  EXPECT_CALL( *pub_twist_eef_, publish( ::testing::_ ) )
+      .WillOnce( []( const geometry_msgs::msg::TwistStamped &msg ) {
+        EXPECT_EQ( msg.twist.linear.x, 0.0 );
+        EXPECT_EQ( msg.twist.linear.y, 0.0 );
+        EXPECT_EQ( msg.twist.linear.z, 0.0 );
+        EXPECT_EQ( msg.twist.angular.x, 0.0 );
+        EXPECT_EQ( msg.twist.angular.y, 0.0 );
+        EXPECT_EQ( msg.twist.angular.z, 0.0 );
+      } );
+  setButton( "right_joy", 1, true );
+  sendJoy();
+  ::testing::Mock::VerifyAndClearExpectations( pub_twist_eef_.get() );
+}
+
+// Regression: switching from nullspace mode to single-joint mode must clear the nullspace bias so
+// the two modes do not issue mixed commands.
+TEST_F( HectorGamepadManagerTest, SingleJointModeClearsNullspaceCmd )
+{
+  switchToConfig( "manipulation" );
+
+  // Activate nullspace mode with a non-zero bias.
+  EXPECT_CALL( *pub_nullspace_, publish( ::testing::_ ) )
+      .WillOnce( []( const std_msgs::msg::Float64MultiArray &msg ) {
+        ASSERT_FALSE( msg.data.empty() );
+        EXPECT_NE( msg.data[0], 0.0 );
+      } );
+  setButton( "a", 1, true );
+  setAxis( "left_stick_left_right", 1.0f );
+  sendJoy();
+  ::testing::Mock::VerifyAndClearExpectations( pub_nullspace_.get() );
+
+  // Release nullspace, press single-joint mode: the nullspace bias must be zeroed.
+  EXPECT_CALL( *pub_nullspace_, publish( ::testing::_ ) )
+      .WillOnce( []( const std_msgs::msg::Float64MultiArray &msg ) {
+        for ( const double v : msg.data ) EXPECT_EQ( v, 0.0 );
+      } );
+  setButton( "right_joy", 1, true );
+  sendJoy();
+  ::testing::Mock::VerifyAndClearExpectations( pub_nullspace_.get() );
 }
 
 // Verifies gripper open/close buttons publish expected velocities.
