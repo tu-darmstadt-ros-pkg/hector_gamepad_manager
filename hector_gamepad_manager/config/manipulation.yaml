@@ -141,8 +141,11 @@ buttons:
       inverted_pose: back
 
   23: # Cross up
-    plugin: ''
-    function: ''
+    plugin: hector_gamepad_manager_plugins::MoveitPlugin
+    function: go_to_pose
+    args:
+      group: arm_group
+      pose: door
 
   24: # Cross down
     plugin: hector_gamepad_manager_plugins::MoveitPlugin
