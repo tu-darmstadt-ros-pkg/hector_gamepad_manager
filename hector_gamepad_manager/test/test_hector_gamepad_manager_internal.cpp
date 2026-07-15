@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-constexpr int MAX_BUTTONS = 25;
+constexpr int MAX_BUTTONS = 26;
 constexpr int MAX_AXES = 8;
 
 class HectorGamepadManagerInternalTest : public ::testing::Test
@@ -75,7 +75,7 @@ protected:
     EXPECT_CALL( *pub_probe_release_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
     EXPECT_CALL( *pub_probe_axis_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
 
-    button_map_ = { { "a", 0 }, { "back", 6 }, { "start", 7 } };
+    button_map_ = { { "a", 0 }, { "back", 6 }, { "start", 7 }, { "share", 11 } };
     axis_map_ = { { "left_stick_left_right", 0 } };
 
     resetJoy();
@@ -130,6 +130,46 @@ TEST_F( HectorGamepadManagerInternalTest, ButtonHoldAndReleaseSequence )
                                           ::testing::HasSubstr( "release:probe" ) ) ) )
       .Times( 1 );
   setButton( "a", 0, true );
+  sendJoy();
+}
+
+TEST_F( HectorGamepadManagerInternalTest, ShareButtonMapsToButton11 )
+{
+  EXPECT_CALL( *pub_probe_press_,
+               publish( ::testing::Field( &std_msgs::msg::String::data,
+                                          ::testing::HasSubstr( "press:share" ) ) ) )
+      .Times( 1 );
+  setButton( "share", 1, true );
+  sendJoy();
+  ::testing::Mock::VerifyAndClearExpectations( pub_probe_press_.get() );
+
+  EXPECT_CALL( *pub_probe_release_,
+               publish( ::testing::Field( &std_msgs::msg::String::data,
+                                          ::testing::HasSubstr( "release:share" ) ) ) )
+      .Times( 1 );
+  setButton( "share", 0, true );
+  sendJoy();
+}
+
+// Gamepads without a Share button publish only 11 buttons (older pads even fewer axes).
+// Entries missing from the message must read as "never pressed" instead of crashing.
+TEST_F( HectorGamepadManagerInternalTest, ShortJoyMessageTreatsMissingEntriesAsNeutral )
+{
+  EXPECT_CALL( *pub_probe_press_, publish( ::testing::_ ) ).Times( 0 );
+  resetJoy();
+  joy_msg_.buttons.resize( 11 ); // no Share button
+  joy_msg_.axes.resize( 2 );     // sticks only, no triggers / cross
+  sendJoy();
+  ::testing::Mock::VerifyAndClearExpectations( pub_probe_press_.get() );
+
+  // Buttons that do exist in the short message still dispatch normally.
+  EXPECT_CALL( *pub_probe_press_,
+               publish( ::testing::Field( &std_msgs::msg::String::data,
+                                          ::testing::HasSubstr( "press:probe" ) ) ) )
+      .Times( 1 );
+  setButton( "a", 1, true );
+  joy_msg_.buttons.resize( 11 );
+  joy_msg_.axes.resize( 2 );
   sendJoy();
 }
 

@@ -55,7 +55,7 @@ private:
     // Vector of axes values
     std::array<float, 8> axes = std::array<float, 8>{ 0.0 };
 
-    std::array<bool, 25> buttons = std::array<bool, 25>{ false };
+    std::array<bool, 26> buttons = std::array<bool, 26>{ false };
   };
 
   struct GamepadConfig {
@@ -76,7 +76,7 @@ private:
   std::map<std::string, GamepadConfig> configs_;
 
   // Maps buttons to config names
-  std::array<std::string, 25> config_switch_button_mapping_;
+  std::array<std::string, 26> config_switch_button_mapping_;
 
   // Name of the active configuration
   std::string active_config_;

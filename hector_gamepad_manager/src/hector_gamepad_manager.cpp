@@ -435,42 +435,51 @@ HectorGamepadManager::GamepadInputs
 HectorGamepadManager::convertJoyToGamepadInputs( const sensor_msgs::msg::Joy::SharedPtr &msg )
 {
   GamepadInputs inputs;
+  // Gamepads differ in how many buttons/axes they report (e.g. the Share button only exists on
+  // newer Xbox controllers), so read out-of-range entries as neutral instead of indexing past the
+  // end of the message arrays.
+  const auto button = [&msg]( const size_t i ) {
+    return i < msg->buttons.size() && msg->buttons[i] != 0;
+  };
+  const auto axis = [&msg]( const size_t i ) { return i < msg->axes.size() ? msg->axes[i] : 0.0f; };
+
   // Axes
-  inputs.axes[0] = msg->axes[0];                    // Left joystick left/right
-  inputs.axes[1] = msg->axes[1];                    // Left joystick up/down
-  inputs.axes[2] = -0.5f * ( msg->axes[2] - 1.0f ); // LT: Change range from [1, -1] to [0, 1]
-  inputs.axes[3] = msg->axes[3];                    // Right joystick left/right
-  inputs.axes[4] = msg->axes[4];                    // Right joystick up/down
-  inputs.axes[5] = -0.5f * ( msg->axes[5] - 1.0f ); // RT: Change range from [1, -1] to [0, 1]
-  inputs.axes[6] = msg->axes[6];                    // Cross left/right
-  inputs.axes[7] = msg->axes[7];                    // Cross up/down
+  inputs.axes[0] = axis( 0 );                    // Left joystick left/right
+  inputs.axes[1] = axis( 1 );                    // Left joystick up/down
+  inputs.axes[2] = -0.5f * ( axis( 2 ) - 1.0f ); // LT: Change range from [1, -1] to [0, 1]
+  inputs.axes[3] = axis( 3 );                    // Right joystick left/right
+  inputs.axes[4] = axis( 4 );                    // Right joystick up/down
+  inputs.axes[5] = -0.5f * ( axis( 5 ) - 1.0f ); // RT: Change range from [1, -1] to [0, 1]
+  inputs.axes[6] = axis( 6 );                    // Cross left/right
+  inputs.axes[7] = axis( 7 );                    // Cross up/down
 
   // Buttons
-  inputs.buttons[0] = msg->buttons[0];   // Button A
-  inputs.buttons[1] = msg->buttons[1];   // Button B
-  inputs.buttons[2] = msg->buttons[2];   // Button X
-  inputs.buttons[3] = msg->buttons[3];   // Button Y
-  inputs.buttons[4] = msg->buttons[4];   // Button LB
-  inputs.buttons[5] = msg->buttons[5];   // Button RB
-  inputs.buttons[6] = msg->buttons[6];   // Button Back
-  inputs.buttons[7] = msg->buttons[7];   // Button Start
-  inputs.buttons[8] = msg->buttons[8];   // Button Guide -> Reserved for config switches
-  inputs.buttons[9] = msg->buttons[9];   // Left joystick pressed
-  inputs.buttons[10] = msg->buttons[10]; // Right joystick pressed
-  inputs.buttons[11] = inputs.axes[0] > AXIS_DEADZONE;  // Left joystick left
-  inputs.buttons[12] = inputs.axes[0] < -AXIS_DEADZONE; // Left joystick right
-  inputs.buttons[13] = inputs.axes[1] > AXIS_DEADZONE;  // Left joystick up
-  inputs.buttons[14] = inputs.axes[1] < -AXIS_DEADZONE; // Left joystick down
-  inputs.buttons[15] = inputs.axes[2] > AXIS_DEADZONE;  // LT button
-  inputs.buttons[16] = inputs.axes[3] > AXIS_DEADZONE;  // Right joystick left
-  inputs.buttons[17] = inputs.axes[3] < -AXIS_DEADZONE; // Right joystick right
-  inputs.buttons[18] = inputs.axes[4] > AXIS_DEADZONE;  // Right joystick up
-  inputs.buttons[19] = inputs.axes[4] < -AXIS_DEADZONE; // Right joystick down
-  inputs.buttons[20] = inputs.axes[5] > AXIS_DEADZONE;  // RT button
-  inputs.buttons[21] = inputs.axes[6] == 1.0f;          // Cross left
-  inputs.buttons[22] = inputs.axes[6] == -1.0f;         // Cross right
-  inputs.buttons[23] = inputs.axes[7] == 1.0f;          // Cross up
-  inputs.buttons[24] = inputs.axes[7] == -1.0f;         // Cross down
+  inputs.buttons[0] = button( 0 );   // Button A
+  inputs.buttons[1] = button( 1 );   // Button B
+  inputs.buttons[2] = button( 2 );   // Button X
+  inputs.buttons[3] = button( 3 );   // Button Y
+  inputs.buttons[4] = button( 4 );   // Button LB
+  inputs.buttons[5] = button( 5 );   // Button RB
+  inputs.buttons[6] = button( 6 );   // Button Back
+  inputs.buttons[7] = button( 7 );   // Button Start
+  inputs.buttons[8] = button( 8 );   // Button Guide (Manufacturer Button)
+  inputs.buttons[9] = button( 9 );   // Left joystick pressed
+  inputs.buttons[10] = button( 10 ); // Right joystick pressed
+  inputs.buttons[11] = button( 11 ); // Button Share (only on newer Xbox controllers)
+  inputs.buttons[12] = inputs.axes[0] > AXIS_DEADZONE;  // Left joystick left
+  inputs.buttons[13] = inputs.axes[0] < -AXIS_DEADZONE; // Left joystick right
+  inputs.buttons[14] = inputs.axes[1] > AXIS_DEADZONE;  // Left joystick up
+  inputs.buttons[15] = inputs.axes[1] < -AXIS_DEADZONE; // Left joystick down
+  inputs.buttons[16] = inputs.axes[2] > AXIS_DEADZONE;  // LT button
+  inputs.buttons[17] = inputs.axes[3] > AXIS_DEADZONE;  // Right joystick left
+  inputs.buttons[18] = inputs.axes[3] < -AXIS_DEADZONE; // Right joystick right
+  inputs.buttons[19] = inputs.axes[4] > AXIS_DEADZONE;  // Right joystick up
+  inputs.buttons[20] = inputs.axes[4] < -AXIS_DEADZONE; // Right joystick down
+  inputs.buttons[21] = inputs.axes[5] > AXIS_DEADZONE;  // RT button
+  inputs.buttons[22] = inputs.axes[6] == 1.0f;          // Cross left
+  inputs.buttons[23] = inputs.axes[6] == -1.0f;         // Cross right
+  inputs.buttons[24] = inputs.axes[7] == 1.0f;          // Cross up
+  inputs.buttons[25] = inputs.axes[7] == -1.0f;         // Cross down
   return inputs;
 }
 

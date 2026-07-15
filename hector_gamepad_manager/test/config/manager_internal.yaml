@@ -25,10 +25,12 @@ buttons:
   8: {plugin: '', function: ''}
   9: {plugin: '', function: ''}
   10: {plugin: '', function: ''}
-  11:
+  11: # Button Share (only on newer Xbox controllers)
+    plugin: hector_gamepad_manager_plugins::TestProbePlugin
+    function: share
+  12:
     plugin: hector_gamepad_manager_plugins::TestProbePlugin
     function: virtual
-  12: {plugin: '', function: ''}
   13: {plugin: '', function: ''}
   14: {plugin: '', function: ''}
   15: {plugin: '', function: ''}
@@ -41,3 +43,4 @@ buttons:
   22: {plugin: '', function: ''}
   23: {plugin: '', function: ''}
   24: {plugin: '', function: ''}
+  25: {plugin: '', function: ''}

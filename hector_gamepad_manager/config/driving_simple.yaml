@@ -76,59 +76,63 @@ buttons:
     plugin: ''
     function: ''
 
+  11: # Button Share (only on newer Xbox controllers)
+    plugin: ''
+    function: ''
+
   # -------------------- All the axes can also be used as buttons if specified here --------------------
-  11: # Left joystick left
+  12: # Left joystick left
     plugin: ''
     function: ''
 
-  12: # Left joystick right
+  13: # Left joystick right
     plugin: ''
     function: ''
 
-  13: # Left joystick up
+  14: # Left joystick up
     plugin: ''
     function: ''
 
-  14: # Left joystick down
+  15: # Left joystick down
     plugin: ''
     function: ''
 
-  15: # LT
+  16: # LT
     plugin: ''
     function: ''
 
-  16: # Right joystick left
+  17: # Right joystick left
     plugin: ''
     function: ''
 
-  17: # Right joystick right
+  18: # Right joystick right
     plugin: ''
     function: ''
 
-  18: # Right joystick up
+  19: # Right joystick up
     plugin: ''
     function: ''
 
-  19: # Right joystick down
+  20: # Right joystick down
     plugin: ''
     function: ''
 
-  20: # RT
+  21: # RT
     plugin: ''
     function: ''
 
-  21: # Cross left
+  22: # Cross left
     plugin: ''
     function: ''
 
-  22: # Cross right
+  23: # Cross right
     plugin: ''
     function: ''
 
-  23: # Cross up
+  24: # Cross up
     plugin: ''
     function: ''
 
-  24: # Cross down
+  25: # Cross down
     plugin: ''
     function: ''
