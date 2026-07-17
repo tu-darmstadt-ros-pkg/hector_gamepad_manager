@@ -48,7 +48,7 @@ buttons:
   1: # Button B
     plugin: hector_gamepad_manager_plugins::ManipulationPlugin
     function: hold_mode
-    description: Hold current pose (hold)
+    description: Drive base holding current EEF pose (hold)
 
   2: # Button X
     plugin: hector_gamepad_manager_plugins::ManipulationPlugin
