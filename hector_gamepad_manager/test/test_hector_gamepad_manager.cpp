@@ -40,8 +40,7 @@ protected:
 
   std::shared_ptr<rclcpp::Subscription<sensor_msgs::msg::Joy>> sub_joy_;
   std::shared_ptr<rtest::PublisherMock<std_msgs::msg::String>> pub_config_;
-  std::shared_ptr<rtest::PublisherMock<hector_gamepad_manager_msgs::msg::GamepadMapping>>
-      pub_mapping_;
+  std::shared_ptr<rtest::PublisherMock<hector_gamepad_manager_msgs::msg::GamepadMapping>> pub_mapping_;
   std::shared_ptr<rtest::PublisherMock<geometry_msgs::msg::TwistStamped>> pub_cmd_vel_;
   std::shared_ptr<rtest::PublisherMock<geometry_msgs::msg::TwistStamped>> pub_twist_eef_;
   std::shared_ptr<rtest::PublisherMock<std_msgs::msg::Float64>> pub_gripper_;

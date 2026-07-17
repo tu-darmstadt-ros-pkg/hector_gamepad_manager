@@ -4,7 +4,8 @@ project(hector_gamepad_manager_msgs)
 find_package(ament_cmake REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 
-rosidl_generate_interfaces(${PROJECT_NAME}
+rosidl_generate_interfaces(
+  ${PROJECT_NAME}
   "msg/GamepadAction.msg"
   "msg/GamepadButtonMapping.msg"
   "msg/GamepadAxisMapping.msg"

@@ -15,12 +15,12 @@ class StubPlugin : public GamepadFunctionPlugin
 {
 public:
   explicit StubPlugin( const std::string &id ) { setPluginId( id ); }
-  void update() override {}
-  void activate() override {}
-  void deactivate() override {}
+  void update() override { }
+  void activate() override { }
+  void deactivate() override { }
 
 protected:
-  void initialize( const rclcpp::Node::SharedPtr & ) override {}
+  void initialize( const rclcpp::Node::SharedPtr & ) override { }
 };
 
 std::shared_ptr<GamepadFunctionPlugin> makePlugin( const std::string &id )
@@ -56,12 +56,12 @@ protected:
     // Legacy-flat button -> single on_press action.
     driving.button_mappings[0] = { drive, { "slow", "Drive slowly" }, {}, {}, {} };
     // Per-event button -> press + double-press actions.
-    driving.button_mappings[1] = { flipper,
-                                   { "individual_front_flipper_control_mode",
-                                     "Individual front flipper control" },
-                                   { "sync_front_flippers", "Sync front flippers" },
-                                   {},
-                                   {} };
+    driving.button_mappings[1] = {
+        flipper,
+        { "individual_front_flipper_control_mode", "Individual front flipper control" },
+        { "sync_front_flippers", "Sync front flippers" },
+        {},
+        {} };
     // Axis with a description, and an axis without one.
     driving.axis_mappings[0] = { drive, "steer", "Steer" };
     driving.axis_mappings[1] = { drive, "drive", "" };

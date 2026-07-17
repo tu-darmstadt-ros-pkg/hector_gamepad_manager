@@ -17,9 +17,14 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
-set(DEPENDENCIES pluginlib rclcpp sensor_msgs yaml-cpp
-                 hector_gamepad_plugin_interface controller_orchestrator
-                 hector_gamepad_manager_msgs)
+set(DEPENDENCIES
+    pluginlib
+    rclcpp
+    sensor_msgs
+    yaml-cpp
+    hector_gamepad_plugin_interface
+    controller_orchestrator
+    hector_gamepad_manager_msgs)
 
 foreach(dependency IN LISTS DEPENDENCIES)
   find_package(${dependency} REQUIRED)
@@ -27,9 +32,10 @@ endforeach()
 
 find_package(rclcpp_components REQUIRED)
 
-set(HEADERS include/hector_gamepad_manager/hector_gamepad_manager.hpp
-            include/hector_gamepad_manager/gamepad_config.hpp
-            include/hector_gamepad_manager/gamepad_mapping_builder.hpp)
+set(HEADERS
+    include/hector_gamepad_manager/hector_gamepad_manager.hpp
+    include/hector_gamepad_manager/gamepad_config.hpp
+    include/hector_gamepad_manager/gamepad_mapping_builder.hpp)
 
 set(SOURCES src/hector_gamepad_manager.cpp src/gamepad_mapping_builder.cpp)
 

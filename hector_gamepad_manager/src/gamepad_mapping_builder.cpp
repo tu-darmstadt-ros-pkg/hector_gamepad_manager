@@ -27,9 +27,10 @@ std::string pluginId( const std::shared_ptr<GamepadFunctionPlugin> &plugin )
 }
 } // namespace
 
-hector_gamepad_manager_msgs::msg::GamepadMapping buildGamepadMappingMsg(
-    const std::map<std::string, GamepadConfig> &configs,
-    const std::array<ConfigSwitch, kNumButtons> &config_switches, const std::string &default_config )
+hector_gamepad_manager_msgs::msg::GamepadMapping
+buildGamepadMappingMsg( const std::map<std::string, GamepadConfig> &configs,
+                        const std::array<ConfigSwitch, kNumButtons> &config_switches,
+                        const std::string &default_config )
 {
   hector_gamepad_manager_msgs::msg::GamepadMapping msg;
   msg.default_config = default_config;
