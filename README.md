@@ -83,26 +83,37 @@ Each configuration file maps **buttons/axes** to **plugin functions**.
 Functions can now include **parameters** via the `args` field. These parameters are stored in the shared **blackboard**
 and are uniquely namespaced, so you can reuse the same function in different or even within the same config.
 
+Each mapping may carry an optional `description`: a short human-readable label of what it does.
+Descriptions are published on the latched `joy_mapping` topic (a `GamepadMapping` message carrying the
+full mapping of every loaded config) so a user interface can show the current controls. An optional
+top-level `description` describes the config itself. Descriptions never affect behavior.
+
 #### Example: Driving Configuration (basic format)
 
 ```yaml
+description: "Drive the robot and control the flippers"   # optional, describes the config
+
 axes:
   0: # Left joystick left/right
     plugin: "hector_gamepad_manager_plugins::DrivePlugin"
     function: "steer"
+    description: "Steer"
 
   1: # Left joystick up/down
     plugin: "hector_gamepad_manager_plugins::DrivePlugin"
     function: "drive"
+    description: "Drive forward/backward"
 
 buttons:
   0: # Button A
     plugin: "hector_gamepad_manager_plugins::DrivePlugin"
     function: "fast"
+    description: "Drive fast (hold)"
 
   1: # Button B
     plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
     function: "go_to_pose"
+    description: "Fold arm"
     args:
       group: "arm_group"
       pose: "folded"
@@ -119,8 +130,10 @@ buttons:
     plugin: "hector_gamepad_manager_plugins::FlipperPlugin"
     on_press:
       function: "flipper_back_up"
+      description: "Raise back flippers"     # optional, per event
     on_double_press:
       function: "flipper_back_upright"
+      description: "Back flippers to upright position"
     on_hold:                          # optional, defaults to on_press function
       function: "flipper_back_up"
     on_release:                       # optional, defaults to on_press function
@@ -128,6 +141,9 @@ buttons:
     args:                             # shared by all events on this button
       some_param: 1.0
 ```
+
+Each event may carry its own `description`, so a button with `on_press` and `on_double_press`
+shows two separate labels in the user interface.
 
 Available event types:
 - **`on_press`** *(required)*: Triggered on button press (single press). This is equivalent to the basic `function` field. It is also the fallback target for `on_hold`/`on_release` and the dispatch target on a single tap when `on_double_press` is configured, so a new-format mapping without `on_press` is rejected at load time.

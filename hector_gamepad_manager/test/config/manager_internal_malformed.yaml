@@ -29,7 +29,11 @@ buttons:
     plugin: hector_gamepad_manager_plugins::TestProbePlugin
     on_double_press: {function: probe_double}
   4: {plugin: '', function: ''}
-  5: {plugin: '', function: ''}
+  # Button RB: legacy entry with a description: but no function: — description must not make it
+  # valid; still skipped.
+  5:
+    plugin: hector_gamepad_manager_plugins::TestProbePlugin
+    description: Should be ignored
   6: {plugin: '', function: ''}
   7: {plugin: '', function: ''}
   8: {plugin: '', function: ''}
