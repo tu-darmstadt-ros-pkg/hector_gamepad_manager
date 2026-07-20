@@ -17,20 +17,27 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
-set(DEPENDENCIES pluginlib rclcpp sensor_msgs yaml-cpp
-                 hector_gamepad_plugin_interface controller_orchestrator)
+set(DEPENDENCIES
+    pluginlib
+    rclcpp
+    sensor_msgs
+    yaml-cpp
+    hector_gamepad_plugin_interface
+    controller_orchestrator
+    hector_gamepad_manager_msgs)
 
 foreach(dependency IN LISTS DEPENDENCIES)
   find_package(${dependency} REQUIRED)
 endforeach()
 
-# Used only by the operator-station joy satellite node (standalone + component).
-find_package(hector_gamepad_manager_msgs REQUIRED)
 find_package(rclcpp_components REQUIRED)
 
-set(HEADERS include/hector_gamepad_manager/hector_gamepad_manager.hpp)
+set(HEADERS
+    include/hector_gamepad_manager/hector_gamepad_manager.hpp
+    include/hector_gamepad_manager/gamepad_config.hpp
+    include/hector_gamepad_manager/gamepad_mapping_builder.hpp)
 
-set(SOURCES src/hector_gamepad_manager.cpp)
+set(SOURCES src/hector_gamepad_manager.cpp src/gamepad_mapping_builder.cpp)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES} ${HEADERS})
 target_include_directories(
@@ -114,6 +121,14 @@ if(BUILD_TESTING)
       ENVIRONMENT
       "AMENT_PREFIX_PATH=${PLUGIN_TEST_PREFIX}:${CMAKE_INSTALL_PREFIX}:$ENV{AMENT_PREFIX_PATH}"
   )
+
+  # Builder unit test: pure message construction, no node or rtest needed.
+  ament_add_gmock(test_gamepad_mapping_builder test/main.cpp
+                  test/test_gamepad_mapping_builder.cpp)
+  target_include_directories(test_gamepad_mapping_builder
+                             PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+  target_link_libraries(test_gamepad_mapping_builder ${PROJECT_NAME})
+  ament_target_dependencies(test_gamepad_mapping_builder ${DEPENDENCIES})
 
   # Satellite test: header-only node compiled directly against the rtest mocks
   # (no plugins).

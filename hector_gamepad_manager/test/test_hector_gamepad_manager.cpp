@@ -18,6 +18,7 @@
 #include <std_msgs/msg/string.hpp>
 
 #include <hector_gamepad_manager/hector_gamepad_manager.hpp>
+#include <hector_gamepad_manager_msgs/msg/gamepad_mapping.hpp>
 
 #include <filesystem>
 #include <functional>
@@ -39,6 +40,7 @@ protected:
 
   std::shared_ptr<rclcpp::Subscription<sensor_msgs::msg::Joy>> sub_joy_;
   std::shared_ptr<rtest::PublisherMock<std_msgs::msg::String>> pub_config_;
+  std::shared_ptr<rtest::PublisherMock<hector_gamepad_manager_msgs::msg::GamepadMapping>> pub_mapping_;
   std::shared_ptr<rtest::PublisherMock<geometry_msgs::msg::TwistStamped>> pub_cmd_vel_;
   std::shared_ptr<rtest::PublisherMock<geometry_msgs::msg::TwistStamped>> pub_twist_eef_;
   std::shared_ptr<rtest::PublisherMock<std_msgs::msg::Float64>> pub_gripper_;
@@ -69,6 +71,8 @@ protected:
     sub_joy_ = rtest::findSubscription<sensor_msgs::msg::Joy>( node_, "/athena/joy" );
     pub_config_ =
         rtest::findPublisher<std_msgs::msg::String>( node_, "/athena/joy_teleop_profile" );
+    pub_mapping_ = rtest::findPublisher<hector_gamepad_manager_msgs::msg::GamepadMapping>(
+        node_, "/athena/joy_mapping" );
     pub_cmd_vel_ =
         rtest::findPublisher<geometry_msgs::msg::TwistStamped>( node_, "/athena/cmd_vel" );
     pub_twist_eef_ = rtest::findPublisher<geometry_msgs::msg::TwistStamped>(
@@ -84,6 +88,7 @@ protected:
 
     ASSERT_TRUE( sub_joy_ );
     ASSERT_TRUE( pub_config_ );
+    ASSERT_TRUE( pub_mapping_ );
     ASSERT_TRUE( pub_cmd_vel_ );
     ASSERT_TRUE( pub_twist_eef_ );
     ASSERT_TRUE( pub_gripper_ );

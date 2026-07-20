@@ -1,10 +1,12 @@
 #ifndef HECTOR_GAMEPAD_MANAGER_HECTOR_GAMEPAD_MANAGER_HPP
 #define HECTOR_GAMEPAD_MANAGER_HECTOR_GAMEPAD_MANAGER_HPP
 
+#include "hector_gamepad_manager/gamepad_config.hpp"
 #include "hector_gamepad_plugin_interface/feedback_manager.hpp"
 #include "hector_gamepad_plugin_interface/gamepad_plugin_interface.hpp"
 
 #include <controller_orchestrator/controller_orchestrator.hpp>
+#include <hector_gamepad_manager_msgs/msg/gamepad_mapping.hpp>
 #include <pluginlib/class_loader.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joy.hpp>
@@ -21,27 +23,6 @@ public:
   explicit HectorGamepadManager( const rclcpp::Node::SharedPtr &node );
 
 private:
-  // Struct to store the mapping of an axis to a function of a plugin
-  struct FunctionMapping {
-    // Name of the plugin
-    std::shared_ptr<GamepadFunctionPlugin> plugin;
-
-    // Name of the function
-    std::string function_name;
-  };
-
-  // For double-press buttons the manager bypasses handleButton and dispatches handlePress / handleHold / handleRelease directly, so plugins must not rely on button_states_ for them.
-  struct ButtonFunctionMapping {
-    std::shared_ptr<GamepadFunctionPlugin> plugin;
-
-    std::string on_press;        // function called on initial press
-    std::string on_double_press; // function called on double press (empty = disabled)
-    std::string on_hold;         // function called while held (empty = uses on_press)
-    std::string on_release;      // function called on release (empty = uses on_press)
-
-    bool has_double_press() const { return !on_double_press.empty(); }
-  };
-
   // Per-button state for double-press detection
   struct ButtonTracker {
     bool pressed = false;          // current physical state
@@ -55,12 +36,7 @@ private:
     // Vector of axes values
     std::array<float, 8> axes = std::array<float, 8>{ 0.0 };
 
-    std::array<bool, 25> buttons = std::array<bool, 25>{ false };
-  };
-
-  struct GamepadConfig {
-    std::unordered_map<int, ButtonFunctionMapping> button_mappings;
-    std::unordered_map<int, FunctionMapping> axis_mappings;
+    std::array<bool, kNumButtons> buttons = std::array<bool, kNumButtons>{ false };
   };
 
   rclcpp::Node::SharedPtr node_;
@@ -70,13 +46,16 @@ private:
   // Publish active configuration -> visualization in user interface
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr active_config_publisher_;
 
+  // Publish the full static button/axis mapping of all loaded configs, once at startup.
+  rclcpp::Publisher<hector_gamepad_manager_msgs::msg::GamepadMapping>::SharedPtr mapping_publisher_;
+
   // Class loader for the gamepad function plugins
   pluginlib::ClassLoader<GamepadFunctionPlugin> plugin_loader_;
 
   std::map<std::string, GamepadConfig> configs_;
 
-  // Maps buttons to config names
-  std::array<std::string, 25> config_switch_button_mapping_;
+  // Maps buttons to the config they switch to
+  std::array<ConfigSwitch, kNumButtons> config_switch_button_mapping_;
 
   // Name of the active configuration
   std::string active_config_;
