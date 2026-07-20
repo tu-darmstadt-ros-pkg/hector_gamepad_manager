@@ -9,7 +9,7 @@ namespace
 {
 using hector_gamepad_manager_msgs::msg::GamepadAction;
 
-// Append an action to the list if it is configured (has a function).
+// Append an action to the list if it is configured (has a non-empty mapping).
 void addAction( std::vector<GamepadAction> &actions, uint8_t event, const ActionMapping &mapping )
 {
   if ( mapping.empty() )
