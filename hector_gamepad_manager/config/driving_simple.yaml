@@ -38,21 +38,21 @@ axes:
 buttons:
   0: # Button A
     plugin: hector_gamepad_manager_plugins::DrivePlugin
-    function: fast
-    description: Drive fast (hold)
+    function: slow
+    description: Drive slowly (hold)
 
   1: # Button B
     plugin: ''
     function: ''
 
   2: # Button X
-    plugin: hector_gamepad_manager_plugins::DrivePlugin
-    function: slow
-    description: Drive slowly (hold)
-
-  3: # Button Y
     plugin: ''
     function: ''
+
+  3: # Button Y
+    plugin: hector_gamepad_manager_plugins::DrivePlugin
+    function: fast
+    description: Drive fast (hold)
 
   4: # Button LB
     plugin: ''
