@@ -14,7 +14,8 @@
 #include <string>
 #include <vector>
 
-constexpr int MAX_BUTTONS = 26;
+constexpr int MAX_BUTTONS =
+    12; // physical buttons on the wire; axis-derived buttons are synthesized internally
 constexpr int MAX_AXES = 8;
 
 class HectorGamepadManagerInternalTest : public ::testing::Test
@@ -108,6 +109,36 @@ protected:
   void sendJoy() { sub_joy_->handle_message( joy_msg_ ); }
 };
 
+namespace
+{
+std::shared_ptr<rclcpp::Node> makeNodeWithParams( const std::string &node_name,
+                                                  const std::string &params_filename )
+{
+  const auto params = std::filesystem::path( __FILE__ ).parent_path() / "config" / params_filename;
+  rclcpp::NodeOptions opts;
+  opts.arguments( { "--ros-args", "--params-file", params.string() } );
+  return std::make_shared<rclcpp::Node>( node_name, "athena", opts );
+}
+} // namespace
+
+// Physical button ids inside the virtual button range (>= 32) would collide with the axis-derived
+// buttons. Such entries must be skipped with a warning while the rest of the config still loads.
+TEST( HectorGamepadManagerConfigValidation, SkipsButtonIdsOverlappingVirtualRange )
+{
+  auto node = makeNodeWithParams( "gamepad_manager_overlapping_ids_test",
+                                  "manager_internal_overlapping_ids_params.yaml" );
+  auto manager = std::make_shared<hector_gamepad_manager::HectorGamepadManager>( node );
+  EXPECT_TRUE( rtest::findSubscription<sensor_msgs::msg::Joy>( node, "/athena/joy" ) );
+}
+
+TEST( HectorGamepadManagerConfigValidation, RejectsUnknownAxisButtonNames )
+{
+  auto node = makeNodeWithParams( "gamepad_manager_bad_axis_name_test",
+                                  "manager_internal_bad_axis_name_params.yaml" );
+  auto manager = std::make_shared<hector_gamepad_manager::HectorGamepadManager>( node );
+  EXPECT_FALSE( rtest::findSubscription<sensor_msgs::msg::Joy>( node, "/athena/joy" ) );
+}
+
 TEST_F( HectorGamepadManagerInternalTest, ButtonHoldAndReleaseSequence )
 {
   EXPECT_CALL( *pub_probe_press_,
@@ -148,6 +179,28 @@ TEST_F( HectorGamepadManagerInternalTest, ShareButtonMapsToButton11 )
                                           ::testing::HasSubstr( "release:share" ) ) ) )
       .Times( 1 );
   setButton( "share", 0, true );
+  sendJoy();
+}
+
+// Gamepads with more physical buttons than the Xbox layout (e.g. rear paddles) map 1:1 without
+// any code changes; button 13 is mapped in manager_internal.yaml.
+TEST_F( HectorGamepadManagerInternalTest, ExtraPhysicalButtonDispatches )
+{
+  EXPECT_CALL( *pub_probe_press_,
+               publish( ::testing::Field( &std_msgs::msg::String::data,
+                                          ::testing::HasSubstr( "press:extra" ) ) ) )
+      .Times( 1 );
+  resetJoy();
+  joy_msg_.buttons.resize( 14, 0 );
+  joy_msg_.buttons[13] = 1;
+  sendJoy();
+  ::testing::Mock::VerifyAndClearExpectations( pub_probe_press_.get() );
+
+  EXPECT_CALL( *pub_probe_release_,
+               publish( ::testing::Field( &std_msgs::msg::String::data,
+                                          ::testing::HasSubstr( "release:extra" ) ) ) )
+      .Times( 1 );
+  joy_msg_.buttons[13] = 0;
   sendJoy();
 }
 

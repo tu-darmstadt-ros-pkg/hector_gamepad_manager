@@ -21,7 +21,8 @@ using ::testing::AnyNumber;
 using ::testing::Field;
 using ::testing::HasSubstr;
 
-constexpr int MAX_BUTTONS = 26;
+constexpr int MAX_BUTTONS =
+    12; // physical buttons on the wire; axis-derived buttons are synthesized internally
 constexpr int MAX_AXES = 8;
 
 class HectorGamepadManagerDoublePressTest : public ::testing::Test

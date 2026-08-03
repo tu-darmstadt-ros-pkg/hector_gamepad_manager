@@ -27,7 +27,8 @@
 #include <string>
 #include <vector>
 
-constexpr int MAX_BUTTONS = 26;
+constexpr int MAX_BUTTONS =
+    12; // physical buttons on the wire; axis-derived buttons are synthesized internally
 constexpr int MAX_AXES = 8;
 
 class HectorGamepadManagerTest : public ::testing::Test
@@ -99,14 +100,9 @@ protected:
     EXPECT_CALL( *pub_nullspace_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
     EXPECT_CALL( *pub_joint_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
 
-    button_map_ = { { "a", 0 },           { "b", 1 },
-                    { "x", 2 },           { "y", 3 },
-                    { "lb", 4 },          { "rb", 5 },
-                    { "back", 6 },        { "start", 7 },
-                    { "power", 8 },       { "left_joy", 9 },
-                    { "right_joy", 10 },  { "share", 11 },
-                    { "cross_left", 22 }, { "cross_right", 23 },
-                    { "cross_up", 24 },   { "cross_down", 25 } };
+    button_map_ = { { "a", 0 },     { "b", 1 },        { "x", 2 },          { "y", 3 },
+                    { "lb", 4 },    { "rb", 5 },       { "back", 6 },       { "start", 7 },
+                    { "power", 8 }, { "left_joy", 9 }, { "right_joy", 10 }, { "share", 11 } };
     axis_map_ = { { "left_stick_left_right", 0 },  { "left_stick_up_down", 1 },  { "lt", 2 },
                   { "right_stick_left_right", 3 }, { "right_stick_up_down", 4 }, { "rt", 5 },
                   { "cross_left_right", 6 },       { "cross_up_down", 7 } };

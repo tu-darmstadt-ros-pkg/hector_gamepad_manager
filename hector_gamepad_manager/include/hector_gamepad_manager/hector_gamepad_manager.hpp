@@ -50,12 +50,17 @@ private:
     rclcpp::Time last_press_time{ 0, 0, RCL_ROS_TIME };
   };
 
+  static constexpr int VIRTUAL_BUTTON_BASE = 32;
+  static constexpr int NUM_VIRTUAL_BUTTONS = 14;
+  static constexpr int NUM_BUTTONS = VIRTUAL_BUTTON_BASE + NUM_VIRTUAL_BUTTONS;
+  static constexpr int NUM_AXES = 8;
+
   // Struct to store the inputs from the gamepad
   struct GamepadInputs {
     // Vector of axes values
-    std::array<float, 8> axes = std::array<float, 8>{ 0.0 };
+    std::array<float, NUM_AXES> axes = std::array<float, NUM_AXES>{ 0.0 };
 
-    std::array<bool, 26> buttons = std::array<bool, 26>{ false };
+    std::array<bool, NUM_BUTTONS> buttons = std::array<bool, NUM_BUTTONS>{ false };
   };
 
   struct GamepadConfig {
@@ -76,7 +81,7 @@ private:
   std::map<std::string, GamepadConfig> configs_;
 
   // Maps buttons to config names
-  std::array<std::string, 26> config_switch_button_mapping_;
+  std::array<std::string, NUM_BUTTONS> config_switch_button_mapping_;
 
   // Name of the active configuration
   std::string active_config_;
@@ -142,19 +147,32 @@ private:
   bool switchConfig( const std::string &config_name );
 
   /**
-   * @brief Initialize the mappings for buttons or axes.
+   * @brief Initialize the button mappings from the "buttons" and "axis_buttons" sections.
    *
    * @param config The YAML node containing the configuration.
-   * @param type The type of the mapping (buttons or axes).
    * @param mappings The mappings to be initialized.
    * @return True if the mappings were initialized successfully, false otherwise.
    */
   bool initButtonMappings( const YAML::Node &config, const std::string &config_name,
                            std::unordered_map<int, ButtonFunctionMapping> &mappings );
 
-  bool initMappings( const YAML::Node &config, const std::string &type,
-                     const std::string &config_name,
-                     std::unordered_map<int, FunctionMapping> &mappings );
+  // Maps "axis_buttons" YAML keys to internal button ids (VIRTUAL_BUTTON_BASE + offset).
+  static const std::map<std::string, int> &axisButtonIds();
+
+  /**
+   * @brief Resolve the physical "buttons" and named "axis_buttons" sections of a config into
+   * (internal button id, mapping node) pairs.
+   *
+   * @return False if the "buttons" section is missing or an axis button name is unknown.
+   * Physical ids outside [0, VIRTUAL_BUTTON_BASE) would overlap the virtual buttons and are
+   * skipped with a warning.
+   */
+  bool collectButtonEntries( const YAML::Node &config,
+                             std::vector<std::pair<int, YAML::Node>> &entries );
+
+  // Initialize the axis mappings from the "axes" section.
+  bool initAxisMappings( const YAML::Node &config, const std::string &config_name,
+                         std::unordered_map<int, FunctionMapping> &mappings );
 
   // Load the named plugin into plugins_ if not already present. Returns false on failure.
   bool ensurePluginLoaded( const std::string &plugin_name );

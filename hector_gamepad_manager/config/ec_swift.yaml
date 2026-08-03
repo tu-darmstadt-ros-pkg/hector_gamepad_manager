@@ -51,59 +51,60 @@ buttons:
     package: ''
     config: ''
 
-  # -------------------- All the axes can also be used as buttons if specified here --------------------
-  12: # Left joystick left
+# -------------------- All the axes can also be used as buttons if specified here --------------------
+axis_buttons:
+  left_stick_left:
     package: ''
     config: ''
 
-  13: # Left joystick right
+  left_stick_right:
     package: ''
     config: ''
 
-  14: # Left joystick up
+  left_stick_up:
     package: ''
     config: ''
 
-  15: # Left joystick down
+  left_stick_down:
     package: ''
     config: ''
 
-  16: # LT
+  left_trigger:
     package: ''
     config: ''
 
-  17: # Right joystick left
+  right_stick_left:
     package: ''
     config: ''
 
-  18: # Right joystick right
+  right_stick_right:
     package: ''
     config: ''
 
-  19: # Right joystick up
+  right_stick_up:
     package: ''
     config: ''
 
-  20: # Right joystick down
+  right_stick_down:
     package: ''
     config: ''
 
-  21: # RT
+  right_trigger:
     package: ''
     config: ''
 
-  22: # Cross left
+  cross_left:
     package: ''
     config: ''
 
-  23: # Cross right
+  cross_right:
     package: ''
     config: ''
 
-  24: # Cross up
+  cross_up:
     package: ''
     config: ''
 
-  25: # Cross down
+  cross_down:
     package: ''
     config: ''

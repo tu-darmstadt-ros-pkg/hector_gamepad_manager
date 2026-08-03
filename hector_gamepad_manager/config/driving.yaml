@@ -103,69 +103,70 @@ buttons:
       name: invert_steering
       ocs_topic: joy_teleop_direction
 
-  # -------------------- All the axes can also be used as buttons if specified here --------------------
-  12: # Left joystick left
+# -------------------- All the axes can also be used as buttons if specified here --------------------
+axis_buttons:
+  left_stick_left:
     plugin: ''
     function: ''
 
-  13: # Left joystick right
+  left_stick_right:
     plugin: ''
     function: ''
 
-  14: # Left joystick up
+  left_stick_up:
     plugin: ''
     function: ''
 
-  15: # Left joystick down
+  left_stick_down:
     plugin: ''
     function: ''
 
-  16: # LT
+  left_trigger:
     plugin: ''
     function: ''
 
-  17: # Right joystick left
+  right_stick_left:
     plugin: ''
     function: ''
 
-  18: # Right joystick right
+  right_stick_right:
     plugin: ''
     function: ''
 
-  19: # Right joystick up
+  right_stick_up:
     plugin: ''
     function: ''
 
-  20: # Right joystick down
+  right_stick_down:
     plugin: ''
     function: ''
 
-  21: # RT
+  right_trigger:
     plugin: ''
     function: ''
 
-  22: # Cross left
+  cross_left:
     plugin: hector_gamepad_manager_plugins::MoveitPlugin
     function: go_to_pose
     args:
       group: flipper_group
       pose: tub
 
-  23: # Cross right
+  cross_right:
     plugin: hector_gamepad_manager_plugins::MoveitPlugin
     function: go_to_pose
     args:
       group: flipper_group
       pose: compact
 
-  24: # Cross up
+  cross_up:
     plugin: hector_gamepad_manager_plugins::MoveitPlugin
     function: go_to_pose
     args:
       group: flipper_group
       pose: up
 
-  25: # Cross down
+  cross_down:
     plugin: hector_gamepad_manager_plugins::MoveitPlugin
     function: go_to_pose
     args:

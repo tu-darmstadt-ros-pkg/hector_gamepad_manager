@@ -38,17 +38,19 @@ buttons:
   9: {plugin: '', function: ''}
   10: {plugin: '', function: ''}
   11: {plugin: '', function: ''}
-  12: {plugin: '', function: ''}
-  13: {plugin: '', function: ''}
-  14: {plugin: '', function: ''}
-  15: {plugin: '', function: ''}
-  16: {plugin: '', function: ''}
-  17: {plugin: '', function: ''}
-  18: {plugin: '', function: ''}
-  19: {plugin: '', function: ''}
-  20: {plugin: '', function: ''}
-  21: {plugin: '', function: ''}
-  22: {plugin: '', function: ''}
-  23: {plugin: '', function: ''}
-  24: {plugin: '', function: ''}
-  25: {plugin: '', function: ''}
+
+axis_buttons:
+  left_stick_left: {plugin: '', function: ''}
+  left_stick_right: {plugin: '', function: ''}
+  left_stick_up: {plugin: '', function: ''}
+  left_stick_down: {plugin: '', function: ''}
+  left_trigger: {plugin: '', function: ''}
+  right_stick_left: {plugin: '', function: ''}
+  right_stick_right: {plugin: '', function: ''}
+  right_stick_up: {plugin: '', function: ''}
+  right_stick_down: {plugin: '', function: ''}
+  right_trigger: {plugin: '', function: ''}
+  cross_left: {plugin: '', function: ''}
+  cross_right: {plugin: '', function: ''}
+  cross_up: {plugin: '', function: ''}
+  cross_down: {plugin: '', function: ''}
