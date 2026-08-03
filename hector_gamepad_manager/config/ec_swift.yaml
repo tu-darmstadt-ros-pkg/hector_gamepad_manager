@@ -34,6 +34,7 @@ buttons:
   7: # Button Start
     package: hector_gamepad_manager
     config: driving_simple
+    description: Switch to driving mode
 
   8: # Button Guide (Manufacturer Button)
     package: ''

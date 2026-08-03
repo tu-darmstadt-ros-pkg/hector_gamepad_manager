@@ -116,6 +116,12 @@ TEST_F( HectorGamepadManagerMalformedConfigTest, MalformedMappingsAreSkipped )
   sendJoy();
   setButton( 3, 0 );
   sendJoy();
+
+  // Button 5: legacy format with a description: but no function: — must be skipped.
+  setButton( 5, 1 );
+  sendJoy();
+  setButton( 5, 0 );
+  sendJoy();
 }
 
 // Test F — A valid entry coexisting with malformed entries in the same config still works.

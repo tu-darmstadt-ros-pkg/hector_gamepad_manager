@@ -1,10 +1,12 @@
 #ifndef HECTOR_GAMEPAD_MANAGER_HECTOR_GAMEPAD_MANAGER_HPP
 #define HECTOR_GAMEPAD_MANAGER_HECTOR_GAMEPAD_MANAGER_HPP
 
+#include "hector_gamepad_manager/gamepad_config.hpp"
 #include "hector_gamepad_plugin_interface/feedback_manager.hpp"
 #include "hector_gamepad_plugin_interface/gamepad_plugin_interface.hpp"
 
 #include <controller_orchestrator/controller_orchestrator.hpp>
+#include <hector_gamepad_manager_msgs/msg/gamepad_mapping.hpp>
 #include <pluginlib/class_loader.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joy.hpp>
@@ -21,27 +23,6 @@ public:
   explicit HectorGamepadManager( const rclcpp::Node::SharedPtr &node );
 
 private:
-  // Struct to store the mapping of an axis to a function of a plugin
-  struct FunctionMapping {
-    // Name of the plugin
-    std::shared_ptr<GamepadFunctionPlugin> plugin;
-
-    // Name of the function
-    std::string function_name;
-  };
-
-  // For double-press buttons the manager bypasses handleButton and dispatches handlePress / handleHold / handleRelease directly, so plugins must not rely on button_states_ for them.
-  struct ButtonFunctionMapping {
-    std::shared_ptr<GamepadFunctionPlugin> plugin;
-
-    std::string on_press;        // function called on initial press
-    std::string on_double_press; // function called on double press (empty = disabled)
-    std::string on_hold;         // function called while held (empty = uses on_press)
-    std::string on_release;      // function called on release (empty = uses on_press)
-
-    bool has_double_press() const { return !on_double_press.empty(); }
-  };
-
   // Per-button state for double-press detection
   struct ButtonTracker {
     bool pressed = false;          // current physical state
@@ -50,22 +31,12 @@ private:
     rclcpp::Time last_press_time{ 0, 0, RCL_ROS_TIME };
   };
 
-  static constexpr int VIRTUAL_BUTTON_BASE = 32;
-  static constexpr int NUM_VIRTUAL_BUTTONS = 14;
-  static constexpr int NUM_BUTTONS = VIRTUAL_BUTTON_BASE + NUM_VIRTUAL_BUTTONS;
-  static constexpr int NUM_AXES = 8;
-
   // Struct to store the inputs from the gamepad
   struct GamepadInputs {
     // Vector of axes values
-    std::array<float, NUM_AXES> axes = std::array<float, NUM_AXES>{ 0.0 };
+    std::array<float, kNumAxes> axes = std::array<float, kNumAxes>{ 0.0 };
 
-    std::array<bool, NUM_BUTTONS> buttons = std::array<bool, NUM_BUTTONS>{ false };
-  };
-
-  struct GamepadConfig {
-    std::unordered_map<int, ButtonFunctionMapping> button_mappings;
-    std::unordered_map<int, FunctionMapping> axis_mappings;
+    std::array<bool, kNumButtons> buttons = std::array<bool, kNumButtons>{ false };
   };
 
   rclcpp::Node::SharedPtr node_;
@@ -75,13 +46,16 @@ private:
   // Publish active configuration -> visualization in user interface
   rclcpp::Publisher<std_msgs::msg::String>::SharedPtr active_config_publisher_;
 
+  // Publish the full static button/axis mapping of all loaded configs, once at startup.
+  rclcpp::Publisher<hector_gamepad_manager_msgs::msg::GamepadMapping>::SharedPtr mapping_publisher_;
+
   // Class loader for the gamepad function plugins
   pluginlib::ClassLoader<GamepadFunctionPlugin> plugin_loader_;
 
   std::map<std::string, GamepadConfig> configs_;
 
-  // Maps buttons to config names
-  std::array<std::string, NUM_BUTTONS> config_switch_button_mapping_;
+  // Maps buttons to the config they switch to
+  std::array<ConfigSwitch, kNumButtons> config_switch_button_mapping_;
 
   // Name of the active configuration
   std::string active_config_;
@@ -156,7 +130,7 @@ private:
   bool initButtonMappings( const YAML::Node &config, const std::string &config_name,
                            std::unordered_map<int, ButtonFunctionMapping> &mappings );
 
-  // Maps "axis_buttons" YAML keys to internal button ids (VIRTUAL_BUTTON_BASE + offset).
+  // Maps "axis_buttons" YAML keys to internal button ids (kVirtualButtonBase + offset).
   static const std::map<std::string, int> &axisButtonIds();
 
   /**
@@ -164,7 +138,7 @@ private:
    * (internal button id, mapping node) pairs.
    *
    * @return False if the "buttons" section is missing or an axis button name is unknown.
-   * Physical ids outside [0, VIRTUAL_BUTTON_BASE) would overlap the virtual buttons and are
+   * Physical ids outside [0, kVirtualButtonBase) would overlap the virtual buttons and are
    * skipped with a warning.
    */
   bool collectButtonEntries( const YAML::Node &config,

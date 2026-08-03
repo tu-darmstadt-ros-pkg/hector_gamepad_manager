@@ -1,5 +1,8 @@
 #include "hector_gamepad_manager/hector_gamepad_manager.hpp"
 
+#include "hector_gamepad_manager/gamepad_config.hpp"
+#include "hector_gamepad_manager/gamepad_mapping_builder.hpp"
+
 #include <filesystem>
 
 namespace hector_gamepad_manager
@@ -26,12 +29,18 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
   qos_profile.durability( RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL );
   active_config_publisher_ =
       node_->create_publisher<std_msgs::msg::String>( "joy_teleop_profile", qos_profile );
+  mapping_publisher_ = node_->create_publisher<hector_gamepad_manager_msgs::msg::GamepadMapping>(
+      "joy_mapping", qos_profile );
   feedback_manager_->initialize( node_, "joy_feedback" );
   controller_orchestrator_ =
       std::make_shared<controller_orchestrator::ControllerOrchestrator>( node_ );
   // load meta switch config and all referenced config files
   if ( loadConfigSwitchesConfig( config_switches_filename ) ) {
     switchConfig( default_config_ );
+
+    // Configs are immutable after load, so the mapping is published once and latched.
+    mapping_publisher_->publish(
+        buildGamepadMappingMsg( configs_, config_switch_button_mapping_, default_config_ ) );
 
     joy_subscription_ = node_->create_subscription<sensor_msgs::msg::Joy>(
         "joy", 1, std::bind( &HectorGamepadManager::joyCallback, this, std::placeholders::_1 ) );
@@ -57,7 +66,10 @@ bool HectorGamepadManager::loadConfigSwitchesConfig( const std::string &file_nam
         RCLCPP_ERROR( node_->get_logger(), "Failed to load config file %s", config_name.c_str() );
         return false;
       }
-      config_switch_button_mapping_[id] = config_name;
+      std::string description;
+      if ( mapping["description"] )
+        description = mapping["description"].as<std::string>();
+      config_switch_button_mapping_[id] = { config_name, description };
     }
     default_config_ = config["default_config"].as<std::string>();
   } catch ( const std::exception &e ) {
@@ -74,6 +86,8 @@ bool HectorGamepadManager::loadConfig( const std::string &pkg_name, const std::s
 
     // Add empty mappings for the filename
     configs_[file_name] = GamepadConfig();
+    if ( config["description"] )
+      configs_[file_name].description = config["description"].as<std::string>();
 
     if ( !initButtonMappings( config, file_name, configs_[file_name].button_mappings ) ||
          !initAxisMappings( config, file_name, configs_[file_name].axis_mappings ) ) {
@@ -126,24 +140,42 @@ bool HectorGamepadManager::ensurePluginLoaded( const std::string &plugin_name )
   }
 }
 
+namespace
+{
+// Read {function, description} from an event node (e.g. on_press). Empty mapping if absent.
+ActionMapping readAction( const YAML::Node &node, const std::string &description_fallback = "" )
+{
+  ActionMapping action;
+  if ( !node )
+    return action;
+  if ( node["function"] )
+    action.function = node["function"].as<std::string>();
+  if ( node["description"] )
+    action.description = node["description"].as<std::string>();
+  else
+    action.description = description_fallback;
+  return action;
+}
+} // namespace
+
 const std::map<std::string, int> &HectorGamepadManager::axisButtonIds()
 {
   // Offsets must match the assignment order in convertJoyToGamepadInputs().
   static const std::map<std::string, int> ids = {
-      { "left_stick_left", VIRTUAL_BUTTON_BASE + 0 },
-      { "left_stick_right", VIRTUAL_BUTTON_BASE + 1 },
-      { "left_stick_up", VIRTUAL_BUTTON_BASE + 2 },
-      { "left_stick_down", VIRTUAL_BUTTON_BASE + 3 },
-      { "left_trigger", VIRTUAL_BUTTON_BASE + 4 },
-      { "right_stick_left", VIRTUAL_BUTTON_BASE + 5 },
-      { "right_stick_right", VIRTUAL_BUTTON_BASE + 6 },
-      { "right_stick_up", VIRTUAL_BUTTON_BASE + 7 },
-      { "right_stick_down", VIRTUAL_BUTTON_BASE + 8 },
-      { "right_trigger", VIRTUAL_BUTTON_BASE + 9 },
-      { "cross_left", VIRTUAL_BUTTON_BASE + 10 },
-      { "cross_right", VIRTUAL_BUTTON_BASE + 11 },
-      { "cross_up", VIRTUAL_BUTTON_BASE + 12 },
-      { "cross_down", VIRTUAL_BUTTON_BASE + 13 },
+      { "left_stick_left", kVirtualButtonBase + 0 },
+      { "left_stick_right", kVirtualButtonBase + 1 },
+      { "left_stick_up", kVirtualButtonBase + 2 },
+      { "left_stick_down", kVirtualButtonBase + 3 },
+      { "left_trigger", kVirtualButtonBase + 4 },
+      { "right_stick_left", kVirtualButtonBase + 5 },
+      { "right_stick_right", kVirtualButtonBase + 6 },
+      { "right_stick_up", kVirtualButtonBase + 7 },
+      { "right_stick_down", kVirtualButtonBase + 8 },
+      { "right_trigger", kVirtualButtonBase + 9 },
+      { "cross_left", kVirtualButtonBase + 10 },
+      { "cross_right", kVirtualButtonBase + 11 },
+      { "cross_up", kVirtualButtonBase + 12 },
+      { "cross_down", kVirtualButtonBase + 13 },
   };
   return ids;
 }
@@ -166,12 +198,12 @@ bool HectorGamepadManager::collectButtonEntries( const YAML::Node &config,
                     entry.first.as<std::string>( "" ).c_str() );
       return false;
     }
-    if ( id < 0 || id >= VIRTUAL_BUTTON_BASE ) {
+    if ( id < 0 || id >= static_cast<int>( kVirtualButtonBase ) ) {
       RCLCPP_WARN( node_->get_logger(),
                    "Button id %d is outside the physical button range [0, %d) and would overlap "
                    "the virtual axis buttons (use the named 'axis_buttons' section for those). "
                    "Skipping.",
-                   id, VIRTUAL_BUTTON_BASE );
+                   id, static_cast<int>( kVirtualButtonBase ) );
       continue;
     }
     entries.emplace_back( id, entry.second );
@@ -210,19 +242,17 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
     // Detect new format: presence of on_press, on_double_press, on_hold, or on_release sub-keys
     const bool new_format = mapping["on_press"] || mapping["on_double_press"] ||
                             mapping["on_hold"] || mapping["on_release"];
+    const std::string &description =
+        mapping["description"] ? mapping["description"].as<std::string>() : "";
 
-    std::string on_press, on_double_press, on_hold, on_release;
+    ActionMapping on_press, on_double_press, on_hold, on_release;
     const std::string function_id = config_name + "_" + std::to_string( id );
 
     if ( new_format ) {
-      if ( mapping["on_press"] && mapping["on_press"]["function"] )
-        on_press = mapping["on_press"]["function"].as<std::string>();
-      if ( mapping["on_double_press"] && mapping["on_double_press"]["function"] )
-        on_double_press = mapping["on_double_press"]["function"].as<std::string>();
-      if ( mapping["on_hold"] && mapping["on_hold"]["function"] )
-        on_hold = mapping["on_hold"]["function"].as<std::string>();
-      if ( mapping["on_release"] && mapping["on_release"]["function"] )
-        on_release = mapping["on_release"]["function"].as<std::string>();
+      on_press = readAction( mapping["on_press"], description );
+      on_double_press = readAction( mapping["on_double_press"], description );
+      on_hold = readAction( mapping["on_hold"], description );
+      on_release = readAction( mapping["on_release"], description );
 
       // on_press is required as the timeout-flush dispatch target and on_hold/on_release fallback.
       if ( on_press.empty() ) {
@@ -260,7 +290,9 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
       auto function = mapping["function"].as<std::string>();
       if ( function.empty() )
         continue;
-      on_press = function;
+      on_press.function = function;
+      if ( mapping["description"] )
+        on_press.description = mapping["description"].as<std::string>();
       blackboard_->set_from_yaml( mapping["args"], plugin_name + "_" + function_id );
     }
 
@@ -278,9 +310,9 @@ bool HectorGamepadManager::initAxisMappings( const YAML::Node &config, const std
   if ( config["axes"] ) {
     for ( const auto &entry : config["axes"] ) {
       int id = entry.first.as<int>();
-      if ( id < 0 || id >= NUM_AXES ) {
-        RCLCPP_WARN( node_->get_logger(),
-                     "Axis id %d is outside the valid range [0, %d). Skipping.", id, NUM_AXES );
+      if ( id < 0 || id >= static_cast<int>( kNumAxes ) ) {
+        RCLCPP_WARN( node_->get_logger(), "Axis id %d is outside the valid range [0, %d). Skipping.",
+                     id, static_cast<int>( kNumAxes ) );
         continue;
       }
       const YAML::Node mapping = entry.second;
@@ -288,6 +320,9 @@ bool HectorGamepadManager::initAxisMappings( const YAML::Node &config, const std
         continue;
       auto plugin_name = mapping["plugin"].as<std::string>();
       auto function = mapping["function"].as<std::string>();
+      std::string description;
+      if ( mapping["description"] )
+        description = mapping["description"].as<std::string>();
       const std::string function_id = config_name + "_" + std::to_string( id );
       if ( mapping["args"] ) {
         blackboard_->set_from_yaml( mapping["args"], plugin_name + std::string( "_" ) + function_id );
@@ -296,7 +331,7 @@ bool HectorGamepadManager::initAxisMappings( const YAML::Node &config, const std
       if ( !plugin_name.empty() && !function.empty() ) {
         if ( !ensurePluginLoaded( plugin_name ) )
           return false;
-        mappings[id] = { plugins_[plugin_name], function };
+        mappings[id] = { plugins_[plugin_name], function, description };
       }
     }
   } else {
@@ -311,8 +346,8 @@ bool HectorGamepadManager::handleConfigurationSwitches( const GamepadInputs &inp
 
   // test if a button is pressed that is mapped to a config switch
   for ( size_t i = 0; i < config_switch_button_mapping_.size(); i++ ) {
-    if ( inputs.buttons[i] && !config_switch_button_mapping_[i].empty() ) {
-      switchConfig( config_switch_button_mapping_[i] );
+    if ( inputs.buttons[i] && !config_switch_button_mapping_[i].config.empty() ) {
+      switchConfig( config_switch_button_mapping_[i].config );
       return true;
     }
   }
@@ -337,7 +372,7 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
 
     if ( !mapping.has_double_press() ) {
       // No double-press configured → dispatch immediately via handleButton (original behavior)
-      const std::string &function = mapping.on_press;
+      const std::string &function = mapping.on_press.function;
       mapping.plugin->handleButton( function, id, pressed );
     } else {
       // Double-press enabled → buffered dispatch
@@ -353,13 +388,13 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
           // Second press within window → double press detected
           tracker.awaiting_double_press = false;
           tracker.press_dispatched = true;
-          mapping.plugin->handlePress( mapping.on_double_press, id );
+          mapping.plugin->handlePress( mapping.on_double_press.function, id );
         } else {
           // Flush a stale buffered tap before overwriting last_press_time, otherwise the original press is silently dropped when no callback fired during the wait window.
           if ( tracker.awaiting_double_press && window_expired ) {
-            mapping.plugin->handlePress( mapping.on_press, id );
+            mapping.plugin->handlePress( mapping.on_press.function, id );
             const std::string &release_fn =
-                mapping.on_release.empty() ? mapping.on_press : mapping.on_release;
+                mapping.on_release.empty() ? mapping.on_press.function : mapping.on_release.function;
             mapping.plugin->handleRelease( release_fn, id );
           }
           // First press → start waiting for potential second press
@@ -370,13 +405,14 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
       } else if ( pressed && was_pressed ) {
         // Held — only dispatch hold if press was already dispatched
         if ( tracker.press_dispatched ) {
-          const std::string &hold_fn = mapping.on_hold.empty() ? mapping.on_press : mapping.on_hold;
+          const std::string &hold_fn =
+              mapping.on_hold.empty() ? mapping.on_press.function : mapping.on_hold.function;
           mapping.plugin->handleHold( hold_fn, id );
         }
       } else if ( falling_edge ) {
         if ( tracker.press_dispatched ) {
           const std::string &release_fn =
-              mapping.on_release.empty() ? mapping.on_press : mapping.on_release;
+              mapping.on_release.empty() ? mapping.on_press.function : mapping.on_release.function;
           mapping.plugin->handleRelease( release_fn, id );
           tracker.press_dispatched = false;
         }
@@ -398,7 +434,7 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
     if ( tracker.awaiting_double_press && window_expired ) {
       tracker.awaiting_double_press = false;
       const std::string id = active_config_ + "_" + std::to_string( button_id );
-      mapping.plugin->handlePress( mapping.on_press, id );
+      mapping.plugin->handlePress( mapping.on_press.function, id );
 
       if ( tracker.pressed ) {
         // Still held — let subsequent frames drive hold/release through the normal path.
@@ -406,7 +442,7 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
       } else {
         // Quick tap: pair the delayed press with an immediate release so the plugin doesn't get stuck.
         const std::string &release_fn =
-            mapping.on_release.empty() ? mapping.on_press : mapping.on_release;
+            mapping.on_release.empty() ? mapping.on_press.function : mapping.on_release.function;
         mapping.plugin->handleRelease( release_fn, id );
         tracker.press_dispatched = false;
       }
@@ -484,14 +520,14 @@ void HectorGamepadManager::flushPendingButtonState()
 
     const std::string id = active_config_ + "_" + std::to_string( button_id );
     const std::string &release_fn =
-        mapping.on_release.empty() ? mapping.on_press : mapping.on_release;
+        mapping.on_release.empty() ? mapping.on_press.function : mapping.on_release.function;
 
     if ( tracker.press_dispatched ) {
       mapping.plugin->handleRelease( release_fn, id );
       tracker.press_dispatched = false;
     } else if ( tracker.awaiting_double_press ) {
       // Emit the same press+release pair the timeout-quick-tap path would have produced.
-      mapping.plugin->handlePress( mapping.on_press, id );
+      mapping.plugin->handlePress( mapping.on_press.function, id );
       mapping.plugin->handleRelease( release_fn, id );
     }
     tracker.awaiting_double_press = false;
@@ -523,23 +559,24 @@ HectorGamepadManager::convertJoyToGamepadInputs( const sensor_msgs::msg::Joy::Sh
   // Buttons: physical wire buttons map 1:1, so gamepads with more buttons work without code
   // changes. Xbox layout: 0=A 1=B 2=X 3=Y 4=LB 5=RB 6=Back 7=Start 8=Guide 9=LeftStickPress
   // 10=RightStickPress 11=Share (only on newer Xbox controllers).
-  for ( int i = 0; i < VIRTUAL_BUTTON_BASE; i++ ) inputs.buttons[i] = button( i );
+  for ( int i = 0; i < static_cast<int>( kVirtualButtonBase ); i++ )
+    inputs.buttons[i] = button( i );
 
   // Axis-derived virtual buttons. Offsets must match axisButtonIds().
-  inputs.buttons[VIRTUAL_BUTTON_BASE + 0] = inputs.axes[0] > AXIS_DEADZONE;  // left_stick_left
-  inputs.buttons[VIRTUAL_BUTTON_BASE + 1] = inputs.axes[0] < -AXIS_DEADZONE; // left_stick_right
-  inputs.buttons[VIRTUAL_BUTTON_BASE + 2] = inputs.axes[1] > AXIS_DEADZONE;  // left_stick_up
-  inputs.buttons[VIRTUAL_BUTTON_BASE + 3] = inputs.axes[1] < -AXIS_DEADZONE; // left_stick_down
-  inputs.buttons[VIRTUAL_BUTTON_BASE + 4] = inputs.axes[2] > AXIS_DEADZONE;  // left_trigger
-  inputs.buttons[VIRTUAL_BUTTON_BASE + 5] = inputs.axes[3] > AXIS_DEADZONE;  // right_stick_left
-  inputs.buttons[VIRTUAL_BUTTON_BASE + 6] = inputs.axes[3] < -AXIS_DEADZONE; // right_stick_right
-  inputs.buttons[VIRTUAL_BUTTON_BASE + 7] = inputs.axes[4] > AXIS_DEADZONE;  // right_stick_up
-  inputs.buttons[VIRTUAL_BUTTON_BASE + 8] = inputs.axes[4] < -AXIS_DEADZONE; // right_stick_down
-  inputs.buttons[VIRTUAL_BUTTON_BASE + 9] = inputs.axes[5] > AXIS_DEADZONE;  // right_trigger
-  inputs.buttons[VIRTUAL_BUTTON_BASE + 10] = inputs.axes[6] == 1.0f;         // cross_left
-  inputs.buttons[VIRTUAL_BUTTON_BASE + 11] = inputs.axes[6] == -1.0f;        // cross_right
-  inputs.buttons[VIRTUAL_BUTTON_BASE + 12] = inputs.axes[7] == 1.0f;         // cross_up
-  inputs.buttons[VIRTUAL_BUTTON_BASE + 13] = inputs.axes[7] == -1.0f;        // cross_down
+  inputs.buttons[kVirtualButtonBase + 0] = inputs.axes[0] > AXIS_DEADZONE;  // left_stick_left
+  inputs.buttons[kVirtualButtonBase + 1] = inputs.axes[0] < -AXIS_DEADZONE; // left_stick_right
+  inputs.buttons[kVirtualButtonBase + 2] = inputs.axes[1] > AXIS_DEADZONE;  // left_stick_up
+  inputs.buttons[kVirtualButtonBase + 3] = inputs.axes[1] < -AXIS_DEADZONE; // left_stick_down
+  inputs.buttons[kVirtualButtonBase + 4] = inputs.axes[2] > AXIS_DEADZONE;  // left_trigger
+  inputs.buttons[kVirtualButtonBase + 5] = inputs.axes[3] > AXIS_DEADZONE;  // right_stick_left
+  inputs.buttons[kVirtualButtonBase + 6] = inputs.axes[3] < -AXIS_DEADZONE; // right_stick_right
+  inputs.buttons[kVirtualButtonBase + 7] = inputs.axes[4] > AXIS_DEADZONE;  // right_stick_up
+  inputs.buttons[kVirtualButtonBase + 8] = inputs.axes[4] < -AXIS_DEADZONE; // right_stick_down
+  inputs.buttons[kVirtualButtonBase + 9] = inputs.axes[5] > AXIS_DEADZONE;  // right_trigger
+  inputs.buttons[kVirtualButtonBase + 10] = inputs.axes[6] == 1.0f;         // cross_left
+  inputs.buttons[kVirtualButtonBase + 11] = inputs.axes[6] == -1.0f;        // cross_right
+  inputs.buttons[kVirtualButtonBase + 12] = inputs.axes[7] == 1.0f;         // cross_up
+  inputs.buttons[kVirtualButtonBase + 13] = inputs.axes[7] == -1.0f;        // cross_down
   return inputs;
 }
 

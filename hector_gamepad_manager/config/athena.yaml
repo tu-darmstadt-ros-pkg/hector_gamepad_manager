@@ -30,10 +30,12 @@ buttons:
   6: # Button Back
     package: hector_gamepad_manager
     config: manipulation
+    description: Switch to manipulation mode
 
   7: # Button Start
     package: hector_gamepad_manager
     config: driving
+    description: Switch to driving mode
 
   8: # Button Guide (Manufacturer Button)
     package: ''
