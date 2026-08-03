@@ -7,6 +7,12 @@
 
 namespace hector_gamepad_manager
 {
+namespace
+{
+// One-shot feedback pattern fired whenever the active gamepad config changes.
+constexpr char kConfigSwitchVibrationId[] = "config_switch_vibration";
+} // namespace
+
 HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node )
     : node_( node ), plugin_loader_( "hector_gamepad_manager",
                                      "hector_gamepad_plugin_interface::GamepadFunctionPlugin" ),
@@ -17,6 +23,7 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
   node_->declare_parameter<std::string>( "config_name", "athena" );
   node_->declare_parameter<std::string>( "config_directory", "config" );
   node_->declare_parameter<double>( "double_press_window_sec", 0.25 );
+  node_->declare_parameter<bool>( "config_switch_vibration_enabled", true );
   const std::string config_switches_filename = node_->get_parameter( "config_name" ).as_string();
 
   config_directory_ = node_->get_parameter( "config_directory" ).as_string();
@@ -32,6 +39,15 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
   mapping_publisher_ = node_->create_publisher<hector_gamepad_manager_msgs::msg::GamepadMapping>(
       "joy_mapping", qos_profile );
   feedback_manager_->initialize( node_, "joy_feedback" );
+  // Short rumble confirming a config switch on the gamepad (tunable via the
+  // config_switch_vibration.* parameters). Pulses shorter than ~0.2 s or much weaker than 0.8
+  // are not reliably perceptible on Xbox pads (motor spin-up time).
+  hector_gamepad_plugin_interface::VibrationPatternDefaults config_switch_vibration;
+  config_switch_vibration.on_durations_sec = { 0.25 };
+  config_switch_vibration.off_durations_sec = { 0.0 };
+  config_switch_vibration.intensity = 0.8;
+  config_switch_vibration.cycle = false;
+  feedback_manager_->createVibrationPattern( kConfigSwitchVibrationId, config_switch_vibration );
   controller_orchestrator_ =
       std::make_shared<controller_orchestrator::ControllerOrchestrator>( node_ );
   // load meta switch config and all referenced config files
@@ -112,6 +128,7 @@ bool HectorGamepadManager::switchConfig( const std::string &config_name )
     return true;
   RCLCPP_DEBUG( node_->get_logger(), "Switching from config %s to config: %s",
                 active_config_.c_str(), config_name.c_str() );
+  const bool initial_switch = active_config_.empty();
   // Must run before deactivatePlugins() and before active_config_ is reassigned.
   flushPendingButtonState();
   deactivatePlugins();
@@ -119,6 +136,11 @@ bool HectorGamepadManager::switchConfig( const std::string &config_name )
   active_config_publisher_->publish( std_msgs::msg::String().set__data( config_name ) );
   active_config_ = config_name;
   activatePlugins( config_name );
+  // Confirm the switch with a short rumble; skip the initial activation at startup.
+  // Read on every switch so the feature can be toggled at runtime via `ros2 param set`.
+  if ( !initial_switch && node_->get_parameter( "config_switch_vibration_enabled" ).as_bool() ) {
+    feedback_manager_->setPatternActive( kConfigSwitchVibrationId, true );
+  }
   return true;
 }
 

@@ -60,6 +60,39 @@ TEST( FeedbackManager, EmitsSingleZeroAfterStopping )
   EXPECT_DOUBLE_EQ( manager.getVibrationIntensity(), -1.0 );
 }
 
+// A finished one-shot pattern turns itself off and can be retriggered with a later
+// setPatternActive(true). Previously the pattern stayed "active" forever after the first
+// playthrough, so every later activation was a silent no-op.
+TEST( FeedbackManager, OneShotPatternCanBeRetriggered )
+{
+  auto node = makeNode( "feedback_retrigger" );
+  VibrationPatternDefaults defaults;
+  defaults.on_durations_sec = { 0.03 };
+  defaults.off_durations_sec = { 0.0 };
+  defaults.intensity = 0.4;
+  defaults.cycle = false;
+
+  FeedbackManager manager;
+  manager.initialize( node );
+  manager.createVibrationPattern( "pattern", defaults );
+
+  manager.setPatternActive( "pattern", true );
+  EXPECT_TRUE( waitForCondition( [&]() { return manager.getVibrationIntensity() > 0.0; },
+                                 std::chrono::milliseconds( 80 ) ) );
+  // Auto-off runs inside getVibrationIntensity, mirroring the periodic publish tick.
+  EXPECT_TRUE( waitForCondition(
+      [&]() {
+        manager.getVibrationIntensity();
+        return !manager.isActive( "pattern" );
+      },
+      std::chrono::milliseconds( 120 ) ) );
+
+  // Second trigger must play the pattern again.
+  manager.setPatternActive( "pattern", true );
+  EXPECT_TRUE( waitForCondition( [&]() { return manager.getVibrationIntensity() > 0.0; },
+                                 std::chrono::milliseconds( 80 ) ) );
+}
+
 TEST( FeedbackManager, InactivePatternsReturnIdle )
 {
   auto node = makeNode( "feedback_inactive" );

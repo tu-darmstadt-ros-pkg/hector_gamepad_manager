@@ -76,11 +76,13 @@ public:
   /**
    * @brief Enable or disable the pattern.
    *
+   * Re-activating a non-cycling pattern that has already played through restarts it.
+   *
    * @param active True to start/continue the pattern, false to stop it.
    */
   void setActive( const bool active )
   {
-    if ( active && !active_ ) {
+    if ( active && ( !active_ || isFinished() ) ) {
       reset();
     }
     active_ = active;
@@ -90,6 +92,18 @@ public:
    * @brief Check whether the pattern is currently active.
    */
   bool isActive() const { return active_; }
+
+  /**
+   * @brief Whether a non-cycling pattern has played through completely. Cycling patterns never
+   * finish.
+   */
+  bool isFinished() const
+  {
+    if ( !active_ || cycle_ || !node_ ) {
+      return false;
+    }
+    return ( node_->now() - start_time_ ).seconds() >= total_duration_sec_;
+  }
 
   /**
    * @brief Get the instantaneous intensity based on the current time.

@@ -112,6 +112,30 @@ TEST( VibrationPattern, ReactivatingResetsTiming )
                                  std::chrono::milliseconds( 80 ) ) );
 }
 
+// setActive(true) on a finished one-shot pattern must restart it even without an intermediate
+// setActive(false) — this is how plugins retrigger notification buzzes.
+TEST( VibrationPattern, ReactivatingFinishedPatternRestartsIt )
+{
+  auto node = makeNode( "vibration_retrigger" );
+  VibrationPatternDefaults defaults;
+  defaults.on_durations_sec = { 0.03 };
+  defaults.off_durations_sec = { 0.0 };
+  defaults.intensity = 0.9;
+  defaults.cycle = false;
+
+  VibrationPattern pattern;
+  pattern.configure( node, "pattern.retrigger", defaults );
+  pattern.setActive( true );
+
+  EXPECT_TRUE( waitForCondition( [&]() { return pattern.isFinished(); },
+                                 std::chrono::milliseconds( 120 ) ) );
+
+  pattern.setActive( true ); // no setActive(false) in between
+
+  EXPECT_TRUE( waitForCondition( [&]() { return pattern.getIntensityNow() > 0.1; },
+                                 std::chrono::milliseconds( 80 ) ) );
+}
+
 TEST( VibrationPattern, RejectsInvalidParameterUpdates )
 {
   auto node = makeNode( "vibration_params" );

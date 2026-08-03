@@ -90,6 +90,11 @@ public:
         continue;
       }
       intensity = std::max( intensity, pattern->getIntensityNow() );
+      // One-shot patterns turn themselves off once played through, so isActive() stays truthful
+      // and a later setPatternActive(true) restarts them instead of being a silent no-op.
+      if ( pattern->isFinished() ) {
+        pattern->setActive( false );
+      }
       ++it;
     }
     if ( intensity <= 0.0 && last_intensity_ > 0.0 ) {

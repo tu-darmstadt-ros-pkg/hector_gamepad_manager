@@ -1,9 +1,11 @@
 #include <gmock/gmock.h>
 #include <rclcpp/rclcpp.hpp>
+#include <rtest/create_timer_mock.hpp>
 #include <rtest/publisher_mock.hpp>
 #include <rtest/subscription_mock.hpp>
 
 #include <sensor_msgs/msg/joy.hpp>
+#include <sensor_msgs/msg/joy_feedback.hpp>
 #include <std_msgs/msg/string.hpp>
 
 #include <hector_gamepad_manager/hector_gamepad_manager.hpp>
@@ -31,6 +33,7 @@ protected:
   std::shared_ptr<rtest::PublisherMock<std_msgs::msg::String>> pub_probe_hold_;
   std::shared_ptr<rtest::PublisherMock<std_msgs::msg::String>> pub_probe_release_;
   std::shared_ptr<rtest::PublisherMock<std_msgs::msg::String>> pub_probe_axis_;
+  std::shared_ptr<rtest::PublisherMock<sensor_msgs::msg::JoyFeedback>> pub_feedback_;
 
   sensor_msgs::msg::Joy joy_msg_;
   std::map<std::string, int> button_map_;
@@ -62,8 +65,11 @@ protected:
         rtest::findPublisher<std_msgs::msg::String>( node_, "/athena/test_probe/release" );
     pub_probe_axis_ =
         rtest::findPublisher<std_msgs::msg::String>( node_, "/athena/test_probe/axis" );
+    pub_feedback_ =
+        rtest::findPublisher<sensor_msgs::msg::JoyFeedback>( node_, "/athena/joy_feedback" );
 
     ASSERT_TRUE( sub_joy_ );
+    ASSERT_TRUE( pub_feedback_ );
     ASSERT_TRUE( pub_config_ );
     ASSERT_TRUE( pub_probe_press_ );
     ASSERT_TRUE( pub_probe_hold_ );
@@ -75,6 +81,7 @@ protected:
     EXPECT_CALL( *pub_probe_hold_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
     EXPECT_CALL( *pub_probe_release_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
     EXPECT_CALL( *pub_probe_axis_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
+    EXPECT_CALL( *pub_feedback_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
 
     button_map_ = { { "a", 0 }, { "back", 6 }, { "start", 7 }, { "share", 11 } };
     axis_map_ = { { "left_stick_left_right", 0 } };
@@ -107,6 +114,14 @@ protected:
   }
 
   void sendJoy() { sub_joy_->handle_message( joy_msg_ ); }
+
+  // Fire the FeedbackManager's periodic publish timer once.
+  void fireFeedbackTimer()
+  {
+    for ( auto &timer : rtest::findTimers( node_ ) ) {
+      timer->execute_callback( std::make_shared<int>( 0 ) );
+    }
+  }
 };
 
 namespace
@@ -224,6 +239,49 @@ TEST_F( HectorGamepadManagerInternalTest, ShortJoyMessageTreatsMissingEntriesAsN
   joy_msg_.buttons.resize( 11 );
   joy_msg_.axes.resize( 2 );
   sendJoy();
+}
+
+// With config_switch_vibration_enabled: false, a config switch must not publish any rumble.
+TEST( HectorGamepadManagerRumble, DisabledViaParameter )
+{
+  auto node = makeNodeWithParams( "gamepad_manager_no_rumble_test",
+                                  "manager_internal_no_rumble_params.yaml" );
+  auto manager = std::make_shared<hector_gamepad_manager::HectorGamepadManager>( node );
+  auto sub_joy = rtest::findSubscription<sensor_msgs::msg::Joy>( node, "/athena/joy" );
+  auto pub_feedback =
+      rtest::findPublisher<sensor_msgs::msg::JoyFeedback>( node, "/athena/joy_feedback" );
+  ASSERT_TRUE( sub_joy );
+  ASSERT_TRUE( pub_feedback );
+
+  EXPECT_CALL( *pub_feedback, publish( ::testing::_ ) ).Times( 0 );
+  sensor_msgs::msg::Joy joy_msg;
+  joy_msg.axes = std::vector<float>( MAX_AXES, 0.0f );
+  joy_msg.axes[2] = 1.0f;
+  joy_msg.axes[5] = 1.0f;
+  joy_msg.buttons = std::vector<int>( MAX_BUTTONS, 0 );
+  joy_msg.buttons[6] = 1; // Back: switch to manager_internal_alt
+  sub_joy->handle_message( joy_msg );
+  for ( auto &timer : rtest::findTimers( node ) ) {
+    timer->execute_callback( std::make_shared<int>( 0 ) );
+  }
+}
+
+// A config switch fires a short one-shot rumble so the operator feels the mode change.
+// The initial config activation at startup must not rumble.
+TEST_F( HectorGamepadManagerInternalTest, ConfigSwitchTriggersRumble )
+{
+  // Startup (default config already active): feedback stays idle, nothing is published.
+  EXPECT_CALL( *pub_feedback_, publish( ::testing::_ ) ).Times( 0 );
+  fireFeedbackTimer();
+  ::testing::Mock::VerifyAndClearExpectations( pub_feedback_.get() );
+
+  // Switching to another config publishes a rumble with non-zero intensity.
+  EXPECT_CALL( *pub_feedback_, publish( ::testing::Field( &sensor_msgs::msg::JoyFeedback::intensity,
+                                                          ::testing::Gt( 0.0f ) ) ) )
+      .Times( 1 );
+  setButton( "back", 1, true ); // switch to manager_internal_alt
+  sendJoy();
+  fireFeedbackTimer();
 }
 
 TEST_F( HectorGamepadManagerInternalTest, ConfigSwitchBlocksOtherInputs )

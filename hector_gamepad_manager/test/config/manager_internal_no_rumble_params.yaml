@@ -1,0 +1,5 @@
+/**:
+  ros__parameters:
+    config_name: manager_internal_switches
+    config_directory: test/config
+    config_switch_vibration_enabled: false
