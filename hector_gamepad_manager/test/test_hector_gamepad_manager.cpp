@@ -17,6 +17,7 @@
 #include <std_msgs/msg/float64_multi_array.hpp>
 #include <std_msgs/msg/string.hpp>
 
+#include <hector_gamepad_manager/gamepad_buttons.hpp>
 #include <hector_gamepad_manager/hector_gamepad_manager.hpp>
 #include <hector_gamepad_manager_msgs/msg/gamepad_mapping.hpp>
 
@@ -29,8 +30,8 @@
 #include <vector>
 
 constexpr int MAX_BUTTONS =
-    12; // physical buttons on the wire; axis-derived buttons are synthesized internally
-constexpr int MAX_AXES = 8;
+    21; // SDL GameController layout; axis-derived buttons are synthesized internally
+constexpr int MAX_AXES = 6;
 
 class HectorGamepadManagerTest : public ::testing::Test
 {
@@ -105,23 +106,30 @@ protected:
     EXPECT_CALL( *pub_nullspace_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
     EXPECT_CALL( *pub_joint_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
 
-    button_map_ = { { "a", 0 },     { "b", 1 },        { "x", 2 },          { "y", 3 },
-                    { "lb", 4 },    { "rb", 5 },       { "back", 6 },       { "start", 7 },
-                    { "power", 8 }, { "left_joy", 9 }, { "right_joy", 10 }, { "share", 11 } };
-    axis_map_ = { { "left_stick_left_right", 0 },  { "left_stick_up_down", 1 },  { "lt", 2 },
-                  { "right_stick_left_right", 3 }, { "right_stick_up_down", 4 }, { "rt", 5 },
-                  { "cross_left_right", 6 },       { "cross_up_down", 7 } };
+    // SDL GameController layout, i.e. what game_controller_node publishes. Kept as literals
+    // rather than gamepad_buttons.hpp lookups so the test pins the wire format independently of
+    // the code under test.
+    button_map_ = {
+        { "a", 0 },          { "b", 1 },          { "x", 2 },           { "y", 3 },
+        { "back", 4 },       { "power", 5 },      { "start", 6 },       { "left_joy", 7 },
+        { "right_joy", 8 },  { "lb", 9 },         { "rb", 10 },         { "dpad_up", 11 },
+        { "dpad_down", 12 }, { "dpad_left", 13 }, { "dpad_right", 14 }, { "share", 15 } };
+    axis_map_ = { { "left_stick_left_right", 0 },
+                  { "left_stick_up_down", 1 },
+                  { "right_stick_left_right", 2 },
+                  { "right_stick_up_down", 3 },
+                  { "lt", 4 },
+                  { "rt", 5 } };
 
     resetJoy();
     active_config_ = "driving";
   }
 
+  // All-zero is rest, triggers included: SDL reports a released trigger as 0.
   void resetJoy()
   {
     joy_msg_.axes = std::vector<float>( MAX_AXES, 0.0f );
     joy_msg_.buttons = std::vector<int>( MAX_BUTTONS, 0 );
-    joy_msg_.axes[axis_map_["rt"]] = 1.0f;
-    joy_msg_.axes[axis_map_["lt"]] = 1.0f;
   }
 
   void setButton( const std::string &button, int value, bool do_reset = false )
@@ -132,15 +140,16 @@ protected:
     joy_msg_.buttons[button_map_[button]] = value;
   }
 
+  // Takes the logical value a plugin should see - for a trigger, 0 released to 1 fully pressed -
+  // and writes what game_controller_node would put on the wire for it (see isTriggerAxis).
+  // Tests of the wire conversion itself write joy_msg_.axes directly.
   void setAxis( const std::string &axis, float value, bool do_reset = false )
   {
     if ( do_reset ) {
       resetJoy();
     }
-    if ( axis == "lt" || axis == "rt" ) {
-      value = -value;
-    }
-    joy_msg_.axes[axis_map_[axis]] = value;
+    const int id = axis_map_[axis];
+    joy_msg_.axes[id] = hector_gamepad_manager::isTriggerAxis( id ) ? -value : value;
   }
 
   void sendJoy() { sub_joy_->handle_message( joy_msg_ ); }
@@ -317,7 +326,7 @@ TEST_F( HectorGamepadManagerTest, InvertSteeringTogglesFromGuideAndShareButton )
   sendJoy();
   ::testing::Mock::VerifyAndClearExpectations( pub_cmd_vel_.get() );
 
-  // Toggle off via Share (button 11) -> back to normal
+  // Toggle off via Share -> back to normal
   setButton( "share", 1, true );
   sendJoy();
   EXPECT_CALL( *pub_cmd_vel_, publish( ::testing::_ ) )
@@ -665,6 +674,28 @@ TEST_F( HectorGamepadManagerTest, ZeroGripperWhenSwitchingToDriving )
   sendJoy();
   ::testing::Mock::VerifyAndClearExpectations( pub_gripper_.get() );
   ::testing::Mock::VerifyAndClearExpectations( pub_config_.get() );
+}
+
+// A fully pressed trigger arrives as -1 on the wire and must reach a plugin as +1; see
+// isTriggerAxis(). Written against the raw Joy message so the conversion itself is under test
+// rather than setAxis()'s matching inversion. A released trigger reads 0 under either sign, so
+// only a pressed one pins the convention.
+TEST_F( HectorGamepadManagerTest, TriggerWireValueIsNormalizedBeforeReachingPlugins )
+{
+  switchToConfig( "driving" );
+  constexpr double flipper_speed = 1.5;
+
+  EXPECT_CALL( *pub_flipper_, publish( ::testing::_ ) )
+      .WillOnce( [flipper_speed]( const std_msgs::msg::Float64MultiArray &msg ) {
+        ASSERT_EQ( msg.data.size(), 4u );
+        // Reads -flipper_speed only if wire -1 became canonical +1: taken at face value the
+        // flippers would run the other way, clamped to 0 they would stay at rest.
+        for ( size_t i = 0; i < 4; ++i ) { EXPECT_EQ( msg.data[i], -flipper_speed ); }
+      } );
+  resetJoy();
+  joy_msg_.axes[axis_map_["lt"]] = -1.0f; // fully pressed, as it arrives on the wire
+  joy_msg_.axes[axis_map_["rt"]] = -1.0f;
+  sendJoy();
 }
 
 // Verifies basic flipper commands publish symmetric velocities.

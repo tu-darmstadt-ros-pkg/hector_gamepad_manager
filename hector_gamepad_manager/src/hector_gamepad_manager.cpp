@@ -1,5 +1,6 @@
 #include "hector_gamepad_manager/hector_gamepad_manager.hpp"
 
+#include "hector_gamepad_manager/gamepad_buttons.hpp"
 #include "hector_gamepad_manager/gamepad_config.hpp"
 #include "hector_gamepad_manager/gamepad_mapping_builder.hpp"
 
@@ -11,6 +12,29 @@ namespace
 {
 // One-shot feedback pattern fired whenever the active gamepad config changes.
 constexpr char kConfigSwitchVibrationId[] = "config_switch_vibration";
+
+// game_controller_node sizes its message once, from SDL_CONTROLLER_AXIS_MAX and
+// SDL_CONTROLLER_BUTTON_MAX, so every message carries the same counts whatever the pad is. The
+// axis count has always been 6; the button count grew to 21 with the paddles and touchpad in SDL
+// 2.0.14, so anything from the earlier 15 upwards counts as the canonical layout. joy_node instead
+// sizes per device - an Xbox pad gives 8 axes and 11 buttons - which is what this separates.
+constexpr std::size_t kMinControllerButtons = 15;
+
+// How often a persistent joy-source mismatch is repeated, so an operator attaching to the log
+// after startup still sees it.
+constexpr int kJoySourceReportIntervalMs = 10000;
+
+// Nodes publishing on `topic`, to point at which node to fix. The node's *name* proves nothing -
+// a launch file may run either joy executable under any name - so this only locates it.
+std::string publisherNames( const rclcpp::Node &node, const char *topic )
+{
+  std::string names;
+  for ( const auto &info : node.get_publishers_info_by_topic( topic ) ) {
+    const std::string ns = info.node_namespace();
+    names += " " + ( ns == "/" ? "" : ns ) + "/" + info.node_name();
+  }
+  return names.empty() ? " unknown" : names;
+}
 } // namespace
 
 HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node )
@@ -68,10 +92,10 @@ bool HectorGamepadManager::loadConfigSwitchesConfig( const std::string &file_nam
 
   try {
     const YAML::Node config = YAML::LoadFile( getPath( "hector_gamepad_manager", file_name ) );
-    std::vector<std::pair<int, YAML::Node>> entries;
+    std::vector<std::tuple<int, std::string, YAML::Node>> entries;
     if ( !collectButtonEntries( config, entries ) )
       return false;
-    for ( const auto &[id, mapping] : entries ) {
+    for ( const auto &[id, name, mapping] : entries ) {
       auto config_name = mapping["config"].as<std::string>();
       auto pkg_name = mapping["package"].as<std::string>();
       if ( config_name.empty() || pkg_name.empty() )
@@ -180,81 +204,48 @@ ActionMapping readAction( const YAML::Node &node, const std::string &description
 }
 } // namespace
 
-const std::map<std::string, int> &HectorGamepadManager::axisButtonIds()
-{
-  // Offsets must match the assignment order in convertJoyToGamepadInputs().
-  static const std::map<std::string, int> ids = {
-      { "left_stick_left", kVirtualButtonBase + 0 },
-      { "left_stick_right", kVirtualButtonBase + 1 },
-      { "left_stick_up", kVirtualButtonBase + 2 },
-      { "left_stick_down", kVirtualButtonBase + 3 },
-      { "left_trigger", kVirtualButtonBase + 4 },
-      { "right_stick_left", kVirtualButtonBase + 5 },
-      { "right_stick_right", kVirtualButtonBase + 6 },
-      { "right_stick_up", kVirtualButtonBase + 7 },
-      { "right_stick_down", kVirtualButtonBase + 8 },
-      { "right_trigger", kVirtualButtonBase + 9 },
-      { "cross_left", kVirtualButtonBase + 10 },
-      { "cross_right", kVirtualButtonBase + 11 },
-      { "cross_up", kVirtualButtonBase + 12 },
-      { "cross_down", kVirtualButtonBase + 13 },
-  };
-  return ids;
-}
-
-bool HectorGamepadManager::collectButtonEntries( const YAML::Node &config,
-                                                 std::vector<std::pair<int, YAML::Node>> &entries )
+bool HectorGamepadManager::collectButtonEntries(
+    const YAML::Node &config, std::vector<std::tuple<int, std::string, YAML::Node>> &entries )
 {
   if ( !config["buttons"] ) {
     RCLCPP_ERROR( node_->get_logger(), "No buttons found in config file" );
     return false;
   }
-  for ( const auto &entry : config["buttons"] ) {
-    int id = -1;
-    try {
-      id = entry.first.as<int>();
-    } catch ( const YAML::Exception & ) {
-      RCLCPP_ERROR( node_->get_logger(),
-                    "Invalid key '%s' in 'buttons'. Physical buttons use numeric ids; "
-                    "axis-derived buttons go in the named 'axis_buttons' section.",
-                    entry.first.as<std::string>( "" ).c_str() );
-      return false;
+  // Both sections are name-keyed; they differ only in whether the button is reported by the
+  // gamepad or synthesized from a deflected axis, which the section makes explicit.
+  const auto collect = [this, &entries]( const YAML::Node &section, const bool axis_derived ) {
+    for ( const auto &entry : section ) {
+      const auto name = entry.first.as<std::string>( "" );
+      const int id = buttonId( name );
+      const bool is_axis_button = id >= static_cast<int>( kVirtualButtonBase );
+      if ( id < 0 || is_axis_button != axis_derived ) {
+        std::string valid_names;
+        for ( const auto &known : buttonNames() ) {
+          const bool known_is_axis_button =
+              buttonId( known ) >= static_cast<int>( kVirtualButtonBase );
+          if ( known_is_axis_button == axis_derived )
+            valid_names += known + " ";
+        }
+        RCLCPP_ERROR( node_->get_logger(), "Unknown button '%s' in '%s'. Valid names: %s",
+                      name.c_str(), axis_derived ? "axis_buttons" : "buttons", valid_names.c_str() );
+        return false;
+      }
+      entries.emplace_back( id, name, entry.second );
     }
-    if ( id < 0 || id >= static_cast<int>( kVirtualButtonBase ) ) {
-      RCLCPP_WARN( node_->get_logger(),
-                   "Button id %d is outside the physical button range [0, %d) and would overlap "
-                   "the virtual axis buttons (use the named 'axis_buttons' section for those). "
-                   "Skipping.",
-                   id, static_cast<int>( kVirtualButtonBase ) );
-      continue;
-    }
-    entries.emplace_back( id, entry.second );
-  }
-  for ( const auto &entry : config["axis_buttons"] ) {
-    const auto name = entry.first.as<std::string>();
-    const auto &ids = axisButtonIds();
-    const auto it = ids.find( name );
-    if ( it == ids.end() ) {
-      std::string valid_names;
-      for ( const auto &known : ids ) valid_names += known.first + " ";
-      RCLCPP_ERROR( node_->get_logger(), "Unknown axis button '%s'. Valid names: %s", name.c_str(),
-                    valid_names.c_str() );
-      return false;
-    }
-    entries.emplace_back( it->second, entry.second );
-  }
-  return true;
+    return true;
+  };
+  return collect( config["buttons"], false ) && collect( config["axis_buttons"], true );
 }
 
 bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
                                                const std::string &config_name,
                                                std::unordered_map<int, ButtonFunctionMapping> &mappings )
 {
-  std::vector<std::pair<int, YAML::Node>> entries;
+  std::vector<std::tuple<int, std::string, YAML::Node>> entries;
   if ( !collectButtonEntries( config, entries ) )
     return false;
 
-  for ( const auto &[id, mapping] : entries ) {
+  for ( const auto &[id, name, mapping] : entries ) {
     if ( !mapping["plugin"] )
       continue;
     auto plugin_name = mapping["plugin"].as<std::string>();
@@ -268,7 +259,7 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
         mapping["description"] ? mapping["description"].as<std::string>() : "";
 
     ActionMapping on_press, on_double_press, on_hold, on_release;
-    const std::string function_id = config_name + "_" + std::to_string( id );
+    const std::string function_id = buttonBindingId( config_name, name );
 
     if ( new_format ) {
       on_press = readAction( mapping["on_press"], description );
@@ -279,10 +270,10 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
       // on_press is required as the timeout-flush dispatch target and on_hold/on_release fallback.
       if ( on_press.empty() ) {
         RCLCPP_WARN( node_->get_logger(),
-                     "Button %d in config '%s' has new-format mapping but no on_press "
+                     "Button '%s' in config '%s' has new-format mapping but no on_press "
                      "function. on_press is required (it is the fallback for on_hold/"
                      "on_release and the dispatch target on a single press). Skipping.",
-                     id, config_name.c_str() );
+                     name.c_str(), config_name.c_str() );
         continue;
       }
 
@@ -296,17 +287,17 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
       for ( const auto &event_key : { "on_double_press", "on_hold", "on_release" } ) {
         if ( mapping[event_key] && mapping[event_key]["args"] ) {
           RCLCPP_WARN( node_->get_logger(),
-                       "Per-event args under '%s' on button %d are not supported and will be "
+                       "Per-event args under '%s' on button '%s' are not supported and will be "
                        "ignored. Move them to a top-level 'args:' block.",
-                       event_key, id );
+                       event_key, name.c_str() );
         }
       }
     } else {
       // Legacy flat format: plugin + function at top level → treat as on_press
       if ( !mapping["function"] ) {
         RCLCPP_WARN( node_->get_logger(),
-                     "Button %d in config '%s' has 'plugin' but no 'function'. Skipping.", id,
-                     config_name.c_str() );
+                     "Button '%s' in config '%s' has 'plugin' but no 'function'. Skipping.",
+                     name.c_str(), config_name.c_str() );
         continue;
       }
       auto function = mapping["function"].as<std::string>();
@@ -331,11 +322,14 @@ bool HectorGamepadManager::initAxisMappings( const YAML::Node &config, const std
 {
   if ( config["axes"] ) {
     for ( const auto &entry : config["axes"] ) {
-      int id = entry.first.as<int>();
-      if ( id < 0 || id >= static_cast<int>( kNumAxes ) ) {
-        RCLCPP_WARN( node_->get_logger(), "Axis id %d is outside the valid range [0, %d). Skipping.",
-                     id, static_cast<int>( kNumAxes ) );
-        continue;
+      const auto name = entry.first.as<std::string>( "" );
+      const int id = axisId( name );
+      if ( id < 0 ) {
+        std::string valid_names;
+        for ( const auto &known : axisNames() ) valid_names += known + " ";
+        RCLCPP_ERROR( node_->get_logger(), "Unknown axis '%s'. Valid names: %s", name.c_str(),
+                      valid_names.c_str() );
+        return false;
       }
       const YAML::Node mapping = entry.second;
       if ( !mapping["plugin"] || !mapping["function"] )
@@ -345,7 +339,7 @@ bool HectorGamepadManager::initAxisMappings( const YAML::Node &config, const std
       std::string description;
       if ( mapping["description"] )
         description = mapping["description"].as<std::string>();
-      const std::string function_id = config_name + "_" + std::to_string( id );
+      const std::string function_id = axisBindingId( config_name, name );
       if ( mapping["args"] ) {
         blackboard_->set_from_yaml( mapping["args"], plugin_name + std::string( "_" ) + function_id );
       }
@@ -376,8 +370,28 @@ bool HectorGamepadManager::handleConfigurationSwitches( const GamepadInputs &inp
   return false;
 }
 
+void HectorGamepadManager::checkJoySource( const sensor_msgs::msg::Joy &msg )
+{
+  // Two size comparisons, against a callback that already allocates a binding-id string per bound
+  // button, so this is affordable on every message rather than only the first.
+  if ( msg.axes.size() == kNumAxes && msg.buttons.size() >= kMinControllerButtons )
+    return;
+
+  // publisherNames() runs a graph query, so it sits in the argument list where the throttle macro
+  // only evaluates it on the messages it actually logs.
+  RCLCPP_ERROR_THROTTLE(
+      node_->get_logger(), *node_->get_clock(), kJoySourceReportIntervalMs,
+      "'%s' carries %zu axes and %zu buttons, but joy's game_controller_node always publishes %zu "
+      "axes and at least %zu. This looks like joy_node, which reports raw device-specific indices, "
+      "so every button and axis bound in this config addresses the wrong control. Launch "
+      "`game_controller_node` from the joy package instead (published by:%s).",
+      joy_subscription_->get_topic_name(), msg.axes.size(), msg.buttons.size(), kNumAxes,
+      kMinControllerButtons, publisherNames( *node_, joy_subscription_->get_topic_name() ).c_str() );
+}
+
 void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr msg )
 {
+  checkJoySource( *msg );
   const auto inputs = convertJoyToGamepadInputs( msg );
   // ignore normal button / axis behavior if configuration switching is in progress
   if ( handleConfigurationSwitches( inputs ) )
@@ -388,7 +402,7 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
   // Handle buttons with double-press detection
   for ( const auto &[button_id, mapping] : configs_[active_config_].button_mappings ) {
     const bool pressed = inputs.buttons[button_id];
-    const std::string id = active_config_ + "_" + std::to_string( button_id );
+    const std::string id = buttonBindingId( active_config_, buttonName( button_id ) );
     auto &tracker = button_trackers_[button_id];
     const bool was_pressed = tracker.pressed;
 
@@ -455,7 +469,7 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
     const bool window_expired = raw_elapsed < 0.0 || raw_elapsed >= double_press_window_sec_;
     if ( tracker.awaiting_double_press && window_expired ) {
       tracker.awaiting_double_press = false;
-      const std::string id = active_config_ + "_" + std::to_string( button_id );
+      const std::string id = buttonBindingId( active_config_, buttonName( button_id ) );
       mapping.plugin->handlePress( mapping.on_press.function, id );
 
       if ( tracker.pressed ) {
@@ -475,7 +489,7 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
   for ( const auto &axis_mapping : configs_[active_config_].axis_mappings ) {
     const float value = inputs.axes[axis_mapping.first];
     const auto &action = axis_mapping.second;
-    const std::string id = active_config_ + "_" + std::to_string( axis_mapping.first );
+    const std::string id = axisBindingId( active_config_, axisName( axis_mapping.first ) );
     axis_mapping.second.plugin->handleAxis( action.function_name, id, value );
   }
 
@@ -540,7 +554,7 @@ void HectorGamepadManager::flushPendingButtonState()
     if ( !mapping.has_double_press() )
       continue;
 
-    const std::string id = active_config_ + "_" + std::to_string( button_id );
+    const std::string id = buttonBindingId( active_config_, buttonName( button_id ) );
     const std::string &release_fn =
         mapping.on_release.empty() ? mapping.on_press.function : mapping.on_release.function;
 
@@ -560,45 +574,46 @@ HectorGamepadManager::GamepadInputs
 HectorGamepadManager::convertJoyToGamepadInputs( const sensor_msgs::msg::Joy::SharedPtr &msg )
 {
   GamepadInputs inputs;
-  // Gamepads differ in how many buttons/axes they report (e.g. the Share button only exists on
-  // newer Xbox controllers), so read out-of-range entries as neutral instead of indexing past the
-  // end of the message arrays.
+  // Pads report different numbers of buttons and axes (paddles and a touchpad only exist on some),
+  // so read out-of-range entries as neutral instead of indexing past the end of the arrays.
   const auto button = [&msg]( const size_t i ) {
     return i < msg->buttons.size() && msg->buttons[i] != 0;
   };
   const auto axis = [&msg]( const size_t i ) { return i < msg->axes.size() ? msg->axes[i] : 0.0f; };
 
-  // Axes
-  inputs.axes[0] = axis( 0 );                    // Left joystick left/right
-  inputs.axes[1] = axis( 1 );                    // Left joystick up/down
-  inputs.axes[2] = -0.5f * ( axis( 2 ) - 1.0f ); // LT: Change range from [1, -1] to [0, 1]
-  inputs.axes[3] = axis( 3 );                    // Right joystick left/right
-  inputs.axes[4] = axis( 4 );                    // Right joystick up/down
-  inputs.axes[5] = -0.5f * ( axis( 5 ) - 1.0f ); // RT: Change range from [1, -1] to [0, 1]
-  inputs.axes[6] = axis( 6 );                    // Cross left/right
-  inputs.axes[7] = axis( 7 );                    // Cross up/down
+  // Axes, in SDL GameController order. Sticks pass through; triggers are flipped to their
+  // canonical 0..1 range - see isTriggerAxis().
+  for ( int i = 0; i < static_cast<int>( kNumAxes ); i++ )
+    inputs.axes[i] = isTriggerAxis( i ) ? -axis( i ) : axis( i );
 
-  // Buttons: physical wire buttons map 1:1, so gamepads with more buttons work without code
-  // changes. Xbox layout: 0=A 1=B 2=X 3=Y 4=LB 5=RB 6=Back 7=Start 8=Guide 9=LeftStickPress
-  // 10=RightStickPress 11=Share (only on newer Xbox controllers).
+  // A trigger outside 0..1 means the joy source is joy_node, whose raw triggers idle at +1 and so
+  // land here as a permanently held trigger. Warn instead of accommodating it, which would break
+  // pads that report the layout correctly.
+  for ( int i = 0; i < static_cast<int>( kNumAxes ); i++ ) {
+    if ( isTriggerAxis( i ) && inputs.axes[i] < -AXIS_DEADZONE ) {
+      RCLCPP_WARN_THROTTLE( node_->get_logger(), *node_->get_clock(), 10000,
+                            "Axis '%s' reads %.2f, outside its 0..1 range. The manager expects "
+                            "joy's game_controller_node; joy_node publishes a different layout.",
+                            axisName( i ).c_str(), inputs.axes[i] );
+    }
+  }
+
+  // Physical buttons map 1:1, so a pad reporting paddles or a touchpad needs no code change.
   for ( int i = 0; i < static_cast<int>( kVirtualButtonBase ); i++ )
     inputs.buttons[i] = button( i );
 
-  // Axis-derived virtual buttons. Offsets must match axisButtonIds().
+  // Axis-derived virtual buttons. Offsets must match axisButtonIds(). The d-pad is not among
+  // them: SDL reports it as four real buttons.
   inputs.buttons[kVirtualButtonBase + 0] = inputs.axes[0] > AXIS_DEADZONE;  // left_stick_left
   inputs.buttons[kVirtualButtonBase + 1] = inputs.axes[0] < -AXIS_DEADZONE; // left_stick_right
   inputs.buttons[kVirtualButtonBase + 2] = inputs.axes[1] > AXIS_DEADZONE;  // left_stick_up
   inputs.buttons[kVirtualButtonBase + 3] = inputs.axes[1] < -AXIS_DEADZONE; // left_stick_down
-  inputs.buttons[kVirtualButtonBase + 4] = inputs.axes[2] > AXIS_DEADZONE;  // left_trigger
-  inputs.buttons[kVirtualButtonBase + 5] = inputs.axes[3] > AXIS_DEADZONE;  // right_stick_left
-  inputs.buttons[kVirtualButtonBase + 6] = inputs.axes[3] < -AXIS_DEADZONE; // right_stick_right
-  inputs.buttons[kVirtualButtonBase + 7] = inputs.axes[4] > AXIS_DEADZONE;  // right_stick_up
-  inputs.buttons[kVirtualButtonBase + 8] = inputs.axes[4] < -AXIS_DEADZONE; // right_stick_down
+  inputs.buttons[kVirtualButtonBase + 4] = inputs.axes[4] > AXIS_DEADZONE;  // left_trigger
+  inputs.buttons[kVirtualButtonBase + 5] = inputs.axes[2] > AXIS_DEADZONE;  // right_stick_left
+  inputs.buttons[kVirtualButtonBase + 6] = inputs.axes[2] < -AXIS_DEADZONE; // right_stick_right
+  inputs.buttons[kVirtualButtonBase + 7] = inputs.axes[3] > AXIS_DEADZONE;  // right_stick_up
+  inputs.buttons[kVirtualButtonBase + 8] = inputs.axes[3] < -AXIS_DEADZONE; // right_stick_down
   inputs.buttons[kVirtualButtonBase + 9] = inputs.axes[5] > AXIS_DEADZONE;  // right_trigger
-  inputs.buttons[kVirtualButtonBase + 10] = inputs.axes[6] == 1.0f;         // cross_left
-  inputs.buttons[kVirtualButtonBase + 11] = inputs.axes[6] == -1.0f;        // cross_right
-  inputs.buttons[kVirtualButtonBase + 12] = inputs.axes[7] == 1.0f;         // cross_up
-  inputs.buttons[kVirtualButtonBase + 13] = inputs.axes[7] == -1.0f;        // cross_down
   return inputs;
 }
 

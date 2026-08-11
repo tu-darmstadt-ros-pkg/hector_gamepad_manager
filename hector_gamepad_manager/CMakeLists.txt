@@ -34,10 +34,12 @@ find_package(rclcpp_components REQUIRED)
 
 set(HEADERS
     include/hector_gamepad_manager/hector_gamepad_manager.hpp
+    include/hector_gamepad_manager/gamepad_buttons.hpp
     include/hector_gamepad_manager/gamepad_config.hpp
     include/hector_gamepad_manager/gamepad_mapping_builder.hpp)
 
-set(SOURCES src/hector_gamepad_manager.cpp src/gamepad_mapping_builder.cpp)
+set(SOURCES src/hector_gamepad_manager.cpp src/gamepad_buttons.cpp
+            src/gamepad_mapping_builder.cpp)
 
 add_library(${PROJECT_NAME} SHARED ${SOURCES} ${HEADERS})
 target_include_directories(

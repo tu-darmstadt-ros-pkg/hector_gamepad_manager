@@ -22,8 +22,8 @@ using ::testing::Field;
 using ::testing::HasSubstr;
 
 constexpr int MAX_BUTTONS =
-    12; // physical buttons on the wire; axis-derived buttons are synthesized internally
-constexpr int MAX_AXES = 8;
+    21; // SDL GameController layout; axis-derived buttons are synthesized internally
+constexpr int MAX_AXES = 6;
 
 class HectorGamepadManagerDoublePressTest : public ::testing::Test
 {
@@ -83,8 +83,6 @@ protected:
   {
     joy_msg_.axes = std::vector<float>( MAX_AXES, 0.0f );
     joy_msg_.buttons = std::vector<int>( MAX_BUTTONS, 0 );
-    joy_msg_.axes[2] = 1.0f;
-    joy_msg_.axes[5] = 1.0f;
   }
 
   void setButton( int id, int value ) { joy_msg_.buttons[id] = value; }
@@ -423,8 +421,6 @@ protected:
 
     joy_msg_.axes = std::vector<float>( MAX_AXES, 0.0f );
     joy_msg_.buttons = std::vector<int>( MAX_BUTTONS, 0 );
-    joy_msg_.axes[2] = 1.0f;
-    joy_msg_.axes[5] = 1.0f;
   }
 
   void setButton( int id, int value ) { joy_msg_.buttons[id] = value; }

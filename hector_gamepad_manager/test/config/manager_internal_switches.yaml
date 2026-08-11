@@ -1,18 +1,23 @@
 # Test-only config switch map for internal gamepad manager tests
 default_config: manager_internal
 buttons:
-  0: {package: '', config: ''}
-  1: {package: '', config: ''}
-  2: {package: '', config: ''}
-  3: {package: '', config: ''}
-  4: {package: '', config: ''}
-  5: {package: '', config: ''}
-  6: {package: hector_gamepad_manager, config: manager_internal_alt}
-  7: {package: hector_gamepad_manager, config: manager_internal}
-  8: {package: '', config: ''}
-  9: {package: '', config: ''}
-  10: {package: '', config: ''}
-  11: {package: '', config: ''}
+  a: {package: '', config: ''}
+  b: {package: '', config: ''}
+  x: {package: '', config: ''}
+  y: {package: '', config: ''}
+  left_bumper: {package: '', config: ''}
+  right_bumper: {package: '', config: ''}
+  back: {package: hector_gamepad_manager, config: manager_internal_alt}
+  start: {package: hector_gamepad_manager, config: manager_internal}
+  guide: {package: '', config: ''}
+  left_stick_click: {package: '', config: ''}
+  right_stick_click: {package: '', config: ''}
+  share: {package: '', config: ''}
+
+  dpad_left: {package: '', config: ''}
+  dpad_right: {package: '', config: ''}
+  dpad_up: {package: '', config: ''}
+  dpad_down: {package: '', config: ''}
 
 axis_buttons:
   left_stick_left: {package: '', config: ''}
@@ -25,7 +30,3 @@ axis_buttons:
   right_stick_up: {package: '', config: ''}
   right_stick_down: {package: '', config: ''}
   right_trigger: {package: '', config: ''}
-  cross_left: {package: '', config: ''}
-  cross_right: {package: '', config: ''}
-  cross_up: {package: '', config: ''}
-  cross_down: {package: '', config: ''}

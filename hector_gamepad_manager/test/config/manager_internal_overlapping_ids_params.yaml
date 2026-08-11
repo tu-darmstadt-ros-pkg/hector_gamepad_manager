@@ -1,4 +1,0 @@
-/**:
-  ros__parameters:
-    config_name: manager_internal_overlapping_ids_switches
-    config_directory: test/config

@@ -1,6 +1,0 @@
-# Switches file with a physical button id inside the virtual button range (>= 32).
-# The entry must be skipped with a warning; the rest of the config must still load.
-default_config: manager_internal
-buttons:
-  7: {package: hector_gamepad_manager, config: manager_internal}
-  33: {package: hector_gamepad_manager, config: manager_internal_alt}

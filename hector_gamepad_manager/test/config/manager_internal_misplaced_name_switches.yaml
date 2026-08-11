@@ -1,0 +1,6 @@
+# Switches file with an axis-derived button name in the physical "buttons" section.
+# Sections are not interchangeable, so this must be rejected at load time.
+default_config: manager_internal
+buttons:
+  start: {package: hector_gamepad_manager, config: manager_internal}
+  left_trigger: {package: hector_gamepad_manager, config: manager_internal_alt}

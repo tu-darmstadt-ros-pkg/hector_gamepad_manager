@@ -6,6 +6,37 @@ For example, the `DrivePlugin` reacts to joystick movements and sends `cmd_vel` 
 
 ---
 
+## Joy source: `game_controller_node`, not `joy_node`
+
+The manager expects the canonical layout that the `joy` package's **`game_controller_node`**
+publishes. That node drives SDL's GameController API, which maps every pad in SDL's controller
+database onto one layout, so an Xbox pad and a DualSense produce identical indices and no
+per-controller configuration is needed.
+
+**Do not use `joy_node`.** It publishes raw device indices, and those differ per pad — even
+between Xbox models. A DualSense reports its right stick on `axes[2]`, where the Xbox layout has
+the left trigger, so on `joy_node` a sideways nudge of the right stick would pull a trigger.
+
+```
+axes    0 left_stick_x  1 left_stick_y  2 right_stick_x  3 right_stick_y
+        4 left_trigger  5 right_trigger          (on the wire: 0 released .. -1 pressed)
+buttons 0 a  1 b  2 x  3 y  4 back  5 guide  6 start
+        7 left_stick_click  8 right_stick_click  9 left_bumper  10 right_bumper
+        11 dpad_up  12 dpad_down  13 dpad_left  14 dpad_right
+        15 share (SDL's MISC1)  16-19 paddle1-4  20 touchpad
+```
+
+Sticks arrive in the ROS convention (left and up positive). Triggers arrive negated, because SDL
+reports them as `0..32767` and `game_controller_node` scales every axis by one negative factor. The
+Joy adapter flips them, so **a plugin bound to a trigger axis receives `0` (released) to `1` (fully
+pressed)**. Only the wire is inverted.
+
+A pad missing from SDL's database is not opened at all. Check with
+`ros2 run joy joy_enumerate_devices`, which prints each device's GUID, name and SDL mapping; a
+missing mapping can be supplied via the `SDL_GAMECONTROLLERCONFIG` environment variable.
+
+---
+
 ## Architecture (on-robot manager + operator-station satellite)
 
 The gamepad manager runs **on the robot**, directly in the robot namespace. All of its topics, services and
@@ -66,11 +97,11 @@ When a mapped button is pressed, the manager switches to the corresponding confi
 
 ```yaml
 buttons:
-  6: # Button Back
+  back:
     package: "hector_gamepad_manager"
     config: "driving"
 
-  7: # Button Start
+  start:
     package: "hector_gamepad_manager"
     config: "manipulation"
 ```
@@ -88,29 +119,34 @@ Descriptions are published on the latched `joy_mapping` topic (a `GamepadMapping
 full mapping of every loaded config) so a user interface can show the current controls. An optional
 top-level `description` describes the config itself. Descriptions never affect behavior.
 
+Every button and axis in that message is identified by its canonical `name` (`"a"`,
+`"left_bumper"`, `"dpad_up"`, `"left_stick_up"`, `"left_stick_x"`, …) — the same identifier the
+config files use. Wire indices are an internal detail of the Joy adapter and are not published.
+The catalog lives in `gamepad_buttons.hpp`.
+
 #### Example: Driving Configuration (basic format)
 
 ```yaml
 description: "Drive the robot and control the flippers"   # optional, describes the config
 
 axes:
-  0: # Left joystick left/right
+  left_stick_x:
     plugin: "hector_gamepad_manager_plugins::DrivePlugin"
     function: "steer"
     description: "Steer"
 
-  1: # Left joystick up/down
+  left_stick_y:
     plugin: "hector_gamepad_manager_plugins::DrivePlugin"
     function: "drive"
     description: "Drive forward/backward"
 
 buttons:
-  0: # Button A
+  a:
     plugin: "hector_gamepad_manager_plugins::DrivePlugin"
     function: "fast"
     description: "Drive fast (hold)"
 
-  1: # Button B
+  dpad_down:
     plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
     function: "go_to_pose"
     description: "Fold arm"
@@ -119,13 +155,17 @@ buttons:
       pose: "folded"
 
 axis_buttons:
-  cross_down: # D-pad down acts as a button
+  left_stick_up: # the stick pushed past the deadzone acts as a button
     plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
     function: "go_to_pose"
     args:
       group: "arm_group"
       pose: "folded"
 ```
+
+Both button sections are keyed by name. `buttons` holds controls the gamepad reports directly;
+`axis_buttons` holds the ones synthesized from a stick or trigger pushed past the deadzone. A name
+in the wrong section is rejected at load time.
 
 #### Per-Event Button Mapping
 
@@ -134,7 +174,7 @@ This enables features like **double-press detection** without requiring plugin-s
 
 ```yaml
 buttons:
-  4: # Button LB
+  left_bumper:
     plugin: "hector_gamepad_manager_plugins::FlipperPlugin"
     on_press:
       function: "flipper_back_up"

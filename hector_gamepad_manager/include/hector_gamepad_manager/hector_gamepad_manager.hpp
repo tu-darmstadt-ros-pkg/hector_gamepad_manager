@@ -130,19 +130,15 @@ private:
   bool initButtonMappings( const YAML::Node &config, const std::string &config_name,
                            std::unordered_map<int, ButtonFunctionMapping> &mappings );
 
-  // Maps "axis_buttons" YAML keys to internal button ids (kVirtualButtonBase + offset).
-  static const std::map<std::string, int> &axisButtonIds();
-
   /**
-   * @brief Resolve the physical "buttons" and named "axis_buttons" sections of a config into
-   * (internal button id, mapping node) pairs.
+   * @brief Resolve the "buttons" and "axis_buttons" sections of a config into
+   * (internal button id, canonical name, mapping node) tuples. Both sections are keyed by
+   * canonical name; the id is only used to index the input arrays.
    *
-   * @return False if the "buttons" section is missing or an axis button name is unknown.
-   * Physical ids outside [0, kVirtualButtonBase) would overlap the virtual buttons and are
-   * skipped with a warning.
+   * @return False if the "buttons" section is missing or any key is not a known button name.
    */
   bool collectButtonEntries( const YAML::Node &config,
-                             std::vector<std::pair<int, YAML::Node>> &entries );
+                             std::vector<std::tuple<int, std::string, YAML::Node>> &entries );
 
   // Initialize the axis mappings from the "axes" section.
   bool initAxisMappings( const YAML::Node &config, const std::string &config_name,
@@ -179,6 +175,13 @@ private:
    * @return the transformed gamepad inputs
    */
   GamepadInputs convertJoyToGamepadInputs( const sensor_msgs::msg::Joy::SharedPtr &msg );
+
+  /**
+   * @brief Check a Joy message against the layout game_controller_node publishes and log how to
+   * fix the launch if it does not match. Runs on every message, so a source that is relaunched or
+   * joined by a second publisher mid-session is caught too. Reporting is throttled.
+   */
+  void checkJoySource( const sensor_msgs::msg::Joy &msg );
 
   /**
    * @brief Get the path of a file in a package. Assuming the file is in the config folder.

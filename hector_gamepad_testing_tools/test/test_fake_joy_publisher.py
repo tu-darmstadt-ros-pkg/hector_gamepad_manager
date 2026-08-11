@@ -19,6 +19,7 @@ from ament_index_python.packages import get_package_share_directory
 
 # Import the Python class directly so we can drive it via API
 from hector_gamepad_testing_tools.fake_joy_publisher import (
+    AXIS_IDS,
     FakeJoyPublisher,
     _safe_func_name,
 )
@@ -324,7 +325,7 @@ class TestFakeJoyPublisher(unittest.TestCase):
                 msg=f"{key} deflect should change axis[{idx}]",
             )
 
-            # Reset to 0.0 (should return to baseline; triggers may map 0.0 -> raw +1.0 baseline)
+            # Reset to 0.0 (returns to baseline; under SDL every axis rests at 0, triggers too)
             axis_dyn(0.0)
 
             self.fake._on_timer()
@@ -340,7 +341,10 @@ class TestFakeJoyPublisher(unittest.TestCase):
             )
 
     def test_02_trigger_mapping(self):
-        """LT/RT mapping: logical [0..1] -> raw [1..-1] in Joy[axis 2 or 5] when functions map to those axes."""
+        """Triggers map logical [0..1] to raw [0..-1] on axes 4 (LT) and 5 (RT).
+
+        Asserts the wire half of the contract; the manager flips these back to 0..1.
+        """
         # Ensure periodic publishing during this test
         self._ensure_fake_timer()
 
@@ -348,28 +352,30 @@ class TestFakeJoyPublisher(unittest.TestCase):
         rt_key = None
         lt_key = None
         for key, idx in mode.axis_map.items():
-            if idx == 5:
+            if idx == AXIS_IDS["right_trigger"]:
                 rt_key = key
-            if idx == 2:
+            if idx == AXIS_IDS["left_trigger"]:
                 lt_key = key
 
         self.probe.drain_joy()
 
         if rt_key:
-            # logical 1.0 -> raw -1.0
+            # logical 1.0 (fully pressed) -> raw -1.0
             self.fake.deflect(rt_key.plugin, rt_key.function, 1.0)
             self.spin_some(0.2)
             self.assertTrue(self.probe.wait_for_joy_msgs(1, 2.0))
             last = self.probe.joy_msgs[-1]
-            self.assertAlmostEqual(last.axes[5], -1.0, places=4)
+            self.assertAlmostEqual(last.axes[AXIS_IDS["right_trigger"]], -1.0, places=4)
         elif lt_key:
             self.fake.deflect(lt_key.plugin, lt_key.function, 1.0)
             self.spin_some(0.2)
             self.assertTrue(self.probe.wait_for_joy_msgs(1, 2.0))
             last = self.probe.joy_msgs[-1]
-            self.assertAlmostEqual(last.axes[2], -1.0, places=4)
+            self.assertAlmostEqual(last.axes[AXIS_IDS["left_trigger"]], -1.0, places=4)
         else:
-            self.skipTest("No trigger-mapped function found on axes 2/5 in active mode")
+            self.skipTest(
+                "No trigger-mapped function found on either trigger in active mode"
+            )
 
     def test_03_mode_switch_sequence(self):
         """
@@ -535,6 +541,63 @@ class TestFakeJoyPublisher(unittest.TestCase):
         self.assertTrue(self.probe.wait_for_joy_msgs(2, 1.0))
         second = self.probe.joy_msgs[-1]
         self.assertEqual(second.buttons[idx], 0)
+
+    def test_06_holding_an_axis_lets_go_of_it(self):
+        """Leaving a `holding()` block must return the axis to neutral.
+
+        `release` used to discard held buttons and pending presses only, so an axis deflected by
+        `holding(..., value)` stayed deflected after the block exited and the robot kept driving.
+        Nothing in a test that asserts "it moved" can see that; what sees it is the next test,
+        which finds a robot already in motion and cannot tell that from one it started itself.
+        """
+        self._ensure_fake_timer()
+
+        mode = self.fake._modes[self.fake._active_mode]
+        if not mode.axis_map:
+            self.skipTest("No axes in active mode to test")
+
+        key, idx = next(iter(mode.axis_map.items()))
+
+        self.probe.drain_joy()
+        with self.fake.holding(key.plugin, key.function, 1.0):
+            self.fake._on_timer()
+            self.assertTrue(self.probe.wait_for_joy_msgs(1, 1.0))
+            deflected = self.probe.joy_msgs[-1]
+            self.assertNotEqual(
+                deflected.axes[idx],
+                0.0,
+                "the axis was never deflected inside the block",
+            )
+
+        self.fake._on_timer()
+        self.assertTrue(self.probe.wait_for_joy_msgs(2, 1.0))
+        released = self.probe.joy_msgs[-1]
+        self.assertEqual(
+            released.axes[idx],
+            0.0,
+            "the axis is still deflected after leaving the holding() block",
+        )
+
+    def test_07_releasing_an_axis_directly_returns_it_to_neutral(self):
+        """The same thing `holding` relies on, asserted without the context manager."""
+        self._ensure_fake_timer()
+
+        mode = self.fake._modes[self.fake._active_mode]
+        if not mode.axis_map:
+            self.skipTest("No axes in active mode to test")
+
+        key, idx = next(iter(mode.axis_map.items()))
+
+        self.probe.drain_joy()
+        self.fake.deflect(key.plugin, key.function, 1.0)
+        self.fake._on_timer()
+        self.assertTrue(self.probe.wait_for_joy_msgs(1, 1.0))
+        self.assertNotEqual(self.probe.joy_msgs[-1].axes[idx], 0.0)
+
+        self.fake.release(key.plugin, key.function)
+        self.fake._on_timer()
+        self.assertTrue(self.probe.wait_for_joy_msgs(2, 1.0))
+        self.assertEqual(self.probe.joy_msgs[-1].axes[idx], 0.0)
 
 
 @launch_testing.post_shutdown_test()

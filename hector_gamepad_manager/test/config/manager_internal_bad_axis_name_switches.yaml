@@ -1,7 +1,7 @@
 # Switches file with an unknown axis button name. Must be rejected at load time.
 default_config: manager_internal
 buttons:
-  7: {package: hector_gamepad_manager, config: manager_internal}
+  start: {package: hector_gamepad_manager, config: manager_internal}
 
 axis_buttons:
   cross_middle: {package: '', config: ''}

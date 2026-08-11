@@ -12,15 +12,14 @@ namespace hector_gamepad_manager
 {
 using GamepadFunctionPlugin = hector_gamepad_plugin_interface::GamepadFunctionPlugin;
 
-// Physical buttons occupy ids [0, kVirtualButtonBase) and are read 1:1 from the Joy message, so
-// gamepads with more buttons than the current Xbox layout work without code changes. Axis-derived
-// virtual buttons (axis deflection past a deadzone) start at kVirtualButtonBase, so new physical
-// buttons never shift them. In config files, physical buttons are keyed by id in the "buttons"
-// section; virtual buttons are keyed by name in the "axis_buttons" section.
+// Physical buttons occupy ids [0, kVirtualButtonBase) and are read 1:1 from the Joy message.
+// Axis-derived virtual buttons (a stick or trigger deflected past a deadzone) start at
+// kVirtualButtonBase, so extending the physical range never shifts them. Both are keyed by name
+// in the config files - see gamepad_buttons.hpp for the catalog and the expected Joy source.
 constexpr std::size_t kVirtualButtonBase = 32;
-constexpr std::size_t kNumVirtualButtons = 14;
+constexpr std::size_t kNumVirtualButtons = 10;
 constexpr std::size_t kNumButtons = kVirtualButtonBase + kNumVirtualButtons;
-constexpr std::size_t kNumAxes = 8;
+constexpr std::size_t kNumAxes = 6;
 
 // A single plugin function bound to one button event, with its human-readable description.
 struct ActionMapping {
