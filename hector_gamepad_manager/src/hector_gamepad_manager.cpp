@@ -50,9 +50,7 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
 
   // The node is launched into the robot namespace, so all topics below are robot-namespaced.
   // setup config publisher
-  rclcpp::QoS qos_profile( 1 );
-  qos_profile.reliability( RMW_QOS_POLICY_RELIABILITY_RELIABLE );
-  qos_profile.durability( RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL );
+  const rclcpp::QoS qos_profile = rclcpp::QoS( 1 ).reliable().transient_local();
   active_config_publisher_ =
       node_->create_publisher<std_msgs::msg::String>( "joy_teleop_profile", qos_profile );
   mapping_publisher_ = node_->create_publisher<hector_gamepad_manager_msgs::msg::GamepadMapping>(
@@ -120,13 +118,15 @@ bool HectorGamepadManager::loadConfig( const std::string &pkg_name, const std::s
   try {
     const YAML::Node config = YAML::LoadFile( getPath( pkg_name, file_name ) );
 
-    // Add empty mappings for the filename
-    configs_[file_name] = GamepadConfig();
+    // Start from empty mappings: two config switch buttons may name the same config, so this can
+    // run twice for one entry. configs_ is a std::map, so the reference survives the loads below.
+    GamepadConfig &gamepad_config = configs_[file_name];
+    gamepad_config = GamepadConfig();
     if ( config["description"] )
-      configs_[file_name].description = config["description"].as<std::string>();
+      gamepad_config.description = config["description"].as<std::string>();
 
-    if ( !initButtonMappings( config, file_name, configs_[file_name].button_mappings ) ||
-         !initAxisMappings( config, file_name, configs_[file_name].axis_mappings ) ) {
+    if ( !initButtonMappings( config, file_name, gamepad_config.button_mappings ) ||
+         !initAxisMappings( config, file_name, gamepad_config.axis_mappings ) ) {
       return false;
     }
 
@@ -164,10 +164,12 @@ bool HectorGamepadManager::switchConfig( const std::string &config_name )
   return true;
 }
 
-bool HectorGamepadManager::ensurePluginLoaded( const std::string &plugin_name )
+std::shared_ptr<HectorGamepadManager::GamepadFunctionPlugin>
+HectorGamepadManager::loadPlugin( const std::string &plugin_name )
 {
-  if ( plugins_.count( plugin_name ) != 0 )
-    return true;
+  const auto it = plugins_.find( plugin_name );
+  if ( it != plugins_.end() )
+    return it->second;
   try {
     std::shared_ptr<GamepadFunctionPlugin> plugin =
         plugin_loader_.createSharedInstance( plugin_name );
@@ -175,10 +177,10 @@ bool HectorGamepadManager::ensurePluginLoaded( const std::string &plugin_name )
                               controller_orchestrator_ );
     plugins_[plugin_name] = plugin;
     RCLCPP_DEBUG( node_->get_logger(), "Loaded plugin: %s", plugin_name.c_str() );
-    return true;
+    return plugin;
   } catch ( const std::exception &e ) {
     RCLCPP_ERROR( node_->get_logger(), "Failed to load plugin %s: %s", plugin_name.c_str(), e.what() );
-    return false;
+    return nullptr;
   }
 }
 
@@ -276,9 +278,9 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
       }
     }
 
-    if ( !ensurePluginLoaded( plugin_name ) )
+    mapping.plugin = loadPlugin( plugin_name );
+    if ( !mapping.plugin )
       return false;
-    mapping.plugin = plugins_[plugin_name];
     mappings[entry.id] = std::move( mapping );
   }
   return true;
@@ -311,10 +313,10 @@ bool HectorGamepadManager::initAxisMappings( const YAML::Node &config, const std
     if ( node["args"] )
       blackboard_->set_from_yaml( node["args"], plugin_name + "_" + binding_id );
 
-    if ( !ensurePluginLoaded( plugin_name ) )
+    const auto plugin = loadPlugin( plugin_name );
+    if ( !plugin )
       return false;
-    mappings[id] = { plugins_[plugin_name], function, node["description"].as<std::string>( "" ),
-                     binding_id };
+    mappings[id] = { plugin, function, node["description"].as<std::string>( "" ), binding_id };
   }
   return true;
 }
@@ -354,9 +356,9 @@ void HectorGamepadManager::checkJoySource( const sensor_msgs::msg::Joy &msg )
   // Second tell: the trigger convention, which catches a source of the right shape. A trigger
   // resting at +1 is joy_node; game_controller_node rests at 0 and goes negative when pressed, so
   // a positive reading cannot come from it.
-  static const int triggers[] = { axisId( "left_trigger" ), axisId( "right_trigger" ) };
-  for ( const int id : triggers ) {
-    if ( msg.axes[id] <= AXIS_DEADZONE )
+  // Indexing is safe: a message of the wrong axis count returned above.
+  for ( int id = 0; id < static_cast<int>( kNumAxes ); id++ ) {
+    if ( !isTriggerAxis( id ) || msg.axes[id] <= AXIS_DEADZONE )
       continue;
     RCLCPP_ERROR_THROTTLE(
         node_->get_logger(), *node_->get_clock(), kJoySourceReportIntervalMs,
@@ -372,7 +374,7 @@ void HectorGamepadManager::checkJoySource( const sensor_msgs::msg::Joy &msg )
 void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr msg )
 {
   checkJoySource( *msg );
-  const auto inputs = convertJoyToGamepadInputs( msg );
+  const auto inputs = convertJoyToGamepadInputs( *msg );
   // ignore normal button / axis behavior if configuration switching is in progress
   if ( handleConfigurationSwitches( inputs ) )
     return;
@@ -381,7 +383,15 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
 
   // Backward clock jumps (sim-time replay/reset) count as expired so a press cannot stay buffered
   // forever. Re-read rather than cached: a rising edge restarts the window mid-iteration.
-  const auto window_expired = [this, now]( const ButtonTracker &tracker ) {
+  //
+  // A button with no double press bound has no window to wait out at all, so its press is buffered
+  // and released again within the iteration that produced it. That is what lets the machine below
+  // be the only dispatch path instead of one of two: with a zero-length window it reduces to
+  // "press on the rising edge, hold while down, release on the falling edge".
+  const auto window_expired = [this, now]( const ButtonFunctionMapping &mapping,
+                                           const ButtonTracker &tracker ) {
+    if ( !mapping.has_double_press() )
+      return true;
     const double elapsed = ( now - tracker.last_press_time ).seconds();
     return elapsed < 0.0 || elapsed >= double_press_window_sec_;
   };
@@ -394,20 +404,8 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
     const bool was_pressed = tracker.pressed;
     tracker.pressed = pressed;
 
-    if ( !mapping.has_double_press() ) {
-      // No double-press configured → the press goes out on the edge that produced it.
-      if ( pressed && !was_pressed )
-        mapping.plugin->handlePress( mapping.on_press.function, id );
-      else if ( pressed )
-        mapping.plugin->handleHold( mapping.holdFunction(), id );
-      else if ( was_pressed )
-        mapping.plugin->handleRelease( mapping.releaseFunction(), id );
-      continue;
-    }
-
-    // Double-press enabled → buffered dispatch
     if ( pressed && !was_pressed ) { // rising edge
-      if ( tracker.state == PressState::Buffering && !window_expired( tracker ) ) {
+      if ( tracker.state == PressState::Buffering && !window_expired( mapping, tracker ) ) {
         // Second press within window → double press detected
         tracker.state = PressState::Dispatched;
         mapping.plugin->handlePress( mapping.on_double_press.function, id );
@@ -435,7 +433,7 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
     }
 
     // The window ran out with no second press: the tap was a single press after all.
-    if ( tracker.state == PressState::Buffering && window_expired( tracker ) )
+    if ( tracker.state == PressState::Buffering && window_expired( mapping, tracker ) )
       dispatchBufferedPress( mapping, tracker, tracker.pressed );
   }
 
@@ -450,11 +448,6 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
 
 void HectorGamepadManager::activatePlugins( const std::string &config_name )
 {
-  if ( configs_.count( config_name ) == 0 ) {
-    RCLCPP_ERROR( node_->get_logger(), "Config %s not found. Cannot activate the gamepad config",
-                  config_name.c_str() );
-    return;
-  }
   // Every plugin the config binds, whether to a button or an axis, and each activated once even
   // when several bindings share it.
   const auto activate = [this]( const auto &mappings ) {
@@ -467,7 +460,8 @@ void HectorGamepadManager::activatePlugins( const std::string &config_name )
       active_plugins_.push_back( mapping.plugin );
     }
   };
-  const GamepadConfig &config = configs_[config_name];
+  // switchConfig is the only caller and rejects an unknown name before getting here.
+  const GamepadConfig &config = configs_.at( config_name );
   activate( config.button_mappings );
   activate( config.axis_mappings );
 }
@@ -508,18 +502,10 @@ void HectorGamepadManager::flushPendingButtonState()
   for ( const auto &[button_id, mapping] : config_it->second.button_mappings ) {
     auto &tracker = button_trackers_[button_id];
 
-    if ( !mapping.has_double_press() ) {
-      // A button still down when the config goes away: the manager detects the edges, so nothing
-      // else would ever produce the release that ends the press it already sent.
-      if ( tracker.pressed ) {
-        mapping.plugin->handleRelease( mapping.releaseFunction(), mapping.binding_id );
-        tracker.pressed = false;
-      }
-      continue;
-    }
-
     switch ( tracker.state ) {
     case PressState::Dispatched:
+      // A button still down when the config goes away: the manager detects the edges, so nothing
+      // else would ever produce the release that ends the press it already sent.
       mapping.plugin->handleRelease( mapping.releaseFunction(), mapping.binding_id );
       tracker.state = PressState::Idle;
       break;
@@ -534,15 +520,15 @@ void HectorGamepadManager::flushPendingButtonState()
 }
 
 HectorGamepadManager::GamepadInputs
-HectorGamepadManager::convertJoyToGamepadInputs( const sensor_msgs::msg::Joy::SharedPtr &msg )
+HectorGamepadManager::convertJoyToGamepadInputs( const sensor_msgs::msg::Joy &msg )
 {
   GamepadInputs inputs;
   // Pads report different numbers of buttons and axes (paddles and a touchpad only exist on some),
   // so read out-of-range entries as neutral instead of indexing past the end of the arrays.
   const auto button = [&msg]( const size_t i ) {
-    return i < msg->buttons.size() && msg->buttons[i] != 0;
+    return i < msg.buttons.size() && msg.buttons[i] != 0;
   };
-  const auto axis = [&msg]( const size_t i ) { return i < msg->axes.size() ? msg->axes[i] : 0.0f; };
+  const auto axis = [&msg]( const size_t i ) { return i < msg.axes.size() ? msg.axes[i] : 0.0f; };
 
   // Axes, in SDL GameController order. Sticks pass through; triggers are flipped to their
   // canonical 0..1 range - see isTriggerAxis().
@@ -573,7 +559,7 @@ std::string HectorGamepadManager::getPath( const std::string &pkg_name, const st
     const auto package_path = ament_index_cpp::get_package_share_directory( pkg_name );
     path = std::filesystem::path( package_path ) / config_directory_ / file_name;
   }
-  if ( file_name.find( ".yaml" ) == std::string::npos ) {
+  if ( path.extension() != ".yaml" ) {
     path += ".yaml";
   }
   return path.string();

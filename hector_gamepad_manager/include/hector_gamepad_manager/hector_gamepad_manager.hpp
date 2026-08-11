@@ -166,8 +166,8 @@ private:
   bool initAxisMappings( const YAML::Node &config, const std::string &config_name,
                          std::map<int, FunctionMapping> &mappings );
 
-  // Load the named plugin into plugins_ if not already present. Returns false on failure.
-  bool ensurePluginLoaded( const std::string &plugin_name );
+  // The named plugin, loaded into plugins_ on first use. Null if it could not be loaded.
+  std::shared_ptr<GamepadFunctionPlugin> loadPlugin( const std::string &plugin_name );
 
   /**
    * @brief Activates all plugins present in the given config
@@ -192,9 +192,9 @@ private:
   void dispatchBufferedPress( const ButtonFunctionMapping &mapping, ButtonTracker &tracker,
                               bool still_held );
 
-  // Synthesize the events needed to bring plugins back to a "no button held" state for
-  // double-press buttons before a config switch. Not wired to shutdown: the manager has no
-  // destructor hook, so a process going down leaves the last press unresolved.
+  // Synthesize the events needed to bring plugins back to a "no button held" state before a
+  // config switch. Not wired to shutdown: the manager has no destructor hook, so a process going
+  // down leaves the last press unresolved.
   void flushPendingButtonState();
 
   /**
@@ -210,7 +210,7 @@ private:
    * @param msg The message containing the gamepad inputs.
    * @return the transformed gamepad inputs
    */
-  GamepadInputs convertJoyToGamepadInputs( const sensor_msgs::msg::Joy::SharedPtr &msg );
+  GamepadInputs convertJoyToGamepadInputs( const sensor_msgs::msg::Joy &msg );
 
   /**
    * @brief Check a Joy message against the layout game_controller_node publishes and log how to
