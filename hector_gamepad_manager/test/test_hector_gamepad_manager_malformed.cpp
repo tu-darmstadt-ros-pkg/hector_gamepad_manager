@@ -18,7 +18,8 @@ using ::testing::AnyNumber;
 using ::testing::Field;
 using ::testing::HasSubstr;
 
-constexpr int MAX_BUTTONS = 25;
+constexpr int MAX_BUTTONS =
+    12; // physical buttons on the wire; axis-derived buttons are synthesized internally
 constexpr int MAX_AXES = 8;
 
 // Verifies malformed YAML entries are skipped with a warning rather than throwing or registering broken mappings.

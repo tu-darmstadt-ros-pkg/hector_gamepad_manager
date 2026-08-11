@@ -38,10 +38,30 @@ class JoyLayout:
         neutrals = tuple(1.0 if i in (2, 5) else 0.0 for i in range(axis_count))
         return cls(
             axis_count=axis_count,
-            button_count=25,
+            button_count=12,  # physical buttons on the wire; virtual buttons are axis-derived
             neutrals=neutrals,
             trigger_axes=frozenset({2, 5}),
         )
+
+
+# Config "axis_buttons" name -> (axis index, logical deflection). Pressing such a virtual button
+# means deflecting the axis past the manager's press threshold; there is no wire button for it.
+AXIS_BUTTON_TO_AXIS: Dict[str, Tuple[int, float]] = {
+    "left_stick_left": (0, 1.0),
+    "left_stick_right": (0, -1.0),
+    "left_stick_up": (1, 1.0),
+    "left_stick_down": (1, -1.0),
+    "left_trigger": (2, 1.0),
+    "right_stick_left": (3, 1.0),
+    "right_stick_right": (3, -1.0),
+    "right_stick_up": (4, 1.0),
+    "right_stick_down": (4, -1.0),
+    "right_trigger": (5, 1.0),
+    "cross_left": (6, 1.0),
+    "cross_right": (6, -1.0),
+    "cross_up": (7, 1.0),
+    "cross_down": (7, -1.0),
+}
 
 
 @dataclass(frozen=True)
@@ -61,6 +81,8 @@ class Mode:
     name: str
     button_map: Dict[Key, int]
     axis_map: Dict[Key, int]
+    # virtual (axis-derived) buttons: Key -> axis_buttons name (see AXIS_BUTTON_TO_AXIS)
+    virtual_button_map: Dict[Key, str]
 
 
 def _pkg_config_path(pkg: str, name: str) -> str:
@@ -161,7 +183,7 @@ def _keys_in_mode_axis(keys: Set["Key"], mode: "Mode") -> Set["Key"]:
 
 
 def _keys_in_mode_button(keys: Set["Key"], mode: "Mode") -> Set["Key"]:
-    return {k for k in keys if k in mode.button_map}
+    return {k for k in keys if k in mode.button_map or k in mode.virtual_button_map}
 
 
 class FakeJoyPublisher(Node):
@@ -379,7 +401,9 @@ class FakeJoyPublisher(Node):
             for key in mode.axis_map.keys():
                 s = _safe_func_name(key.function)
                 axis_index.setdefault(s, set()).add(key)
-            for key in mode.button_map.keys():
+            for key in list(mode.button_map.keys()) + list(
+                mode.virtual_button_map.keys()
+            ):
                 s = _safe_func_name(key.function)
                 button_index.setdefault(s, set()).add(key)
         self._axis_name_to_keys = axis_index
@@ -505,26 +529,28 @@ class FakeJoyPublisher(Node):
         buttons = [0] * self.layout.button_count
         mode = self._modes[self._active_mode]
 
-        # Apply held buttons
-        for key in list(self._held_buttons):
+        def apply_button(key: Key, action: str) -> None:
             if key in mode.button_map:
                 buttons[mode.button_map[key]] = 1
+            elif key in mode.virtual_button_map:
+                # virtual button: deflect the corresponding axis past the press threshold
+                idx, logical = AXIS_BUTTON_TO_AXIS[mode.virtual_button_map[key]]
+                axes[idx] = self.layout.logical_to_raw(idx, logical)
             else:
                 raise RuntimeError(
-                    f"Held button {key} not available in active mode '{self._active_mode}'"
+                    f"{action} button {key} not available in active mode '{self._active_mode}'"
                 )
+
+        # Apply held buttons
+        for key in list(self._held_buttons):
+            apply_button(key, "Held")
 
         # Apply one-shot presses
         for key in list(self._pending_one_shot_keys):
-            if key in mode.button_map:
-                self.get_logger().info(
-                    f"Pressing button {key} in mode '{self._active_mode} [button index: {mode.button_map[key]} vs. button len {len(mode.button_map)} ]"
-                )
-                buttons[mode.button_map[key]] = 1
-            else:
-                raise RuntimeError(
-                    f"Pressed button {key} not available in active mode '{self._active_mode}'"
-                )
+            self.get_logger().info(
+                f"Pressing button {key} in mode '{self._active_mode}'"
+            )
+            apply_button(key, "Pressed")
         self._pending_one_shot_keys.clear()
 
         # Apply axes
@@ -549,6 +575,7 @@ class FakeJoyPublisher(Node):
     def _parse_mode(self, name: str, cfg: dict, reserved_buttons: Set[int]) -> Mode:
         buttons = {}
         axes = {}
+        virtual_buttons = {}
         for k, v in (cfg.get("buttons") or {}).items():
             idx = int(k)
             if idx in reserved_buttons:
@@ -557,6 +584,13 @@ class FakeJoyPublisher(Node):
             func = (v or {}).get("function", "") or ""
             if plugin and func:
                 buttons[Key(plugin, func)] = idx
+        for k, v in (cfg.get("axis_buttons") or {}).items():
+            if k not in AXIS_BUTTON_TO_AXIS:
+                raise ValueError(f"Unknown axis button '{k}' in config '{name}'")
+            plugin = (v or {}).get("plugin", "") or ""
+            func = (v or {}).get("function", "") or ""
+            if plugin and func:
+                virtual_buttons[Key(plugin, func)] = k
         for k, v in (cfg.get("axes") or {}).items():
             idx = int(k)
             plugin = (v or {}).get("plugin", "") or ""
@@ -564,20 +598,32 @@ class FakeJoyPublisher(Node):
             if plugin and func:
                 axes[Key(plugin, func)] = idx
         self.get_logger().info(
-            f"Loaded mode '{name}' with {len(buttons)} buttons and {len(axes)} axes"
-            f"\nButtons:{yaml.dump(buttons)}, \nAxes:{yaml.dump(axes)}"
+            f"Loaded mode '{name}' with {len(buttons)} buttons, "
+            f"{len(virtual_buttons)} virtual buttons and {len(axes)} axes"
+            f"\nButtons:{yaml.dump(buttons)}, \nVirtual buttons:{yaml.dump(virtual_buttons)}, "
+            f"\nAxes:{yaml.dump(axes)}"
         )
-        return Mode(name=name, button_map=buttons, axis_map=axes)
+        return Mode(
+            name=name,
+            button_map=buttons,
+            axis_map=axes,
+            virtual_button_map=virtual_buttons,
+        )
 
     def _find_mode_for_key(self, key: Key, active_mode: str) -> Optional[str]:
         # preferred: active mode first, then all modes
         if (
             key in self._modes[active_mode].button_map
+            or key in self._modes[active_mode].virtual_button_map
             or key in self._modes[active_mode].axis_map
         ):
             return active_mode
         for name, mode in self._modes.items():
-            if key in mode.button_map or key in mode.axis_map:
+            if (
+                key in mode.button_map
+                or key in mode.virtual_button_map
+                or key in mode.axis_map
+            ):
                 return name
         return None
 

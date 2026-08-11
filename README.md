@@ -117,6 +117,14 @@ buttons:
     args:
       group: "arm_group"
       pose: "folded"
+
+axis_buttons:
+  cross_down: # D-pad down acts as a button
+    plugin: "hector_gamepad_manager_plugins::MoveitPlugin"
+    function: "go_to_pose"
+    args:
+      group: "arm_group"
+      pose: "folded"
 ```
 
 #### Per-Event Button Mapping

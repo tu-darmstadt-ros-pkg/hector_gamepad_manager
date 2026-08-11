@@ -48,59 +48,64 @@ buttons:
     package: ''
     config: ''
 
-  # -------------------- All the axes can also be used as buttons if specified here --------------------
-  11: # Left joystick left
+  11: # Button Share (only on newer Xbox controllers)
     package: ''
     config: ''
 
-  12: # Left joystick right
+# -------------------- All the axes can also be used as buttons if specified here --------------------
+axis_buttons:
+  left_stick_left:
     package: ''
     config: ''
 
-  13: # Left joystick up
+  left_stick_right:
     package: ''
     config: ''
 
-  14: # Left joystick down
+  left_stick_up:
     package: ''
     config: ''
 
-  15: # LT
+  left_stick_down:
     package: ''
     config: ''
 
-  16: # Right joystick left
+  left_trigger:
     package: ''
     config: ''
 
-  17: # Right joystick right
+  right_stick_left:
     package: ''
     config: ''
 
-  18: # Right joystick up
+  right_stick_right:
     package: ''
     config: ''
 
-  19: # Right joystick down
+  right_stick_up:
     package: ''
     config: ''
 
-  20: # RT
+  right_stick_down:
     package: ''
     config: ''
 
-  21: # Cross left
+  right_trigger:
     package: ''
     config: ''
 
-  22: # Cross right
+  cross_left:
     package: ''
     config: ''
 
-  23: # Cross up
+  cross_right:
     package: ''
     config: ''
 
-  24: # Cross down
+  cross_up:
+    package: ''
+    config: ''
+
+  cross_down:
     package: ''
     config: ''

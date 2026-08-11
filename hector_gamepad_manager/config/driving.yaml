@@ -117,48 +117,56 @@ buttons:
     function: reset_camera
     description: Reset camera view
 
-  # -------------------- All the axes can also be used as buttons if specified here --------------------
-  11: # Left joystick left
+  11: # Button Share (only on newer Xbox controllers)
+    plugin: hector_gamepad_manager_plugins::BlackboardPlugin
+    function: toggle
+    args:
+      name: invert_steering
+      ocs_topic: joy_teleop_direction
+
+# -------------------- All the axes can also be used as buttons if specified here --------------------
+axis_buttons:
+  left_stick_left:
     plugin: ''
     function: ''
 
-  12: # Left joystick right
+  left_stick_right:
     plugin: ''
     function: ''
 
-  13: # Left joystick up
+  left_stick_up:
     plugin: ''
     function: ''
 
-  14: # Left joystick down
+  left_stick_down:
     plugin: ''
     function: ''
 
-  15: # LT
+  left_trigger:
     plugin: ''
     function: ''
 
-  16: # Right joystick left
+  right_stick_left:
     plugin: ''
     function: ''
 
-  17: # Right joystick right
+  right_stick_right:
     plugin: ''
     function: ''
 
-  18: # Right joystick up
+  right_stick_up:
     plugin: ''
     function: ''
 
-  19: # Right joystick down
+  right_stick_down:
     plugin: ''
     function: ''
 
-  20: # RT
+  right_trigger:
     plugin: ''
     function: ''
 
-  21: # Cross left
+  cross_left:
     plugin: hector_gamepad_manager_plugins::MoveitPlugin
     function: go_to_pose
     description: Flippers to tub pose
@@ -166,7 +174,7 @@ buttons:
       group: flipper_group
       pose: tub
 
-  22: # Cross right
+  cross_right:
     plugin: hector_gamepad_manager_plugins::MoveitPlugin
     function: go_to_pose
     description: Flippers to compact pose
@@ -174,7 +182,7 @@ buttons:
       group: flipper_group
       pose: compact
 
-  23: # Cross up
+  cross_up:
     plugin: hector_gamepad_manager_plugins::MoveitPlugin
     function: go_to_pose
     description: Flippers to up pose
@@ -182,7 +190,7 @@ buttons:
       group: flipper_group
       pose: up
 
-  24: # Cross down
+  cross_down:
     plugin: hector_gamepad_manager_plugins::MoveitPlugin
     function: go_to_pose
     description: Flippers to flat pose

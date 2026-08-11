@@ -1,0 +1,4 @@
+/**:
+  ros__parameters:
+    config_name: manager_internal_bad_axis_name_switches
+    config_directory: test/config

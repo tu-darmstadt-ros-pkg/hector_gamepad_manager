@@ -28,7 +28,8 @@
 #include <string>
 #include <vector>
 
-constexpr int MAX_BUTTONS = 25;
+constexpr int MAX_BUTTONS =
+    12; // physical buttons on the wire; axis-derived buttons are synthesized internally
 constexpr int MAX_AXES = 8;
 
 class HectorGamepadManagerTest : public ::testing::Test
@@ -104,21 +105,9 @@ protected:
     EXPECT_CALL( *pub_nullspace_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
     EXPECT_CALL( *pub_joint_, publish( ::testing::_ ) ).Times( ::testing::AnyNumber() );
 
-    button_map_ = { { "a", 0 },
-                    { "b", 1 },
-                    { "x", 2 },
-                    { "y", 3 },
-                    { "lb", 4 },
-                    { "rb", 5 },
-                    { "back", 6 },
-                    { "start", 7 },
-                    { "power", 8 },
-                    { "left_joy", 9 },
-                    { "right_joy", 10 },
-                    { "cross_left", 21 },
-                    { "cross_right", 22 },
-                    { "cross_up", 23 },
-                    { "cross_down", 24 } };
+    button_map_ = { { "a", 0 },     { "b", 1 },        { "x", 2 },          { "y", 3 },
+                    { "lb", 4 },    { "rb", 5 },       { "back", 6 },       { "start", 7 },
+                    { "power", 8 }, { "left_joy", 9 }, { "right_joy", 10 }, { "share", 11 } };
     axis_map_ = { { "left_stick_left_right", 0 },  { "left_stick_up_down", 1 },  { "lt", 2 },
                   { "right_stick_left_right", 3 }, { "right_stick_up_down", 4 }, { "rt", 5 },
                   { "cross_left_right", 6 },       { "cross_up_down", 7 } };
@@ -186,7 +175,7 @@ protected:
 
   void enableInvertSteering()
   {
-    setButton( "power", 1, true );
+    setButton( "share", 1, true );
     sendJoy();
     resetJoy();
   }
@@ -308,6 +297,34 @@ TEST_F( HectorGamepadManagerTest, CmdVelInvertedSteering )
 
   setAxis( "left_stick_left_right", 0.5f, true );
   setAxis( "left_stick_up_down", 0.5f );
+  sendJoy();
+}
+
+// Verifies invert_steering is toggleable from both the Guide button (pads without a Share
+// button) and the Share button, acting on the same blackboard flag.
+TEST_F( HectorGamepadManagerTest, InvertSteeringTogglesFromGuideAndShareButton )
+{
+  switchToConfig( "driving" );
+
+  // Toggle on via Guide (button 8) -> inverted
+  setButton( "power", 1, true );
+  sendJoy();
+  EXPECT_CALL( *pub_cmd_vel_, publish( ::testing::_ ) )
+      .WillOnce( []( const geometry_msgs::msg::TwistStamped &msg ) {
+        EXPECT_LT( msg.twist.linear.x, 0.0 );
+      } );
+  setAxis( "left_stick_up_down", 0.5f, true );
+  sendJoy();
+  ::testing::Mock::VerifyAndClearExpectations( pub_cmd_vel_.get() );
+
+  // Toggle off via Share (button 11) -> back to normal
+  setButton( "share", 1, true );
+  sendJoy();
+  EXPECT_CALL( *pub_cmd_vel_, publish( ::testing::_ ) )
+      .WillOnce( []( const geometry_msgs::msg::TwistStamped &msg ) {
+        EXPECT_GT( msg.twist.linear.x, 0.0 );
+      } );
+  setAxis( "left_stick_up_down", 0.5f, true );
   sendJoy();
 }
 

@@ -7,6 +7,12 @@
 
 namespace hector_gamepad_manager
 {
+namespace
+{
+// One-shot feedback pattern fired whenever the active gamepad config changes.
+constexpr char kConfigSwitchVibrationId[] = "config_switch_vibration";
+} // namespace
+
 HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node )
     : node_( node ), plugin_loader_( "hector_gamepad_manager",
                                      "hector_gamepad_plugin_interface::GamepadFunctionPlugin" ),
@@ -17,6 +23,7 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
   node_->declare_parameter<std::string>( "config_name", "athena" );
   node_->declare_parameter<std::string>( "config_directory", "config" );
   node_->declare_parameter<double>( "double_press_window_sec", 0.25 );
+  node_->declare_parameter<bool>( "config_switch_vibration_enabled", true );
   const std::string config_switches_filename = node_->get_parameter( "config_name" ).as_string();
 
   config_directory_ = node_->get_parameter( "config_directory" ).as_string();
@@ -32,6 +39,15 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
   mapping_publisher_ = node_->create_publisher<hector_gamepad_manager_msgs::msg::GamepadMapping>(
       "joy_mapping", qos_profile );
   feedback_manager_->initialize( node_, "joy_feedback" );
+  // Short rumble confirming a config switch on the gamepad (tunable via the
+  // config_switch_vibration.* parameters). Pulses shorter than ~0.2 s or much weaker than 0.8
+  // are not reliably perceptible on Xbox pads (motor spin-up time).
+  hector_gamepad_plugin_interface::VibrationPatternDefaults config_switch_vibration;
+  config_switch_vibration.on_durations_sec = { 0.25 };
+  config_switch_vibration.off_durations_sec = { 0.0 };
+  config_switch_vibration.intensity = 0.8;
+  config_switch_vibration.cycle = false;
+  feedback_manager_->createVibrationPattern( kConfigSwitchVibrationId, config_switch_vibration );
   controller_orchestrator_ =
       std::make_shared<controller_orchestrator::ControllerOrchestrator>( node_ );
   // load meta switch config and all referenced config files
@@ -52,14 +68,10 @@ bool HectorGamepadManager::loadConfigSwitchesConfig( const std::string &file_nam
 
   try {
     const YAML::Node config = YAML::LoadFile( getPath( "hector_gamepad_manager", file_name ) );
-    for ( const auto &entry : config["buttons"] ) {
-      const int id = entry.first.as<int>();
-      if ( static_cast<size_t>( id ) >= kNumButtons ) {
-        RCLCPP_ERROR( node_->get_logger(), "Button ID %d exceeds maximum of %lu. Skipping.", id,
-                      kNumButtons - 1 );
-        continue;
-      }
-      YAML::Node mapping = entry.second;
+    std::vector<std::pair<int, YAML::Node>> entries;
+    if ( !collectButtonEntries( config, entries ) )
+      return false;
+    for ( const auto &[id, mapping] : entries ) {
       auto config_name = mapping["config"].as<std::string>();
       auto pkg_name = mapping["package"].as<std::string>();
       if ( config_name.empty() || pkg_name.empty() )
@@ -94,7 +106,7 @@ bool HectorGamepadManager::loadConfig( const std::string &pkg_name, const std::s
       configs_[file_name].description = config["description"].as<std::string>();
 
     if ( !initButtonMappings( config, file_name, configs_[file_name].button_mappings ) ||
-         !initMappings( config, "axes", file_name, configs_[file_name].axis_mappings ) ) {
+         !initAxisMappings( config, file_name, configs_[file_name].axis_mappings ) ) {
       return false;
     }
 
@@ -116,6 +128,7 @@ bool HectorGamepadManager::switchConfig( const std::string &config_name )
     return true;
   RCLCPP_DEBUG( node_->get_logger(), "Switching from config %s to config: %s",
                 active_config_.c_str(), config_name.c_str() );
+  const bool initial_switch = active_config_.empty();
   // Must run before deactivatePlugins() and before active_config_ is reassigned.
   flushPendingButtonState();
   deactivatePlugins();
@@ -123,6 +136,11 @@ bool HectorGamepadManager::switchConfig( const std::string &config_name )
   active_config_publisher_->publish( std_msgs::msg::String().set__data( config_name ) );
   active_config_ = config_name;
   activatePlugins( config_name );
+  // Confirm the switch with a short rumble; skip the initial activation at startup.
+  // Read on every switch so the feature can be toggled at runtime via `ros2 param set`.
+  if ( !initial_switch && node_->get_parameter( "config_switch_vibration_enabled" ).as_bool() ) {
+    feedback_manager_->setPatternActive( kConfigSwitchVibrationId, true );
+  }
   return true;
 }
 
@@ -162,19 +180,81 @@ ActionMapping readAction( const YAML::Node &node, const std::string &description
 }
 } // namespace
 
-bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
-                                               const std::string &config_name,
-                                               std::unordered_map<int, ButtonFunctionMapping> &mappings )
+const std::map<std::string, int> &HectorGamepadManager::axisButtonIds()
+{
+  // Offsets must match the assignment order in convertJoyToGamepadInputs().
+  static const std::map<std::string, int> ids = {
+      { "left_stick_left", kVirtualButtonBase + 0 },
+      { "left_stick_right", kVirtualButtonBase + 1 },
+      { "left_stick_up", kVirtualButtonBase + 2 },
+      { "left_stick_down", kVirtualButtonBase + 3 },
+      { "left_trigger", kVirtualButtonBase + 4 },
+      { "right_stick_left", kVirtualButtonBase + 5 },
+      { "right_stick_right", kVirtualButtonBase + 6 },
+      { "right_stick_up", kVirtualButtonBase + 7 },
+      { "right_stick_down", kVirtualButtonBase + 8 },
+      { "right_trigger", kVirtualButtonBase + 9 },
+      { "cross_left", kVirtualButtonBase + 10 },
+      { "cross_right", kVirtualButtonBase + 11 },
+      { "cross_up", kVirtualButtonBase + 12 },
+      { "cross_down", kVirtualButtonBase + 13 },
+  };
+  return ids;
+}
+
+bool HectorGamepadManager::collectButtonEntries( const YAML::Node &config,
+                                                 std::vector<std::pair<int, YAML::Node>> &entries )
 {
   if ( !config["buttons"] ) {
     RCLCPP_ERROR( node_->get_logger(), "No buttons found in config file" );
     return false;
   }
-
   for ( const auto &entry : config["buttons"] ) {
-    const int id = entry.first.as<int>();
-    const YAML::Node mapping = entry.second;
+    int id = -1;
+    try {
+      id = entry.first.as<int>();
+    } catch ( const YAML::Exception & ) {
+      RCLCPP_ERROR( node_->get_logger(),
+                    "Invalid key '%s' in 'buttons'. Physical buttons use numeric ids; "
+                    "axis-derived buttons go in the named 'axis_buttons' section.",
+                    entry.first.as<std::string>( "" ).c_str() );
+      return false;
+    }
+    if ( id < 0 || id >= static_cast<int>( kVirtualButtonBase ) ) {
+      RCLCPP_WARN( node_->get_logger(),
+                   "Button id %d is outside the physical button range [0, %d) and would overlap "
+                   "the virtual axis buttons (use the named 'axis_buttons' section for those). "
+                   "Skipping.",
+                   id, static_cast<int>( kVirtualButtonBase ) );
+      continue;
+    }
+    entries.emplace_back( id, entry.second );
+  }
+  for ( const auto &entry : config["axis_buttons"] ) {
+    const auto name = entry.first.as<std::string>();
+    const auto &ids = axisButtonIds();
+    const auto it = ids.find( name );
+    if ( it == ids.end() ) {
+      std::string valid_names;
+      for ( const auto &known : ids ) valid_names += known.first + " ";
+      RCLCPP_ERROR( node_->get_logger(), "Unknown axis button '%s'. Valid names: %s", name.c_str(),
+                    valid_names.c_str() );
+      return false;
+    }
+    entries.emplace_back( it->second, entry.second );
+  }
+  return true;
+}
 
+bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
+                                               const std::string &config_name,
+                                               std::unordered_map<int, ButtonFunctionMapping> &mappings )
+{
+  std::vector<std::pair<int, YAML::Node>> entries;
+  if ( !collectButtonEntries( config, entries ) )
+    return false;
+
+  for ( const auto &[id, mapping] : entries ) {
     if ( !mapping["plugin"] )
       continue;
     auto plugin_name = mapping["plugin"].as<std::string>();
@@ -246,13 +326,17 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
   return true;
 }
 
-bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::string &type,
-                                         const std::string &config_name,
-                                         std::unordered_map<int, FunctionMapping> &mappings )
+bool HectorGamepadManager::initAxisMappings( const YAML::Node &config, const std::string &config_name,
+                                             std::unordered_map<int, FunctionMapping> &mappings )
 {
-  if ( config[type] ) {
-    for ( const auto &entry : config[type] ) {
+  if ( config["axes"] ) {
+    for ( const auto &entry : config["axes"] ) {
       int id = entry.first.as<int>();
+      if ( id < 0 || id >= static_cast<int>( kNumAxes ) ) {
+        RCLCPP_WARN( node_->get_logger(), "Axis id %d is outside the valid range [0, %d). Skipping.",
+                     id, static_cast<int>( kNumAxes ) );
+        continue;
+      }
       const YAML::Node mapping = entry.second;
       if ( !mapping["plugin"] || !mapping["function"] )
         continue;
@@ -273,7 +357,7 @@ bool HectorGamepadManager::initMappings( const YAML::Node &config, const std::st
       }
     }
   } else {
-    RCLCPP_ERROR( node_->get_logger(), "No %s found in config file", type.c_str() );
+    RCLCPP_ERROR( node_->get_logger(), "No axes found in config file" );
     return false;
   }
   return true;
@@ -476,42 +560,45 @@ HectorGamepadManager::GamepadInputs
 HectorGamepadManager::convertJoyToGamepadInputs( const sensor_msgs::msg::Joy::SharedPtr &msg )
 {
   GamepadInputs inputs;
-  // Axes
-  inputs.axes[0] = msg->axes[0];                    // Left joystick left/right
-  inputs.axes[1] = msg->axes[1];                    // Left joystick up/down
-  inputs.axes[2] = -0.5f * ( msg->axes[2] - 1.0f ); // LT: Change range from [1, -1] to [0, 1]
-  inputs.axes[3] = msg->axes[3];                    // Right joystick left/right
-  inputs.axes[4] = msg->axes[4];                    // Right joystick up/down
-  inputs.axes[5] = -0.5f * ( msg->axes[5] - 1.0f ); // RT: Change range from [1, -1] to [0, 1]
-  inputs.axes[6] = msg->axes[6];                    // Cross left/right
-  inputs.axes[7] = msg->axes[7];                    // Cross up/down
+  // Gamepads differ in how many buttons/axes they report (e.g. the Share button only exists on
+  // newer Xbox controllers), so read out-of-range entries as neutral instead of indexing past the
+  // end of the message arrays.
+  const auto button = [&msg]( const size_t i ) {
+    return i < msg->buttons.size() && msg->buttons[i] != 0;
+  };
+  const auto axis = [&msg]( const size_t i ) { return i < msg->axes.size() ? msg->axes[i] : 0.0f; };
 
-  // Buttons
-  inputs.buttons[0] = msg->buttons[0];   // Button A
-  inputs.buttons[1] = msg->buttons[1];   // Button B
-  inputs.buttons[2] = msg->buttons[2];   // Button X
-  inputs.buttons[3] = msg->buttons[3];   // Button Y
-  inputs.buttons[4] = msg->buttons[4];   // Button LB
-  inputs.buttons[5] = msg->buttons[5];   // Button RB
-  inputs.buttons[6] = msg->buttons[6];   // Button Back
-  inputs.buttons[7] = msg->buttons[7];   // Button Start
-  inputs.buttons[8] = msg->buttons[8];   // Button Guide -> Reserved for config switches
-  inputs.buttons[9] = msg->buttons[9];   // Left joystick pressed
-  inputs.buttons[10] = msg->buttons[10]; // Right joystick pressed
-  inputs.buttons[11] = inputs.axes[0] > AXIS_DEADZONE;  // Left joystick left
-  inputs.buttons[12] = inputs.axes[0] < -AXIS_DEADZONE; // Left joystick right
-  inputs.buttons[13] = inputs.axes[1] > AXIS_DEADZONE;  // Left joystick up
-  inputs.buttons[14] = inputs.axes[1] < -AXIS_DEADZONE; // Left joystick down
-  inputs.buttons[15] = inputs.axes[2] > AXIS_DEADZONE;  // LT button
-  inputs.buttons[16] = inputs.axes[3] > AXIS_DEADZONE;  // Right joystick left
-  inputs.buttons[17] = inputs.axes[3] < -AXIS_DEADZONE; // Right joystick right
-  inputs.buttons[18] = inputs.axes[4] > AXIS_DEADZONE;  // Right joystick up
-  inputs.buttons[19] = inputs.axes[4] < -AXIS_DEADZONE; // Right joystick down
-  inputs.buttons[20] = inputs.axes[5] > AXIS_DEADZONE;  // RT button
-  inputs.buttons[21] = inputs.axes[6] == 1.0f;          // Cross left
-  inputs.buttons[22] = inputs.axes[6] == -1.0f;         // Cross right
-  inputs.buttons[23] = inputs.axes[7] == 1.0f;          // Cross up
-  inputs.buttons[24] = inputs.axes[7] == -1.0f;         // Cross down
+  // Axes
+  inputs.axes[0] = axis( 0 );                    // Left joystick left/right
+  inputs.axes[1] = axis( 1 );                    // Left joystick up/down
+  inputs.axes[2] = -0.5f * ( axis( 2 ) - 1.0f ); // LT: Change range from [1, -1] to [0, 1]
+  inputs.axes[3] = axis( 3 );                    // Right joystick left/right
+  inputs.axes[4] = axis( 4 );                    // Right joystick up/down
+  inputs.axes[5] = -0.5f * ( axis( 5 ) - 1.0f ); // RT: Change range from [1, -1] to [0, 1]
+  inputs.axes[6] = axis( 6 );                    // Cross left/right
+  inputs.axes[7] = axis( 7 );                    // Cross up/down
+
+  // Buttons: physical wire buttons map 1:1, so gamepads with more buttons work without code
+  // changes. Xbox layout: 0=A 1=B 2=X 3=Y 4=LB 5=RB 6=Back 7=Start 8=Guide 9=LeftStickPress
+  // 10=RightStickPress 11=Share (only on newer Xbox controllers).
+  for ( int i = 0; i < static_cast<int>( kVirtualButtonBase ); i++ )
+    inputs.buttons[i] = button( i );
+
+  // Axis-derived virtual buttons. Offsets must match axisButtonIds().
+  inputs.buttons[kVirtualButtonBase + 0] = inputs.axes[0] > AXIS_DEADZONE;  // left_stick_left
+  inputs.buttons[kVirtualButtonBase + 1] = inputs.axes[0] < -AXIS_DEADZONE; // left_stick_right
+  inputs.buttons[kVirtualButtonBase + 2] = inputs.axes[1] > AXIS_DEADZONE;  // left_stick_up
+  inputs.buttons[kVirtualButtonBase + 3] = inputs.axes[1] < -AXIS_DEADZONE; // left_stick_down
+  inputs.buttons[kVirtualButtonBase + 4] = inputs.axes[2] > AXIS_DEADZONE;  // left_trigger
+  inputs.buttons[kVirtualButtonBase + 5] = inputs.axes[3] > AXIS_DEADZONE;  // right_stick_left
+  inputs.buttons[kVirtualButtonBase + 6] = inputs.axes[3] < -AXIS_DEADZONE; // right_stick_right
+  inputs.buttons[kVirtualButtonBase + 7] = inputs.axes[4] > AXIS_DEADZONE;  // right_stick_up
+  inputs.buttons[kVirtualButtonBase + 8] = inputs.axes[4] < -AXIS_DEADZONE; // right_stick_down
+  inputs.buttons[kVirtualButtonBase + 9] = inputs.axes[5] > AXIS_DEADZONE;  // right_trigger
+  inputs.buttons[kVirtualButtonBase + 10] = inputs.axes[6] == 1.0f;         // cross_left
+  inputs.buttons[kVirtualButtonBase + 11] = inputs.axes[6] == -1.0f;        // cross_right
+  inputs.buttons[kVirtualButtonBase + 12] = inputs.axes[7] == 1.0f;         // cross_up
+  inputs.buttons[kVirtualButtonBase + 13] = inputs.axes[7] == -1.0f;        // cross_down
   return inputs;
 }
 

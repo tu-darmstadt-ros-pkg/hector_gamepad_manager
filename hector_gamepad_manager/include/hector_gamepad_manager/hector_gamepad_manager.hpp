@@ -34,7 +34,7 @@ private:
   // Struct to store the inputs from the gamepad
   struct GamepadInputs {
     // Vector of axes values
-    std::array<float, 8> axes = std::array<float, 8>{ 0.0 };
+    std::array<float, kNumAxes> axes = std::array<float, kNumAxes>{ 0.0 };
 
     std::array<bool, kNumButtons> buttons = std::array<bool, kNumButtons>{ false };
   };
@@ -121,19 +121,32 @@ private:
   bool switchConfig( const std::string &config_name );
 
   /**
-   * @brief Initialize the mappings for buttons or axes.
+   * @brief Initialize the button mappings from the "buttons" and "axis_buttons" sections.
    *
    * @param config The YAML node containing the configuration.
-   * @param type The type of the mapping (buttons or axes).
    * @param mappings The mappings to be initialized.
    * @return True if the mappings were initialized successfully, false otherwise.
    */
   bool initButtonMappings( const YAML::Node &config, const std::string &config_name,
                            std::unordered_map<int, ButtonFunctionMapping> &mappings );
 
-  bool initMappings( const YAML::Node &config, const std::string &type,
-                     const std::string &config_name,
-                     std::unordered_map<int, FunctionMapping> &mappings );
+  // Maps "axis_buttons" YAML keys to internal button ids (kVirtualButtonBase + offset).
+  static const std::map<std::string, int> &axisButtonIds();
+
+  /**
+   * @brief Resolve the physical "buttons" and named "axis_buttons" sections of a config into
+   * (internal button id, mapping node) pairs.
+   *
+   * @return False if the "buttons" section is missing or an axis button name is unknown.
+   * Physical ids outside [0, kVirtualButtonBase) would overlap the virtual buttons and are
+   * skipped with a warning.
+   */
+  bool collectButtonEntries( const YAML::Node &config,
+                             std::vector<std::pair<int, YAML::Node>> &entries );
+
+  // Initialize the axis mappings from the "axes" section.
+  bool initAxisMappings( const YAML::Node &config, const std::string &config_name,
+                         std::unordered_map<int, FunctionMapping> &mappings );
 
   // Load the named plugin into plugins_ if not already present. Returns false on failure.
   bool ensurePluginLoaded( const std::string &plugin_name );
