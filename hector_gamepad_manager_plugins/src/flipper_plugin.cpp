@@ -62,8 +62,6 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
       node_, node_->get_parameter( plugin_namespace + ".drive_flipper_action" ).as_string() );
   sync_flipper_client_ = rclcpp_action::create_client<SyncFlipperGroupAction>(
       node_, node_->get_parameter( plugin_namespace + ".sync_flipper_action" ).as_string() );
-
-  active_ = true;
 }
 
 void FlipperPlugin::handlePress( const std::string &function, const std::string &id )

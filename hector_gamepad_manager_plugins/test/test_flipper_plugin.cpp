@@ -45,6 +45,10 @@ protected:
 
     ASSERT_TRUE( drive_mock_ );
     ASSERT_TRUE( sync_mock_ );
+
+    // The manager activates a plugin once the config that binds it becomes active; the plugin
+    // ignores input until then.
+    plugin_->activate();
   }
 };
 
