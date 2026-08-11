@@ -3,42 +3,12 @@ axes:
   left_stick_x:
     plugin: hector_gamepad_manager_plugins::TestProbePlugin
     function: axis
-  left_stick_y: {plugin: '', function: ''}
-  left_trigger: {plugin: '', function: ''}
-  right_stick_x: {plugin: '', function: ''}
-  right_stick_y: {plugin: '', function: ''}
-  right_trigger: {plugin: '', function: ''}
 buttons:
   a:
     plugin: hector_gamepad_manager_plugins::TestProbePlugin
     function: probe
-  b: {plugin: '', function: ''}
-  x: {plugin: '', function: ''}
-  y: {plugin: '', function: ''}
-  left_bumper: {plugin: '', function: ''}
-  right_bumper: {plugin: '', function: ''}
-  back: {plugin: '', function: ''}
-  start: {plugin: '', function: ''}
-  guide: {plugin: '', function: ''}
-  left_stick_click: {plugin: '', function: ''}
-  right_stick_click: {plugin: '', function: ''}
-  share: {plugin: '', function: ''}
-
-  dpad_left: {plugin: '', function: ''}
-  dpad_right: {plugin: '', function: ''}
-  dpad_up: {plugin: '', function: ''}
-  dpad_down: {plugin: '', function: ''}
 
 axis_buttons:
   left_stick_left:
     plugin: hector_gamepad_manager_plugins::TestProbePlugin
     function: virtual
-  left_stick_right: {plugin: '', function: ''}
-  left_stick_up: {plugin: '', function: ''}
-  left_stick_down: {plugin: '', function: ''}
-  left_trigger: {plugin: '', function: ''}
-  right_stick_left: {plugin: '', function: ''}
-  right_stick_right: {plugin: '', function: ''}
-  right_stick_up: {plugin: '', function: ''}
-  right_stick_down: {plugin: '', function: ''}
-  right_trigger: {plugin: '', function: ''}

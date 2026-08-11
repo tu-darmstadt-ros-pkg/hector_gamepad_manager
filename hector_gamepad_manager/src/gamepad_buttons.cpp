@@ -49,8 +49,6 @@ constexpr std::array<const char *, kNumAxes> kAxisNames = {
 // Axis-derived virtual buttons, indexed by their offset from kVirtualButtonBase. The name a config
 // binds, the axis it reads and the deflection that counts as a press sit on one row, so the
 // catalog and the Joy adapter that applies it cannot disagree.
-//
-// The d-pad is not here: SDL reports it as four real buttons.
 constexpr std::array<AxisButton, kNumVirtualButtons> kAxisButtons = { {
     /*  0 */ { "left_stick_left", 0, +1.0f },
     /*  1 */ { "left_stick_right", 0, -1.0f },
@@ -64,6 +62,12 @@ constexpr std::array<AxisButton, kNumVirtualButtons> kAxisButtons = { {
     /*  9 */ { "right_trigger", 5, +1.0f },
 } };
 // clang-format on
+
+// Physical ids are the wire ids, so the catalog may only name as many as fit below the range the
+// axis-derived buttons start at; past it, isAxisButton() would send a physical button's config
+// entry to the wrong section.
+static_assert( kPhysicalButtonNames.size() <= kVirtualButtonBase,
+               "physical button names would collide with the axis-derived button ids" );
 
 constexpr bool axisButtonsReadKnownAxes()
 {

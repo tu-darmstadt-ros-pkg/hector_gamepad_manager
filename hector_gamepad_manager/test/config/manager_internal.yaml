@@ -1,53 +1,28 @@
-# Test-only config for manager internal logic tests
+# Test-only config for manager internal logic tests.
+# Only bound controls are listed: an unlisted one behaves exactly like one written with an empty
+# plugin, and the catalog of what exists lives in gamepad_buttons.hpp.
 axes:
   left_stick_x:
     plugin: hector_gamepad_manager_plugins::TestProbePlugin
     function: axis
-  left_stick_y: {plugin: '', function: ''}
-  left_trigger: {plugin: '', function: ''}
-  right_stick_x: {plugin: '', function: ''}
-  right_stick_y: {plugin: '', function: ''}
-  right_trigger: {plugin: '', function: ''}
 buttons:
   a:
     plugin: hector_gamepad_manager_plugins::TestProbePlugin
     function: probe
-  b: {plugin: '', function: ''}
-  x: {plugin: '', function: ''}
-  y: {plugin: '', function: ''}
-  left_bumper: {plugin: '', function: ''}
-  right_bumper: {plugin: '', function: ''}
-  back: {plugin: '', function: ''}
-  start: {plugin: '', function: ''}
-  guide: {plugin: '', function: ''}
-  left_stick_click: {plugin: '', function: ''}
-  right_stick_click: {plugin: '', function: ''}
   share: # Button Share (only on newer Xbox controllers)
     plugin: hector_gamepad_manager_plugins::TestProbePlugin
     function: share
   paddle1: # Only some pads have paddles; they map 1:1 like any other button
     plugin: hector_gamepad_manager_plugins::TestProbePlugin
     function: extra
-
-  dpad_left: {plugin: '', function: ''}
-  dpad_right: {plugin: '', function: ''}
   dpad_up:
     plugin: hector_gamepad_manager_plugins::TestProbePlugin
     function: dpad
-  dpad_down: {plugin: '', function: ''}
 
 axis_buttons:
   left_stick_left:
     plugin: hector_gamepad_manager_plugins::TestProbePlugin
     function: virtual
-  left_stick_right: {plugin: '', function: ''}
-  left_stick_up: {plugin: '', function: ''}
-  left_stick_down: {plugin: '', function: ''}
   left_trigger:
     plugin: hector_gamepad_manager_plugins::TestProbePlugin
     function: trigger_button
-  right_stick_left: {plugin: '', function: ''}
-  right_stick_right: {plugin: '', function: ''}
-  right_stick_up: {plugin: '', function: ''}
-  right_stick_down: {plugin: '', function: ''}
-  right_trigger: {plugin: '', function: ''}

@@ -13,15 +13,10 @@ namespace
 // One-shot feedback pattern fired whenever the active gamepad config changes.
 constexpr char kConfigSwitchVibrationId[] = "config_switch_vibration";
 
-// game_controller_node sizes its message once, from SDL_CONTROLLER_AXIS_MAX and
-// SDL_CONTROLLER_BUTTON_MAX, so every message carries the same counts whatever the pad is. The
-// axis count has always been 6; the button count grew to 21 with the paddles and touchpad in SDL
-// 2.0.14, so anything from the earlier 15 upwards counts as the canonical layout. joy_node instead
-// sizes per device - an Xbox pad gives 8 axes and 11 buttons - which is what this separates.
+/// joy msgs with less buttons are ignored with a warning
 constexpr std::size_t kMinControllerButtons = 15;
 
-// How often a persistent joy-source mismatch is repeated, so an operator attaching to the log
-// after startup still sees it.
+// How often a persistent joy-source mismatch is repeated
 constexpr int kJoySourceReportIntervalMs = 10000;
 
 // Nodes publishing on `topic`, to point at which node to fix. The node's *name* proves nothing -
@@ -192,16 +187,10 @@ namespace
 // Read {function, description} from an event node (e.g. on_press). Empty mapping if absent.
 ActionMapping readAction( const YAML::Node &node, const std::string &description_fallback = "" )
 {
-  ActionMapping action;
   if ( !node )
-    return action;
-  if ( node["function"] )
-    action.function = node["function"].as<std::string>();
-  if ( node["description"] )
-    action.description = node["description"].as<std::string>();
-  else
-    action.description = description_fallback;
-  return action;
+    return {};
+  return { node["function"].as<std::string>( "" ),
+           node["description"].as<std::string>( description_fallback ) };
 }
 } // namespace
 
@@ -252,7 +241,7 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
     const bool per_event =
         node["on_press"] || node["on_double_press"] || node["on_hold"] || node["on_release"];
     const YAML::Node press_node = per_event ? node["on_press"] : node;
-    const std::string description = node["description"] ? node["description"].as<std::string>() : "";
+    const std::string description = node["description"].as<std::string>( "" );
 
     ButtonFunctionMapping mapping;
     mapping.on_press = readAction( press_node, description );
@@ -298,37 +287,34 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
 bool HectorGamepadManager::initAxisMappings( const YAML::Node &config, const std::string &config_name,
                                              std::map<int, FunctionMapping> &mappings )
 {
-  if ( config["axes"] ) {
-    for ( const auto &entry : config["axes"] ) {
-      const auto name = entry.first.as<std::string>( "" );
-      const int id = axisId( name );
-      if ( id < 0 ) {
-        RCLCPP_ERROR( node_->get_logger(), "Unknown axis '%s'. Valid names: %s", name.c_str(),
-                      axisNameList().c_str() );
-        return false;
-      }
-      const YAML::Node mapping = entry.second;
-      if ( !mapping["plugin"] || !mapping["function"] )
-        continue;
-      auto plugin_name = mapping["plugin"].as<std::string>();
-      auto function = mapping["function"].as<std::string>();
-      std::string description;
-      if ( mapping["description"] )
-        description = mapping["description"].as<std::string>();
-      const std::string function_id = axisBindingId( config_name, name );
-      if ( mapping["args"] ) {
-        blackboard_->set_from_yaml( mapping["args"], plugin_name + std::string( "_" ) + function_id );
-      }
-
-      if ( !plugin_name.empty() && !function.empty() ) {
-        if ( !ensurePluginLoaded( plugin_name ) )
-          return false;
-        mappings[id] = { plugins_[plugin_name], function, description, function_id };
-      }
-    }
-  } else {
+  if ( !config["axes"] ) {
     RCLCPP_ERROR( node_->get_logger(), "No axes found in config file" );
     return false;
+  }
+  for ( const auto &entry : config["axes"] ) {
+    const auto name = entry.first.as<std::string>( "" );
+    const int id = axisId( name );
+    if ( id < 0 ) {
+      RCLCPP_ERROR( node_->get_logger(), "Unknown axis '%s'. Valid names: %s", name.c_str(),
+                    axisNameList().c_str() );
+      return false;
+    }
+    const YAML::Node node = entry.second;
+    const auto plugin_name = node["plugin"].as<std::string>( "" );
+    const auto function = node["function"].as<std::string>( "" );
+    // Nothing to bind. Checked before the args are stored, or they would land under a binding id
+    // no mapping ever reads.
+    if ( plugin_name.empty() || function.empty() )
+      continue;
+
+    const std::string binding_id = axisBindingId( config_name, name );
+    if ( node["args"] )
+      blackboard_->set_from_yaml( node["args"], plugin_name + "_" + binding_id );
+
+    if ( !ensurePluginLoaded( plugin_name ) )
+      return false;
+    mappings[id] = { plugins_[plugin_name], function, node["description"].as<std::string>( "" ),
+                     binding_id };
   }
   return true;
 }
@@ -348,10 +334,7 @@ bool HectorGamepadManager::handleConfigurationSwitches( const GamepadInputs &inp
 
 void HectorGamepadManager::checkJoySource( const sensor_msgs::msg::Joy &msg )
 {
-  // A handful of comparisons against a callback that already does far more per message, so both
-  // tells are checked on every message rather than only the first. publisherNames() runs a graph
-  // query, so it sits in the argument lists where the throttle macros only evaluate it on the
-  // messages they actually log.
+  // this function verifies whether the joy msgs is valid e.g. warns if msg from joy_node instead of gamepadnode
   const char *topic = joy_subscription_->get_topic_name();
 
   // First tell: the message shape. game_controller_node sizes every message the same way whatever
@@ -403,7 +386,8 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
     return elapsed < 0.0 || elapsed >= double_press_window_sec_;
   };
 
-  for ( const auto &[button_id, mapping] : configs_[active_config_].button_mappings ) {
+  const GamepadConfig &config = configs_[active_config_];
+  for ( const auto &[button_id, mapping] : config.button_mappings ) {
     const bool pressed = inputs.buttons[button_id];
     const std::string &id = mapping.binding_id;
     auto &tracker = button_trackers_[button_id];
@@ -456,7 +440,7 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
   }
 
   // Handle axes
-  for ( const auto &[axis_id, mapping] : configs_[active_config_].axis_mappings ) {
+  for ( const auto &[axis_id, mapping] : config.axis_mappings ) {
     mapping.plugin->handleAxis( mapping.function_name, mapping.binding_id, inputs.axes[axis_id] );
   }
 
@@ -483,8 +467,9 @@ void HectorGamepadManager::activatePlugins( const std::string &config_name )
       active_plugins_.push_back( mapping.plugin );
     }
   };
-  activate( configs_[config_name].button_mappings );
-  activate( configs_[config_name].axis_mappings );
+  const GamepadConfig &config = configs_[config_name];
+  activate( config.button_mappings );
+  activate( config.axis_mappings );
 }
 
 void HectorGamepadManager::deactivatePlugins()

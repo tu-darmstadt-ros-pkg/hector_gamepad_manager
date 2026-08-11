@@ -1,11 +1,6 @@
 # Test-only config exercising the per-event button format and double-press detection.
-axes:
-  left_stick_x: {plugin: '', function: ''}
-  left_stick_y: {plugin: '', function: ''}
-  left_trigger: {plugin: '', function: ''}
-  right_stick_x: {plugin: '', function: ''}
-  right_stick_y: {plugin: '', function: ''}
-  right_trigger: {plugin: '', function: ''}
+# `back` and `start` are left unbound here; the switches file makes them switch configs.
+axes: {}
 buttons:
   # Button A: on_press + on_double_press, no custom hold/release (so they fall back to on_press)
   a:
@@ -25,30 +20,3 @@ buttons:
     plugin: hector_gamepad_manager_plugins::TestProbePlugin
     on_press: {function: probe2}
     on_double_press: {function: probe2_double}
-  y: {plugin: '', function: ''}
-  left_bumper: {plugin: '', function: ''}
-  right_bumper: {plugin: '', function: ''}
-  # Buttons 6 & 7 reserved for config switches
-  back: {plugin: '', function: ''}
-  start: {plugin: '', function: ''}
-  guide: {plugin: '', function: ''}
-  left_stick_click: {plugin: '', function: ''}
-  right_stick_click: {plugin: '', function: ''}
-  share: {plugin: '', function: ''}
-
-  dpad_left: {plugin: '', function: ''}
-  dpad_right: {plugin: '', function: ''}
-  dpad_up: {plugin: '', function: ''}
-  dpad_down: {plugin: '', function: ''}
-
-axis_buttons:
-  left_stick_left: {plugin: '', function: ''}
-  left_stick_right: {plugin: '', function: ''}
-  left_stick_up: {plugin: '', function: ''}
-  left_stick_down: {plugin: '', function: ''}
-  left_trigger: {plugin: '', function: ''}
-  right_stick_left: {plugin: '', function: ''}
-  right_stick_right: {plugin: '', function: ''}
-  right_stick_up: {plugin: '', function: ''}
-  right_stick_down: {plugin: '', function: ''}
-  right_trigger: {plugin: '', function: ''}

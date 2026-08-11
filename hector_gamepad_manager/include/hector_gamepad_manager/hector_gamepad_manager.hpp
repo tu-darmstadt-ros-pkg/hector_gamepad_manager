@@ -54,12 +54,11 @@ private:
     YAML::Node node;
   };
 
-  // Struct to store the inputs from the gamepad
+  // One Joy message translated into the canonical layout: axes in SDL order, buttons indexed by
+  // the ids of gamepad_buttons.hpp, physical and axis-derived alike.
   struct GamepadInputs {
-    // Vector of axes values
-    std::array<float, kNumAxes> axes = std::array<float, kNumAxes>{ 0.0 };
-
-    std::array<bool, kNumButtons> buttons = std::array<bool, kNumButtons>{ false };
+    std::array<float, kNumAxes> axes = {};
+    std::array<bool, kNumButtons> buttons = {};
   };
 
   rclcpp::Node::SharedPtr node_;

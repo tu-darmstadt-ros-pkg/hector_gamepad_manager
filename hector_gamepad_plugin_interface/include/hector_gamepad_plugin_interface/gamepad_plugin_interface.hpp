@@ -4,7 +4,6 @@
 #include "blackboard.hpp"
 #include "feedback_manager.hpp"
 
-#include <algorithm>
 #include <controller_orchestrator/controller_orchestrator.hpp>
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
