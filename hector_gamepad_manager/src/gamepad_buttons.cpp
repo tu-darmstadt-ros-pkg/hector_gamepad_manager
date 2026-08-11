@@ -45,38 +45,46 @@ constexpr std::array<const char *, kNumAxes> kAxisNames = {
     /*  4 */ "left_trigger",   // negative on the wire; see isTriggerAxis()
     /*  5 */ "right_trigger",
 };
+
+// Axis-derived virtual buttons, indexed by their offset from kVirtualButtonBase. The name a config
+// binds, the axis it reads and the deflection that counts as a press sit on one row, so the
+// catalog and the Joy adapter that applies it cannot disagree.
+//
+// The d-pad is not here: SDL reports it as four real buttons.
+constexpr std::array<AxisButton, kNumVirtualButtons> kAxisButtons = { {
+    /*  0 */ { "left_stick_left", 0, +1.0f },
+    /*  1 */ { "left_stick_right", 0, -1.0f },
+    /*  2 */ { "left_stick_up", 1, +1.0f },
+    /*  3 */ { "left_stick_down", 1, -1.0f },
+    /*  4 */ { "left_trigger", 4, +1.0f },
+    /*  5 */ { "right_stick_left", 2, +1.0f },
+    /*  6 */ { "right_stick_right", 2, -1.0f },
+    /*  7 */ { "right_stick_up", 3, +1.0f },
+    /*  8 */ { "right_stick_down", 3, -1.0f },
+    /*  9 */ { "right_trigger", 5, +1.0f },
+} };
 // clang-format on
+
+constexpr bool axisButtonsReadKnownAxes()
+{
+  for ( const auto &axis_button : kAxisButtons )
+    if ( axis_button.axis < 0 || axis_button.axis >= static_cast<int>( kNumAxes ) )
+      return false;
+  return true;
+}
+static_assert( axisButtonsReadKnownAxes(), "an axis button reads an axis that does not exist" );
 } // namespace
 
-const std::map<std::string, int> &axisButtonIds()
-{
-  static const std::map<std::string, int> ids = {
-      { "left_stick_left", kVirtualButtonBase + 0 },
-      { "left_stick_right", kVirtualButtonBase + 1 },
-      { "left_stick_up", kVirtualButtonBase + 2 },
-      { "left_stick_down", kVirtualButtonBase + 3 },
-      { "left_trigger", kVirtualButtonBase + 4 },
-      { "right_stick_left", kVirtualButtonBase + 5 },
-      { "right_stick_right", kVirtualButtonBase + 6 },
-      { "right_stick_up", kVirtualButtonBase + 7 },
-      { "right_stick_down", kVirtualButtonBase + 8 },
-      { "right_trigger", kVirtualButtonBase + 9 },
-  };
-  return ids;
-}
+const std::array<AxisButton, kNumVirtualButtons> &axisButtons() { return kAxisButtons; }
 
 std::string buttonName( const int id )
 {
   if ( id < 0 || id >= static_cast<int>( kNumButtons ) )
     return "";
-  if ( !isAxisButton( id ) ) {
-    if ( id < static_cast<int>( kPhysicalButtonNames.size() ) )
-      return kPhysicalButtonNames[id];
-    return "";
-  }
-  for ( const auto &[name, virtual_id] : axisButtonIds() )
-    if ( virtual_id == id )
-      return name;
+  if ( isAxisButton( id ) )
+    return kAxisButtons[id - kVirtualButtonBase].name;
+  if ( id < static_cast<int>( kPhysicalButtonNames.size() ) )
+    return kPhysicalButtonNames[id];
   return "";
 }
 
@@ -92,9 +100,10 @@ int buttonId( const std::string &name )
   for ( std::size_t i = 0; i < kPhysicalButtonNames.size(); ++i )
     if ( name == kPhysicalButtonNames[i] )
       return static_cast<int>( i );
-  const auto &ids = axisButtonIds();
-  const auto it = ids.find( name );
-  return it == ids.end() ? -1 : it->second;
+  for ( std::size_t i = 0; i < kAxisButtons.size(); ++i )
+    if ( name == kAxisButtons[i].name )
+      return static_cast<int>( kVirtualButtonBase + i );
+  return -1;
 }
 
 int axisId( const std::string &name )
@@ -107,7 +116,10 @@ int axisId( const std::string &name )
 
 bool isTriggerAxis( const int id )
 {
-  return id == axisId( "left_trigger" ) || id == axisId( "right_trigger" );
+  // Resolved once: this runs for every axis of every Joy message, and axisId() is a name scan.
+  static const int left = axisId( "left_trigger" );
+  static const int right = axisId( "right_trigger" );
+  return id == left || id == right;
 }
 
 bool isAxisButton( const int id ) { return id >= static_cast<int>( kVirtualButtonBase ); }
@@ -116,7 +128,7 @@ std::string buttonNameList( const bool axis_derived )
 {
   std::string names;
   if ( axis_derived ) {
-    for ( const auto &[name, id] : axisButtonIds() ) names += name + " ";
+    for ( const auto &axis_button : kAxisButtons ) names += std::string( axis_button.name ) + " ";
   } else {
     for ( const auto *name : kPhysicalButtonNames ) names += std::string( name ) + " ";
   }

@@ -3,7 +3,7 @@
 
 #include "hector_gamepad_manager/gamepad_config.hpp"
 
-#include <map>
+#include <array>
 #include <string>
 
 namespace hector_gamepad_manager
@@ -12,9 +12,18 @@ namespace hector_gamepad_manager
 // published GamepadMapping message and whatever renders it. Ids stay inside the Joy adapter and
 // follow SDL's GameController layout, which `game_controller_node` publishes (never `joy_node`).
 
-//! "axis_buttons" YAML key -> internal button id (kVirtualButtonBase + offset). The offsets match
-//! the assignment order in HectorGamepadManager::convertJoyToGamepadInputs().
-const std::map<std::string, int> &axisButtonIds();
+//! One axis-derived virtual button: the "axis_buttons" key a config binds, the axis it reads, and
+//! the direction of deflection that counts as a press.
+struct AxisButton {
+  const char *name;
+  int axis;
+  float direction;
+};
+
+//! The axis-derived buttons, indexed by their offset from kVirtualButtonBase. Being one table
+//! rather than a name catalog beside a conversion rule is what keeps the two from drifting: the
+//! Joy adapter derives the button from the same row that names it.
+const std::array<AxisButton, kNumVirtualButtons> &axisButtons();
 
 //! Canonical name of a button id, or "" if the id has no canonical meaning.
 std::string buttonName( int id );

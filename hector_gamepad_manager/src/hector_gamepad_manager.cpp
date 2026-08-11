@@ -348,21 +348,42 @@ bool HectorGamepadManager::handleConfigurationSwitches( const GamepadInputs &inp
 
 void HectorGamepadManager::checkJoySource( const sensor_msgs::msg::Joy &msg )
 {
-  // Two size comparisons, against a callback that already allocates a binding-id string per bound
-  // button, so this is affordable on every message rather than only the first.
-  if ( msg.axes.size() == kNumAxes && msg.buttons.size() >= kMinControllerButtons )
-    return;
+  // A handful of comparisons against a callback that already does far more per message, so both
+  // tells are checked on every message rather than only the first. publisherNames() runs a graph
+  // query, so it sits in the argument lists where the throttle macros only evaluate it on the
+  // messages they actually log.
+  const char *topic = joy_subscription_->get_topic_name();
 
-  // publisherNames() runs a graph query, so it sits in the argument list where the throttle macro
-  // only evaluates it on the messages it actually logs.
-  RCLCPP_ERROR_THROTTLE(
-      node_->get_logger(), *node_->get_clock(), kJoySourceReportIntervalMs,
-      "'%s' carries %zu axes and %zu buttons, but joy's game_controller_node always publishes %zu "
-      "axes and at least %zu. This looks like joy_node, which reports raw device-specific indices, "
-      "so every button and axis bound in this config addresses the wrong control. Launch "
-      "`game_controller_node` from the joy package instead (published by:%s).",
-      joy_subscription_->get_topic_name(), msg.axes.size(), msg.buttons.size(), kNumAxes,
-      kMinControllerButtons, publisherNames( *node_, joy_subscription_->get_topic_name() ).c_str() );
+  // First tell: the message shape. game_controller_node sizes every message the same way whatever
+  // the pad is, so a different count is a different node.
+  if ( msg.axes.size() != kNumAxes || msg.buttons.size() < kMinControllerButtons ) {
+    RCLCPP_ERROR_THROTTLE(
+        node_->get_logger(), *node_->get_clock(), kJoySourceReportIntervalMs,
+        "'%s' carries %zu axes and %zu buttons, but joy's game_controller_node always publishes "
+        "%zu axes and at least %zu. This looks like joy_node, which reports raw device-specific "
+        "indices, so every button and axis bound in this config addresses the wrong control. "
+        "Launch `game_controller_node` from the joy package instead (published by:%s).",
+        topic, msg.axes.size(), msg.buttons.size(), kNumAxes, kMinControllerButtons,
+        publisherNames( *node_, topic ).c_str() );
+    return;
+  }
+
+  // Second tell: the trigger convention, which catches a source of the right shape. A trigger
+  // resting at +1 is joy_node; game_controller_node rests at 0 and goes negative when pressed, so
+  // a positive reading cannot come from it.
+  static const int triggers[] = { axisId( "left_trigger" ), axisId( "right_trigger" ) };
+  for ( const int id : triggers ) {
+    if ( msg.axes[id] <= AXIS_DEADZONE )
+      continue;
+    RCLCPP_ERROR_THROTTLE(
+        node_->get_logger(), *node_->get_clock(), kJoySourceReportIntervalMs,
+        "Axis '%s' on '%s' reads %.2f, but joy's game_controller_node rests a trigger at 0 and "
+        "drives it negative when pressed. This is a different source - most likely joy_node, whose "
+        "raw indices address different controls. Launch `game_controller_node` from the joy "
+        "package instead (published by:%s).",
+        axisName( id ).c_str(), topic, msg.axes[id], publisherNames( *node_, topic ).c_str() );
+    return;
+  }
 }
 
 void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr msg )
@@ -533,34 +554,17 @@ HectorGamepadManager::convertJoyToGamepadInputs( const sensor_msgs::msg::Joy::Sh
   for ( int i = 0; i < static_cast<int>( kNumAxes ); i++ )
     inputs.axes[i] = isTriggerAxis( i ) ? -axis( i ) : axis( i );
 
-  // A trigger outside 0..1 means the joy source is joy_node, whose raw triggers idle at +1 and so
-  // land here as a permanently held trigger. Warn instead of accommodating it, which would break
-  // pads that report the layout correctly.
-  for ( int i = 0; i < static_cast<int>( kNumAxes ); i++ ) {
-    if ( isTriggerAxis( i ) && inputs.axes[i] < -AXIS_DEADZONE ) {
-      RCLCPP_WARN_THROTTLE( node_->get_logger(), *node_->get_clock(), 10000,
-                            "Axis '%s' reads %.2f, outside its 0..1 range. The manager expects "
-                            "joy's game_controller_node; joy_node publishes a different layout.",
-                            axisName( i ).c_str(), inputs.axes[i] );
-    }
-  }
-
   // Physical buttons map 1:1, so a pad reporting paddles or a touchpad needs no code change.
   for ( int i = 0; i < static_cast<int>( kVirtualButtonBase ); i++ )
     inputs.buttons[i] = button( i );
 
-  // Axis-derived virtual buttons. Offsets must match axisButtonIds(). The d-pad is not among
-  // them: SDL reports it as four real buttons.
-  inputs.buttons[kVirtualButtonBase + 0] = inputs.axes[0] > AXIS_DEADZONE;  // left_stick_left
-  inputs.buttons[kVirtualButtonBase + 1] = inputs.axes[0] < -AXIS_DEADZONE; // left_stick_right
-  inputs.buttons[kVirtualButtonBase + 2] = inputs.axes[1] > AXIS_DEADZONE;  // left_stick_up
-  inputs.buttons[kVirtualButtonBase + 3] = inputs.axes[1] < -AXIS_DEADZONE; // left_stick_down
-  inputs.buttons[kVirtualButtonBase + 4] = inputs.axes[4] > AXIS_DEADZONE;  // left_trigger
-  inputs.buttons[kVirtualButtonBase + 5] = inputs.axes[2] > AXIS_DEADZONE;  // right_stick_left
-  inputs.buttons[kVirtualButtonBase + 6] = inputs.axes[2] < -AXIS_DEADZONE; // right_stick_right
-  inputs.buttons[kVirtualButtonBase + 7] = inputs.axes[3] > AXIS_DEADZONE;  // right_stick_up
-  inputs.buttons[kVirtualButtonBase + 8] = inputs.axes[3] < -AXIS_DEADZONE; // right_stick_down
-  inputs.buttons[kVirtualButtonBase + 9] = inputs.axes[5] > AXIS_DEADZONE;  // right_trigger
+  // Axis-derived virtual buttons: each is its own axis deflected past the deadzone in its own
+  // direction, both read off the row that also names it.
+  const auto &axis_buttons = axisButtons();
+  for ( std::size_t i = 0; i < axis_buttons.size(); i++ ) {
+    inputs.buttons[kVirtualButtonBase + i] =
+        axis_buttons[i].direction * inputs.axes[axis_buttons[i].axis] > AXIS_DEADZONE;
+  }
   return inputs;
 }
 
