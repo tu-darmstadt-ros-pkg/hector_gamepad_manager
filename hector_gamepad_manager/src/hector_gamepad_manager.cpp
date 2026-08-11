@@ -418,49 +418,36 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
 
     // Double-press enabled → buffered dispatch
     if ( pressed && !was_pressed ) { // rising edge
-      if ( tracker.awaiting_double_press && !window_expired( tracker ) ) {
+      if ( tracker.state == PressState::Buffering && !window_expired( tracker ) ) {
         // Second press within window → double press detected
-        tracker.awaiting_double_press = false;
-        tracker.press_dispatched = true;
+        tracker.state = PressState::Dispatched;
         mapping.plugin->handlePress( mapping.on_double_press.function, id );
       } else {
-        // Flush a stale buffered tap before overwriting last_press_time, otherwise the original press is silently dropped when no callback fired during the wait window.
-        if ( tracker.awaiting_double_press ) {
-          mapping.plugin->handlePress( mapping.on_press.function, id );
-          mapping.plugin->handleRelease( mapping.releaseFunction(), id );
-        }
+        // A stale buffered tap has to go out before last_press_time is overwritten, or the press
+        // it holds is lost when no callback fired during the wait window. The button being down
+        // again is a new press, so the old one takes its release now.
+        if ( tracker.state == PressState::Buffering )
+          dispatchBufferedPress( mapping, tracker, false );
         // First press → start waiting for potential second press
-        tracker.awaiting_double_press = true;
+        tracker.state = PressState::Buffering;
         tracker.last_press_time = now;
-        tracker.press_dispatched = false;
       }
     } else if ( pressed ) {
       // Held — only dispatch hold if press was already dispatched
-      if ( tracker.press_dispatched ) {
+      if ( tracker.state == PressState::Dispatched ) {
         mapping.plugin->handleHold( mapping.holdFunction(), id );
       }
     } else if ( was_pressed ) { // falling edge
-      if ( tracker.press_dispatched ) {
+      if ( tracker.state == PressState::Dispatched ) {
         mapping.plugin->handleRelease( mapping.releaseFunction(), id );
-        tracker.press_dispatched = false;
+        tracker.state = PressState::Idle;
       }
-      // If awaiting_double_press, keep waiting — the second press can still arrive after release.
+      // While Buffering, keep waiting — the second press can still arrive after the release.
     }
 
-    // Flush a buffered single press whose window has expired without a second press arriving.
-    if ( tracker.awaiting_double_press && window_expired( tracker ) ) {
-      tracker.awaiting_double_press = false;
-      mapping.plugin->handlePress( mapping.on_press.function, id );
-
-      if ( tracker.pressed ) {
-        // Still held — let subsequent frames drive hold/release through the normal path.
-        tracker.press_dispatched = true;
-      } else {
-        // Quick tap: pair the delayed press with an immediate release so the plugin doesn't get stuck.
-        mapping.plugin->handleRelease( mapping.releaseFunction(), id );
-        tracker.press_dispatched = false;
-      }
-    }
+    // The window ran out with no second press: the tap was a single press after all.
+    if ( tracker.state == PressState::Buffering && window_expired( tracker ) )
+      dispatchBufferedPress( mapping, tracker, tracker.pressed );
   }
 
   // Handle axes
@@ -511,6 +498,20 @@ void HectorGamepadManager::deactivatePlugins()
   active_plugins_.clear();
 }
 
+void HectorGamepadManager::dispatchBufferedPress( const ButtonFunctionMapping &mapping,
+                                                  ButtonTracker &tracker, const bool still_held )
+{
+  mapping.plugin->handlePress( mapping.on_press.function, mapping.binding_id );
+  if ( still_held ) {
+    // The coming messages drive hold and release through the normal path.
+    tracker.state = PressState::Dispatched;
+    return;
+  }
+  // Nothing later will produce the release, so it goes out paired with the press.
+  mapping.plugin->handleRelease( mapping.releaseFunction(), mapping.binding_id );
+  tracker.state = PressState::Idle;
+}
+
 void HectorGamepadManager::flushPendingButtonState()
 {
   // Operates on the OUTGOING config — must run before active_config_ is reassigned.
@@ -524,17 +525,18 @@ void HectorGamepadManager::flushPendingButtonState()
       continue;
 
     auto &tracker = button_trackers_[button_id];
-    const std::string &id = mapping.binding_id;
-
-    if ( tracker.press_dispatched ) {
-      mapping.plugin->handleRelease( mapping.releaseFunction(), id );
-      tracker.press_dispatched = false;
-    } else if ( tracker.awaiting_double_press ) {
-      // Emit the same press+release pair the timeout-quick-tap path would have produced.
-      mapping.plugin->handlePress( mapping.on_press.function, id );
-      mapping.plugin->handleRelease( mapping.releaseFunction(), id );
+    switch ( tracker.state ) {
+    case PressState::Dispatched:
+      mapping.plugin->handleRelease( mapping.releaseFunction(), mapping.binding_id );
+      tracker.state = PressState::Idle;
+      break;
+    case PressState::Buffering:
+      // The outgoing config will never see the second press, so the tap resolves to a single one.
+      dispatchBufferedPress( mapping, tracker, false );
+      break;
+    case PressState::Idle:
+      break;
     }
-    tracker.awaiting_double_press = false;
   }
 }
 

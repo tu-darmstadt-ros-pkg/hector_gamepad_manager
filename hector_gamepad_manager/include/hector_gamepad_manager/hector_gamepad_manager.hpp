@@ -29,11 +29,20 @@ public:
   explicit HectorGamepadManager( const rclcpp::Node::SharedPtr &node );
 
 private:
+  // What the manager owes the plugin for a double-press button. Buffering and Dispatched cannot
+  // both hold - a press is either still held back to see whether a second one follows, or it has
+  // gone out and the plugin is owed the release that ends it - which is what this buys over the
+  // two booleans it replaced.
+  enum class PressState {
+    Idle,       // nothing pending
+    Buffering,  // a first press is held back, waiting out the double-press window
+    Dispatched, // a press was sent; a release is outstanding
+  };
+
   // Per-button state for double-press detection
   struct ButtonTracker {
-    bool pressed = false;          // current physical state
-    bool press_dispatched = false; // was on_press already sent?
-    bool awaiting_double_press = false;
+    bool pressed = false; // current physical state
+    PressState state = PressState::Idle;
     rclcpp::Time last_press_time{ 0, 0, RCL_ROS_TIME };
   };
 
@@ -172,7 +181,21 @@ private:
    */
   void deactivatePlugins();
 
-  // Synthesize the events needed to bring plugins back to a "no button held" state for double-press buttons before a config switch or shutdown.
+  /**
+   * @brief Emit the press a Buffering tracker was holding back, because it turned out to be a
+   * single press rather than the first half of a double one.
+   *
+   * @param still_held True if the button is down *from that press*, so the coming messages will
+   * produce its hold and release through the normal path. False pairs the press with an immediate
+   * release, which is what a quick tap needs and what a press superseded by a new one needs - the
+   * button being down again does not make the old press still held.
+   */
+  void dispatchBufferedPress( const ButtonFunctionMapping &mapping, ButtonTracker &tracker,
+                              bool still_held );
+
+  // Synthesize the events needed to bring plugins back to a "no button held" state for
+  // double-press buttons before a config switch. Not wired to shutdown: the manager has no
+  // destructor hook, so a process going down leaves the last press unresolved.
   void flushPendingButtonState();
 
   /**

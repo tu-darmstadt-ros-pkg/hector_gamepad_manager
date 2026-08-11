@@ -284,7 +284,7 @@ TEST_F( HectorGamepadManagerDoublePressTest, InterleavedDoublePressButtonsTrackI
 // Config switch while a double-press button is pressed must synthesize a release.
 TEST_F( HectorGamepadManagerDoublePressTest, ConfigSwitchWhileHeldFlushesRelease )
 {
-  // Drive button 0 into press_dispatched=true via timeout flush while still held.
+  // Drive button 0 into the Dispatched state via the timeout flush while still held.
   setButton( 0, 1 );
   sendJoy();
   EXPECT_CALL( *pub_probe_press_,
@@ -430,7 +430,7 @@ protected:
 // A zero-window press flushes immediately and pairs cleanly with a release on button-up.
 TEST_F( HectorGamepadManagerZeroWindowTest, ZeroWindowFlushesPressImmediately )
 {
-  // Press flushes immediately; button still held leaves press_dispatched=true.
+  // Press flushes immediately; the button still being held leaves the tracker Dispatched.
   EXPECT_CALL( *pub_probe_press_,
                publish( Field( &std_msgs::msg::String::data, HasSubstr( "press:probe:" ) ) ) )
       .Times( 1 );
