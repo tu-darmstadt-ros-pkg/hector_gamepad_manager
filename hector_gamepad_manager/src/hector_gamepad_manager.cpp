@@ -239,7 +239,7 @@ bool HectorGamepadManager::collectButtonEntries(
 
 bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
                                                const std::string &config_name,
-                                               std::unordered_map<int, ButtonFunctionMapping> &mappings )
+                                               std::map<int, ButtonFunctionMapping> &mappings )
 {
   std::vector<std::tuple<int, std::string, YAML::Node>> entries;
   if ( !collectButtonEntries( config, entries ) )
@@ -312,13 +312,14 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
     if ( !ensurePluginLoaded( plugin_name ) )
       return false;
 
-    mappings[id] = { plugins_[plugin_name], on_press, on_double_press, on_hold, on_release };
+    mappings[id] = {
+        plugins_[plugin_name], on_press, on_double_press, on_hold, on_release, function_id };
   }
   return true;
 }
 
 bool HectorGamepadManager::initAxisMappings( const YAML::Node &config, const std::string &config_name,
-                                             std::unordered_map<int, FunctionMapping> &mappings )
+                                             std::map<int, FunctionMapping> &mappings )
 {
   if ( config["axes"] ) {
     for ( const auto &entry : config["axes"] ) {
@@ -347,7 +348,7 @@ bool HectorGamepadManager::initAxisMappings( const YAML::Node &config, const std
       if ( !plugin_name.empty() && !function.empty() ) {
         if ( !ensurePluginLoaded( plugin_name ) )
           return false;
-        mappings[id] = { plugins_[plugin_name], function, description };
+        mappings[id] = { plugins_[plugin_name], function, description, function_id };
       }
     }
   } else {
@@ -402,7 +403,7 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
   // Handle buttons with double-press detection
   for ( const auto &[button_id, mapping] : configs_[active_config_].button_mappings ) {
     const bool pressed = inputs.buttons[button_id];
-    const std::string id = buttonBindingId( active_config_, buttonName( button_id ) );
+    const std::string &id = mapping.binding_id;
     auto &tracker = button_trackers_[button_id];
     const bool was_pressed = tracker.pressed;
 
@@ -429,9 +430,7 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
           // Flush a stale buffered tap before overwriting last_press_time, otherwise the original press is silently dropped when no callback fired during the wait window.
           if ( tracker.awaiting_double_press && window_expired ) {
             mapping.plugin->handlePress( mapping.on_press.function, id );
-            const std::string &release_fn =
-                mapping.on_release.empty() ? mapping.on_press.function : mapping.on_release.function;
-            mapping.plugin->handleRelease( release_fn, id );
+            mapping.plugin->handleRelease( mapping.releaseFunction(), id );
           }
           // First press → start waiting for potential second press
           tracker.awaiting_double_press = true;
@@ -441,15 +440,11 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
       } else if ( pressed && was_pressed ) {
         // Held — only dispatch hold if press was already dispatched
         if ( tracker.press_dispatched ) {
-          const std::string &hold_fn =
-              mapping.on_hold.empty() ? mapping.on_press.function : mapping.on_hold.function;
-          mapping.plugin->handleHold( hold_fn, id );
+          mapping.plugin->handleHold( mapping.holdFunction(), id );
         }
       } else if ( falling_edge ) {
         if ( tracker.press_dispatched ) {
-          const std::string &release_fn =
-              mapping.on_release.empty() ? mapping.on_press.function : mapping.on_release.function;
-          mapping.plugin->handleRelease( release_fn, id );
+          mapping.plugin->handleRelease( mapping.releaseFunction(), id );
           tracker.press_dispatched = false;
         }
         // If awaiting_double_press, keep waiting — the second press can still arrive after release.
@@ -469,28 +464,22 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
     const bool window_expired = raw_elapsed < 0.0 || raw_elapsed >= double_press_window_sec_;
     if ( tracker.awaiting_double_press && window_expired ) {
       tracker.awaiting_double_press = false;
-      const std::string id = buttonBindingId( active_config_, buttonName( button_id ) );
-      mapping.plugin->handlePress( mapping.on_press.function, id );
+      mapping.plugin->handlePress( mapping.on_press.function, mapping.binding_id );
 
       if ( tracker.pressed ) {
         // Still held — let subsequent frames drive hold/release through the normal path.
         tracker.press_dispatched = true;
       } else {
         // Quick tap: pair the delayed press with an immediate release so the plugin doesn't get stuck.
-        const std::string &release_fn =
-            mapping.on_release.empty() ? mapping.on_press.function : mapping.on_release.function;
-        mapping.plugin->handleRelease( release_fn, id );
+        mapping.plugin->handleRelease( mapping.releaseFunction(), mapping.binding_id );
         tracker.press_dispatched = false;
       }
     }
   }
 
   // Handle axes
-  for ( const auto &axis_mapping : configs_[active_config_].axis_mappings ) {
-    const float value = inputs.axes[axis_mapping.first];
-    const auto &action = axis_mapping.second;
-    const std::string id = axisBindingId( active_config_, axisName( axis_mapping.first ) );
-    axis_mapping.second.plugin->handleAxis( action.function_name, id, value );
+  for ( const auto &[axis_id, mapping] : configs_[active_config_].axis_mappings ) {
+    mapping.plugin->handleAxis( mapping.function_name, mapping.binding_id, inputs.axes[axis_id] );
   }
 
   // Update all active plugins
@@ -554,17 +543,15 @@ void HectorGamepadManager::flushPendingButtonState()
     if ( !mapping.has_double_press() )
       continue;
 
-    const std::string id = buttonBindingId( active_config_, buttonName( button_id ) );
-    const std::string &release_fn =
-        mapping.on_release.empty() ? mapping.on_press.function : mapping.on_release.function;
+    const std::string &id = mapping.binding_id;
 
     if ( tracker.press_dispatched ) {
-      mapping.plugin->handleRelease( release_fn, id );
+      mapping.plugin->handleRelease( mapping.releaseFunction(), id );
       tracker.press_dispatched = false;
     } else if ( tracker.awaiting_double_press ) {
       // Emit the same press+release pair the timeout-quick-tap path would have produced.
       mapping.plugin->handlePress( mapping.on_press.function, id );
-      mapping.plugin->handleRelease( release_fn, id );
+      mapping.plugin->handleRelease( mapping.releaseFunction(), id );
     }
     tracker.awaiting_double_press = false;
   }

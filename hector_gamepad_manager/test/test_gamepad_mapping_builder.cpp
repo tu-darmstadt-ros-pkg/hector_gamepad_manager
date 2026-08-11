@@ -54,21 +54,29 @@ protected:
 
     GamepadConfig driving;
     driving.description = "Drive the robot and control the flippers";
+    // The builder does not read the binding ids, but they are filled the way loadConfig would so
+    // the fixture stays a faithful stand-in for a loaded config.
     // Legacy-flat button -> single on_press action.
-    driving.button_mappings[buttonId( "a" )] = { drive, { "slow", "Drive slowly" }, {}, {}, {} };
+    driving.button_mappings[buttonId( "a" )] = { drive, { "slow", "Drive slowly" },       {}, {},
+                                                 {},    buttonBindingId( "driving", "a" ) };
     // Per-event button -> press + double-press actions.
     driving.button_mappings[buttonId( "b" )] = {
         flipper,
         { "individual_front_flipper_control_mode", "Individual front flipper control" },
         { "sync_front_flippers", "Sync front flippers" },
         {},
-        {} };
+        {},
+        buttonBindingId( "driving", "b" ) };
     // A virtual axis button, and a control only some pads report.
-    driving.button_mappings[buttonId( "left_trigger" )] = { drive, { "boost", "Boost" }, {}, {}, {} };
-    driving.button_mappings[buttonId( "touchpad" )] = { drive, { "extra", "Extra" }, {}, {}, {} };
+    driving.button_mappings[buttonId( "left_trigger" )] = {
+        drive, { "boost", "Boost" }, {}, {}, {}, buttonBindingId( "driving", "left_trigger" ) };
+    driving.button_mappings[buttonId( "touchpad" )] = {
+        drive, { "extra", "Extra" }, {}, {}, {}, buttonBindingId( "driving", "touchpad" ) };
     // Axis with a description, and an axis without one.
-    driving.axis_mappings[axisId( "left_stick_x" )] = { drive, "steer", "Steer" };
-    driving.axis_mappings[axisId( "left_stick_y" )] = { drive, "drive", "" };
+    driving.axis_mappings[axisId( "left_stick_x" )] = {
+        drive, "steer", "Steer", axisBindingId( "driving", "left_stick_x" ) };
+    driving.axis_mappings[axisId( "left_stick_y" )] = {
+        drive, "drive", "", axisBindingId( "driving", "left_stick_y" ) };
     configs_["driving"] = driving;
 
     switches_[buttonId( "back" )] = { "manipulation", "Switch to manipulation mode" };
@@ -176,7 +184,7 @@ TEST_F( GamepadMappingBuilderTest, ConfigSwitchesPopulatedAndSorted )
 TEST_F( GamepadMappingBuilderTest, NullPluginYieldsEmptyName )
 {
   configs_["driving"].button_mappings[buttonId( "y" )] = {
-      nullptr, { "fast", "Drive fast" }, {}, {}, {} };
+      nullptr, { "fast", "Drive fast" }, {}, {}, {}, buttonBindingId( "driving", "y" ) };
   auto msg = build();
   const auto *button = findByName( msg.configs[0].buttons, "y" );
   ASSERT_NE( button, nullptr );

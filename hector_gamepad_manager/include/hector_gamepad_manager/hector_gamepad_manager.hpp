@@ -13,6 +13,12 @@
 #include <std_msgs/msg/string.hpp>
 #include <yaml-cpp/yaml.h>
 
+#include <array>
+#include <map>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 namespace hector_gamepad_manager
 {
 class HectorGamepadManager
@@ -128,7 +134,7 @@ private:
    * @return True if the mappings were initialized successfully, false otherwise.
    */
   bool initButtonMappings( const YAML::Node &config, const std::string &config_name,
-                           std::unordered_map<int, ButtonFunctionMapping> &mappings );
+                           std::map<int, ButtonFunctionMapping> &mappings );
 
   /**
    * @brief Resolve the "buttons" and "axis_buttons" sections of a config into
@@ -142,7 +148,7 @@ private:
 
   // Initialize the axis mappings from the "axes" section.
   bool initAxisMappings( const YAML::Node &config, const std::string &config_name,
-                         std::unordered_map<int, FunctionMapping> &mappings );
+                         std::map<int, FunctionMapping> &mappings );
 
   // Load the named plugin into plugins_ if not already present. Returns false on failure.
   bool ensurePluginLoaded( const std::string &plugin_name );
