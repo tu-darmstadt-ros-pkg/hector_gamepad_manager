@@ -5,7 +5,6 @@
 
 #include <map>
 #include <string>
-#include <vector>
 
 namespace hector_gamepad_manager
 {
@@ -29,6 +28,10 @@ int buttonId( const std::string &name );
 //! Axis id for a canonical name, or -1 if the name is unknown.
 int axisId( const std::string &name );
 
+//! True if the id belongs to a button synthesized from a deflected axis rather than one the
+//! gamepad reports - i.e. whether it is configured under "axis_buttons" or under "buttons".
+bool isAxisButton( int id );
+
 //! True for the two trigger axes, which are the only axes the Joy adapter has to convert.
 //!
 //! A trigger reads 0 (released) to 1 (fully pressed); the sticks read -1 to 1. On the wire a
@@ -37,11 +40,12 @@ int axisId( const std::string &name );
 //! flips them back, so nothing downstream sees the wire sign.
 bool isTriggerAxis( int id );
 
-//! Every valid button name, physical then virtual, for error messages.
-std::vector<std::string> buttonNames();
+//! Every button name a config section accepts, space-separated for an error message: the
+//! axis-derived ones if `axis_derived`, the ones the gamepad reports otherwise.
+std::string buttonNameList( bool axis_derived );
 
-//! Every valid axis name, for error messages.
-std::vector<std::string> axisNames();
+//! Every valid axis name, space-separated for an error message.
+std::string axisNameList();
 
 // Identity of one binding: it namespaces the binding's `args` on the blackboard at load time and
 // tells the plugin which binding fired at dispatch time. Those two sites are far apart, so both

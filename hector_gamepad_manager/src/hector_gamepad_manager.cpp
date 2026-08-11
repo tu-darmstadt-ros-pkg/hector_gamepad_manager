@@ -92,10 +92,11 @@ bool HectorGamepadManager::loadConfigSwitchesConfig( const std::string &file_nam
 
   try {
     const YAML::Node config = YAML::LoadFile( getPath( "hector_gamepad_manager", file_name ) );
-    std::vector<std::tuple<int, std::string, YAML::Node>> entries;
+    std::vector<ButtonEntry> entries;
     if ( !collectButtonEntries( config, entries ) )
       return false;
-    for ( const auto &[id, name, mapping] : entries ) {
+    for ( const auto &entry : entries ) {
+      const YAML::Node mapping = entry.node;
       auto config_name = mapping["config"].as<std::string>();
       auto pkg_name = mapping["package"].as<std::string>();
       if ( config_name.empty() || pkg_name.empty() )
@@ -109,7 +110,7 @@ bool HectorGamepadManager::loadConfigSwitchesConfig( const std::string &file_nam
       std::string description;
       if ( mapping["description"] )
         description = mapping["description"].as<std::string>();
-      config_switch_button_mapping_[id] = { config_name, description };
+      config_switch_button_mapping_[entry.id] = { config_name, description };
     }
     default_config_ = config["default_config"].as<std::string>();
   } catch ( const std::exception &e ) {
@@ -156,7 +157,7 @@ bool HectorGamepadManager::switchConfig( const std::string &config_name )
   // Must run before deactivatePlugins() and before active_config_ is reassigned.
   flushPendingButtonState();
   deactivatePlugins();
-  button_trackers_.clear();
+  button_trackers_ = {};
   active_config_publisher_->publish( std_msgs::msg::String().set__data( config_name ) );
   active_config_ = config_name;
   activatePlugins( config_name );
@@ -204,8 +205,8 @@ ActionMapping readAction( const YAML::Node &node, const std::string &description
 }
 } // namespace
 
-bool HectorGamepadManager::collectButtonEntries(
-    const YAML::Node &config, std::vector<std::tuple<int, std::string, YAML::Node>> &entries )
+bool HectorGamepadManager::collectButtonEntries( const YAML::Node &config,
+                                                 std::vector<ButtonEntry> &entries )
 {
   if ( !config["buttons"] ) {
     RCLCPP_ERROR( node_->get_logger(), "No buttons found in config file" );
@@ -217,20 +218,13 @@ bool HectorGamepadManager::collectButtonEntries(
     for ( const auto &entry : section ) {
       const auto name = entry.first.as<std::string>( "" );
       const int id = buttonId( name );
-      const bool is_axis_button = id >= static_cast<int>( kVirtualButtonBase );
-      if ( id < 0 || is_axis_button != axis_derived ) {
-        std::string valid_names;
-        for ( const auto &known : buttonNames() ) {
-          const bool known_is_axis_button =
-              buttonId( known ) >= static_cast<int>( kVirtualButtonBase );
-          if ( known_is_axis_button == axis_derived )
-            valid_names += known + " ";
-        }
+      if ( id < 0 || isAxisButton( id ) != axis_derived ) {
         RCLCPP_ERROR( node_->get_logger(), "Unknown button '%s' in '%s'. Valid names: %s",
-                      name.c_str(), axis_derived ? "axis_buttons" : "buttons", valid_names.c_str() );
+                      name.c_str(), axis_derived ? "axis_buttons" : "buttons",
+                      buttonNameList( axis_derived ).c_str() );
         return false;
       }
-      entries.emplace_back( id, name, entry.second );
+      entries.push_back( { id, name, entry.second } );
     }
     return true;
   };
@@ -241,79 +235,62 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
                                                const std::string &config_name,
                                                std::map<int, ButtonFunctionMapping> &mappings )
 {
-  std::vector<std::tuple<int, std::string, YAML::Node>> entries;
+  std::vector<ButtonEntry> entries;
   if ( !collectButtonEntries( config, entries ) )
     return false;
 
-  for ( const auto &[id, name, mapping] : entries ) {
-    if ( !mapping["plugin"] )
+  for ( const auto &entry : entries ) {
+    const YAML::Node node = entry.node;
+    if ( !node["plugin"] )
       continue;
-    auto plugin_name = mapping["plugin"].as<std::string>();
+    const auto plugin_name = node["plugin"].as<std::string>();
     if ( plugin_name.empty() )
       continue;
 
-    // Detect new format: presence of on_press, on_double_press, on_hold, or on_release sub-keys
-    const bool new_format = mapping["on_press"] || mapping["on_double_press"] ||
-                            mapping["on_hold"] || mapping["on_release"];
-    const std::string &description =
-        mapping["description"] ? mapping["description"].as<std::string>() : "";
+    // Per-event format if any on_* key is present. The legacy flat format is the same thing with
+    // the press action written straight onto the button, so both read through readAction().
+    const bool per_event =
+        node["on_press"] || node["on_double_press"] || node["on_hold"] || node["on_release"];
+    const YAML::Node press_node = per_event ? node["on_press"] : node;
+    const std::string description = node["description"] ? node["description"].as<std::string>() : "";
 
-    ActionMapping on_press, on_double_press, on_hold, on_release;
-    const std::string function_id = buttonBindingId( config_name, name );
+    ButtonFunctionMapping mapping;
+    mapping.on_press = readAction( press_node, description );
+    if ( per_event ) {
+      mapping.on_double_press = readAction( node["on_double_press"], description );
+      mapping.on_hold = readAction( node["on_hold"], description );
+      mapping.on_release = readAction( node["on_release"], description );
+    }
 
-    if ( new_format ) {
-      on_press = readAction( mapping["on_press"], description );
-      on_double_press = readAction( mapping["on_double_press"], description );
-      on_hold = readAction( mapping["on_hold"], description );
-      on_release = readAction( mapping["on_release"], description );
+    // on_press is what a single press dispatches, what the timeout flush replays and what an
+    // unset on_hold/on_release falls back to, so a binding without one has nothing to dispatch.
+    if ( mapping.on_press.empty() ) {
+      RCLCPP_WARN( node_->get_logger(),
+                   "Button '%s' in config '%s' has a plugin but no press function ('function', or "
+                   "'on_press: {function: ...}' in the per-event format). Skipping.",
+                   entry.name.c_str(), config_name.c_str() );
+      continue;
+    }
 
-      // on_press is required as the timeout-flush dispatch target and on_hold/on_release fallback.
-      if ( on_press.empty() ) {
+    // All events on a button share one args block; per-event args are not distinguishable on the
+    // read side. A top-level 'args' wins over one written under 'on_press'.
+    mapping.binding_id = buttonBindingId( config_name, entry.name );
+    const YAML::Node args = node["args"] ? node["args"] : press_node["args"];
+    if ( args )
+      blackboard_->set_from_yaml( args, plugin_name + "_" + mapping.binding_id );
+    for ( const auto &event_key : { "on_double_press", "on_hold", "on_release" } ) {
+      if ( node[event_key] && node[event_key]["args"] ) {
         RCLCPP_WARN( node_->get_logger(),
-                     "Button '%s' in config '%s' has new-format mapping but no on_press "
-                     "function. on_press is required (it is the fallback for on_hold/"
-                     "on_release and the dispatch target on a single press). Skipping.",
-                     name.c_str(), config_name.c_str() );
-        continue;
+                     "Per-event args under '%s' on button '%s' are not supported and will be "
+                     "ignored. Move them to a top-level 'args:' block.",
+                     event_key, entry.name.c_str() );
       }
-
-      // All events on a button share one args block; per-event args are not distinguishable on the read side. Top-level wins over on_press/args fallback.
-      const std::string blackboard_prefix = plugin_name + "_" + function_id;
-      if ( mapping["args"] ) {
-        blackboard_->set_from_yaml( mapping["args"], blackboard_prefix );
-      } else if ( mapping["on_press"] && mapping["on_press"]["args"] ) {
-        blackboard_->set_from_yaml( mapping["on_press"]["args"], blackboard_prefix );
-      }
-      for ( const auto &event_key : { "on_double_press", "on_hold", "on_release" } ) {
-        if ( mapping[event_key] && mapping[event_key]["args"] ) {
-          RCLCPP_WARN( node_->get_logger(),
-                       "Per-event args under '%s' on button '%s' are not supported and will be "
-                       "ignored. Move them to a top-level 'args:' block.",
-                       event_key, name.c_str() );
-        }
-      }
-    } else {
-      // Legacy flat format: plugin + function at top level → treat as on_press
-      if ( !mapping["function"] ) {
-        RCLCPP_WARN( node_->get_logger(),
-                     "Button '%s' in config '%s' has 'plugin' but no 'function'. Skipping.",
-                     name.c_str(), config_name.c_str() );
-        continue;
-      }
-      auto function = mapping["function"].as<std::string>();
-      if ( function.empty() )
-        continue;
-      on_press.function = function;
-      if ( mapping["description"] )
-        on_press.description = mapping["description"].as<std::string>();
-      blackboard_->set_from_yaml( mapping["args"], plugin_name + "_" + function_id );
     }
 
     if ( !ensurePluginLoaded( plugin_name ) )
       return false;
-
-    mappings[id] = {
-        plugins_[plugin_name], on_press, on_double_press, on_hold, on_release, function_id };
+    mapping.plugin = plugins_[plugin_name];
+    mappings[entry.id] = std::move( mapping );
   }
   return true;
 }
@@ -326,10 +303,8 @@ bool HectorGamepadManager::initAxisMappings( const YAML::Node &config, const std
       const auto name = entry.first.as<std::string>( "" );
       const int id = axisId( name );
       if ( id < 0 ) {
-        std::string valid_names;
-        for ( const auto &known : axisNames() ) valid_names += known + " ";
         RCLCPP_ERROR( node_->get_logger(), "Unknown axis '%s'. Valid names: %s", name.c_str(),
-                      valid_names.c_str() );
+                      axisNameList().c_str() );
         return false;
       }
       const YAML::Node mapping = entry.second;
@@ -400,78 +375,68 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
 
   const auto now = node_->now();
 
-  // Handle buttons with double-press detection
+  // Backward clock jumps (sim-time replay/reset) count as expired so a press cannot stay buffered
+  // forever. Re-read rather than cached: a rising edge restarts the window mid-iteration.
+  const auto window_expired = [this, now]( const ButtonTracker &tracker ) {
+    const double elapsed = ( now - tracker.last_press_time ).seconds();
+    return elapsed < 0.0 || elapsed >= double_press_window_sec_;
+  };
+
   for ( const auto &[button_id, mapping] : configs_[active_config_].button_mappings ) {
     const bool pressed = inputs.buttons[button_id];
     const std::string &id = mapping.binding_id;
     auto &tracker = button_trackers_[button_id];
     const bool was_pressed = tracker.pressed;
+    tracker.pressed = pressed;
 
     if ( !mapping.has_double_press() ) {
       // No double-press configured → dispatch immediately via handleButton (original behavior)
-      const std::string &function = mapping.on_press.function;
-      mapping.plugin->handleButton( function, id, pressed );
-    } else {
-      // Double-press enabled → buffered dispatch
-      const bool rising_edge = pressed && !was_pressed;
-      const bool falling_edge = !pressed && was_pressed;
-
-      // Backward clock jumps (sim-time replay/reset) are treated as "window expired" so the press doesn't stay buffered forever.
-      const double raw_elapsed = ( now - tracker.last_press_time ).seconds();
-      const bool window_expired = raw_elapsed < 0.0 || raw_elapsed >= double_press_window_sec_;
-
-      if ( rising_edge ) {
-        if ( tracker.awaiting_double_press && !window_expired ) {
-          // Second press within window → double press detected
-          tracker.awaiting_double_press = false;
-          tracker.press_dispatched = true;
-          mapping.plugin->handlePress( mapping.on_double_press.function, id );
-        } else {
-          // Flush a stale buffered tap before overwriting last_press_time, otherwise the original press is silently dropped when no callback fired during the wait window.
-          if ( tracker.awaiting_double_press && window_expired ) {
-            mapping.plugin->handlePress( mapping.on_press.function, id );
-            mapping.plugin->handleRelease( mapping.releaseFunction(), id );
-          }
-          // First press → start waiting for potential second press
-          tracker.awaiting_double_press = true;
-          tracker.last_press_time = now;
-          tracker.press_dispatched = false;
-        }
-      } else if ( pressed && was_pressed ) {
-        // Held — only dispatch hold if press was already dispatched
-        if ( tracker.press_dispatched ) {
-          mapping.plugin->handleHold( mapping.holdFunction(), id );
-        }
-      } else if ( falling_edge ) {
-        if ( tracker.press_dispatched ) {
-          mapping.plugin->handleRelease( mapping.releaseFunction(), id );
-          tracker.press_dispatched = false;
-        }
-        // If awaiting_double_press, keep waiting — the second press can still arrive after release.
-      }
+      mapping.plugin->handleButton( mapping.on_press.function, id, pressed );
+      continue;
     }
 
-    tracker.pressed = pressed;
-  }
+    // Double-press enabled → buffered dispatch
+    if ( pressed && !was_pressed ) { // rising edge
+      if ( tracker.awaiting_double_press && !window_expired( tracker ) ) {
+        // Second press within window → double press detected
+        tracker.awaiting_double_press = false;
+        tracker.press_dispatched = true;
+        mapping.plugin->handlePress( mapping.on_double_press.function, id );
+      } else {
+        // Flush a stale buffered tap before overwriting last_press_time, otherwise the original press is silently dropped when no callback fired during the wait window.
+        if ( tracker.awaiting_double_press ) {
+          mapping.plugin->handlePress( mapping.on_press.function, id );
+          mapping.plugin->handleRelease( mapping.releaseFunction(), id );
+        }
+        // First press → start waiting for potential second press
+        tracker.awaiting_double_press = true;
+        tracker.last_press_time = now;
+        tracker.press_dispatched = false;
+      }
+    } else if ( pressed ) {
+      // Held — only dispatch hold if press was already dispatched
+      if ( tracker.press_dispatched ) {
+        mapping.plugin->handleHold( mapping.holdFunction(), id );
+      }
+    } else if ( was_pressed ) { // falling edge
+      if ( tracker.press_dispatched ) {
+        mapping.plugin->handleRelease( mapping.releaseFunction(), id );
+        tracker.press_dispatched = false;
+      }
+      // If awaiting_double_press, keep waiting — the second press can still arrive after release.
+    }
 
-  // Flush buffered single presses whose double-press window has expired.
-  for ( const auto &[button_id, mapping] : configs_[active_config_].button_mappings ) {
-    if ( !mapping.has_double_press() )
-      continue;
-
-    auto &tracker = button_trackers_[button_id];
-    const double raw_elapsed = ( now - tracker.last_press_time ).seconds();
-    const bool window_expired = raw_elapsed < 0.0 || raw_elapsed >= double_press_window_sec_;
-    if ( tracker.awaiting_double_press && window_expired ) {
+    // Flush a buffered single press whose window has expired without a second press arriving.
+    if ( tracker.awaiting_double_press && window_expired( tracker ) ) {
       tracker.awaiting_double_press = false;
-      mapping.plugin->handlePress( mapping.on_press.function, mapping.binding_id );
+      mapping.plugin->handlePress( mapping.on_press.function, id );
 
       if ( tracker.pressed ) {
         // Still held — let subsequent frames drive hold/release through the normal path.
         tracker.press_dispatched = true;
       } else {
         // Quick tap: pair the delayed press with an immediate release so the plugin doesn't get stuck.
-        mapping.plugin->handleRelease( mapping.releaseFunction(), mapping.binding_id );
+        mapping.plugin->handleRelease( mapping.releaseFunction(), id );
         tracker.press_dispatched = false;
       }
     }
@@ -533,16 +498,11 @@ void HectorGamepadManager::flushPendingButtonState()
   auto config_it = configs_.find( active_config_ );
   if ( config_it == configs_.end() )
     return;
-  const auto &button_mappings = config_it->second.button_mappings;
-
-  for ( auto &[button_id, tracker] : button_trackers_ ) {
-    auto mapping_it = button_mappings.find( button_id );
-    if ( mapping_it == button_mappings.end() )
-      continue;
-    const auto &mapping = mapping_it->second;
+  for ( const auto &[button_id, mapping] : config_it->second.button_mappings ) {
     if ( !mapping.has_double_press() )
       continue;
 
+    auto &tracker = button_trackers_[button_id];
     const std::string &id = mapping.binding_id;
 
     if ( tracker.press_dispatched ) {

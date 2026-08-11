@@ -69,7 +69,7 @@ std::string buttonName( const int id )
 {
   if ( id < 0 || id >= static_cast<int>( kNumButtons ) )
     return "";
-  if ( id < static_cast<int>( kVirtualButtonBase ) ) {
+  if ( !isAxisButton( id ) ) {
     if ( id < static_cast<int>( kPhysicalButtonNames.size() ) )
       return kPhysicalButtonNames[id];
     return "";
@@ -110,16 +110,24 @@ bool isTriggerAxis( const int id )
   return id == axisId( "left_trigger" ) || id == axisId( "right_trigger" );
 }
 
-std::vector<std::string> buttonNames()
+bool isAxisButton( const int id ) { return id >= static_cast<int>( kVirtualButtonBase ); }
+
+std::string buttonNameList( const bool axis_derived )
 {
-  std::vector<std::string> names( kPhysicalButtonNames.begin(), kPhysicalButtonNames.end() );
-  for ( const auto &[name, id] : axisButtonIds() ) names.push_back( name );
+  std::string names;
+  if ( axis_derived ) {
+    for ( const auto &[name, id] : axisButtonIds() ) names += name + " ";
+  } else {
+    for ( const auto *name : kPhysicalButtonNames ) names += std::string( name ) + " ";
+  }
   return names;
 }
 
-std::vector<std::string> axisNames()
+std::string axisNameList()
 {
-  return std::vector<std::string>( kAxisNames.begin(), kAxisNames.end() );
+  std::string names;
+  for ( const auto *name : kAxisNames ) names += std::string( name ) + " ";
+  return names;
 }
 
 std::string buttonBindingId( const std::string &config_name, const std::string &button_name )

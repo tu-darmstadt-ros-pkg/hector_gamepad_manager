@@ -37,6 +37,14 @@ private:
     rclcpp::Time last_press_time{ 0, 0, RCL_ROS_TIME };
   };
 
+  // One entry of a config's "buttons"/"axis_buttons" section, resolved against the canonical
+  // catalog: the name is the binding's identity, the id only indexes GamepadInputs::buttons.
+  struct ButtonEntry {
+    int id;
+    std::string name;
+    YAML::Node node;
+  };
+
   // Struct to store the inputs from the gamepad
   struct GamepadInputs {
     // Vector of axes values
@@ -87,8 +95,9 @@ private:
   // Controller Orchestrator for activating controllers
   std::shared_ptr<controller_orchestrator::ControllerOrchestrator> controller_orchestrator_;
 
-  // Per-button trackers for double-press detection
-  std::unordered_map<int, ButtonTracker> button_trackers_;
+  // Per-button trackers for double-press detection, indexed by button id and reset on every
+  // config switch. Small enough to hold one entry per known button outright.
+  std::array<ButtonTracker, kNumButtons> button_trackers_;
 
   // Double-press window in seconds (ROS param `double_press_window_sec`, default 0.25).
   double double_press_window_sec_;
@@ -137,14 +146,13 @@ private:
                            std::map<int, ButtonFunctionMapping> &mappings );
 
   /**
-   * @brief Resolve the "buttons" and "axis_buttons" sections of a config into
-   * (internal button id, canonical name, mapping node) tuples. Both sections are keyed by
-   * canonical name; the id is only used to index the input arrays.
+   * @brief Resolve the "buttons" and "axis_buttons" sections of a config. Both are keyed by
+   * canonical name and differ only in whether the button is one the gamepad reports.
    *
-   * @return False if the "buttons" section is missing or any key is not a known button name.
+   * @return False if the "buttons" section is missing, or a key is not a known button name, or it
+   * is written in the wrong one of the two sections.
    */
-  bool collectButtonEntries( const YAML::Node &config,
-                             std::vector<std::tuple<int, std::string, YAML::Node>> &entries );
+  bool collectButtonEntries( const YAML::Node &config, std::vector<ButtonEntry> &entries );
 
   // Initialize the axis mappings from the "axes" section.
   bool initAxisMappings( const YAML::Node &config, const std::string &config_name,
