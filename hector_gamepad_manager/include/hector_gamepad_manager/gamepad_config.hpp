@@ -39,8 +39,8 @@ struct FunctionMapping {
   std::string binding_id;
 };
 
-// For double-press buttons the manager bypasses handleButton and dispatches handlePress /
-// handleHold / handleRelease directly, so plugins must not rely on button_states_ for them.
+// The manager owns the edge detection and dispatches handlePress / handleHold / handleRelease, so
+// a plugin sees the events and never a raw button level to derive them from.
 struct ButtonFunctionMapping {
   std::shared_ptr<GamepadFunctionPlugin> plugin;
 

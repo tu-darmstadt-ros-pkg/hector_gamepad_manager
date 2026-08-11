@@ -179,6 +179,29 @@ TEST_F( HectorGamepadManagerInternalTest, ButtonHoldAndReleaseSequence )
   sendJoy();
 }
 
+// A plain button held when the config goes away must still get its release: the manager detects
+// the edges, so nothing else would ever end the press it already dispatched.
+TEST_F( HectorGamepadManagerInternalTest, ConfigSwitchWhileHeldReleasesAPlainButton )
+{
+  EXPECT_CALL( *pub_probe_press_,
+               publish( ::testing::Field( &std_msgs::msg::String::data,
+                                          ::testing::HasSubstr( "press:probe" ) ) ) )
+      .Times( 1 );
+  setButton( "a", 1, true );
+  sendJoy();
+  ::testing::Mock::VerifyAndClearExpectations( pub_probe_press_.get() );
+
+  // The switch button goes down while "a" is still held, so the release can only come from the
+  // flush: handleConfigurationSwitches returns before the button loop runs.
+  EXPECT_CALL( *pub_probe_release_,
+               publish( ::testing::Field( &std_msgs::msg::String::data,
+                                          ::testing::HasSubstr( "release:probe" ) ) ) )
+      .Times( 1 );
+  EXPECT_CALL( *pub_probe_hold_, publish( ::testing::_ ) ).Times( 0 );
+  setButton( "back", 1 ); // switch to manager_internal_alt
+  sendJoy();
+}
+
 // SDL reports the d-pad as four real buttons. `dpad_up` is mapped in manager_internal.yaml.
 TEST_F( HectorGamepadManagerInternalTest, DpadButtonDispatches )
 {

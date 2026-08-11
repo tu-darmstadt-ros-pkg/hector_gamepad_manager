@@ -31,34 +31,6 @@ public:
   }
 
   /**
-   * @brief Handle button input events.
-   *
-   * @param function The function name that is associated with the button.
-   * @param pressed True if the button is pressed, false otherwise.
-   */
-  virtual void handleButton( const std::string &function, const std::string &id, const bool pressed )
-  {
-    const std::string unique_function = function + "_" + id;
-    if ( button_states_.count( unique_function ) == 0 ) {
-      button_states_[unique_function] = false;
-    }
-
-    if ( pressed ) {
-      if ( button_states_[unique_function] ) {
-        handleHold( function, id );
-      } else {
-        handlePress( function, id );
-      }
-    } else {
-      if ( button_states_[unique_function] ) {
-        handleRelease( function, id );
-      }
-    }
-
-    button_states_[unique_function] = pressed;
-  }
-
-  /**
    * @brief Handle axis input events.
    *
    * @param function The function name that is associated with the axis.
@@ -239,8 +211,6 @@ protected:
   // Specifies if the plugin is active.
   bool active_ = false;
 
-  // The current state of the buttons per function.
-  std::unordered_map<std::string, bool> button_states_;
   std::string plugin_id_;
   std::string plugin_name_;
   std::string plugin_namespace_;

@@ -411,8 +411,13 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
     tracker.pressed = pressed;
 
     if ( !mapping.has_double_press() ) {
-      // No double-press configured → dispatch immediately via handleButton (original behavior)
-      mapping.plugin->handleButton( mapping.on_press.function, id, pressed );
+      // No double-press configured → the press goes out on the edge that produced it.
+      if ( pressed && !was_pressed )
+        mapping.plugin->handlePress( mapping.on_press.function, id );
+      else if ( pressed )
+        mapping.plugin->handleHold( mapping.holdFunction(), id );
+      else if ( was_pressed )
+        mapping.plugin->handleRelease( mapping.releaseFunction(), id );
       continue;
     }
 
@@ -461,30 +466,25 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
 
 void HectorGamepadManager::activatePlugins( const std::string &config_name )
 {
-  // activate all  plugins present in the button_mappings_ and axis_mappings_ of the given config
   if ( configs_.count( config_name ) == 0 ) {
     RCLCPP_ERROR( node_->get_logger(), "Config %s not found. Cannot activate the gamepad config",
                   config_name.c_str() );
     return;
   }
-  // activate all plugins present in the button_mappings_
-  for ( const auto &button_mapping : configs_[config_name].button_mappings ) {
-    if ( !button_mapping.second.plugin->isActive() ) {
-      button_mapping.second.plugin->activate();
+  // Every plugin the config binds, whether to a button or an axis, and each activated once even
+  // when several bindings share it.
+  const auto activate = [this]( const auto &mappings ) {
+    for ( const auto &[input_id, mapping] : mappings ) {
+      if ( mapping.plugin->isActive() )
+        continue;
+      mapping.plugin->activate();
       RCLCPP_DEBUG( node_->get_logger(), "Activated plugin: %s",
-                    button_mapping.second.plugin->getPluginName().c_str() );
-      active_plugins_.push_back( button_mapping.second.plugin );
+                    mapping.plugin->getPluginName().c_str() );
+      active_plugins_.push_back( mapping.plugin );
     }
-  }
-  // activate all plugins present in the axis_mappings_
-  for ( const auto &axis_mapping : configs_[config_name].axis_mappings ) {
-    if ( !axis_mapping.second.plugin->isActive() ) {
-      axis_mapping.second.plugin->activate();
-      RCLCPP_DEBUG( node_->get_logger(), "Activated plugin: %s",
-                    axis_mapping.second.plugin->getPluginName().c_str() );
-      active_plugins_.push_back( axis_mapping.second.plugin );
-    }
-  }
+  };
+  activate( configs_[config_name].button_mappings );
+  activate( configs_[config_name].axis_mappings );
 }
 
 void HectorGamepadManager::deactivatePlugins()
@@ -521,10 +521,18 @@ void HectorGamepadManager::flushPendingButtonState()
   if ( config_it == configs_.end() )
     return;
   for ( const auto &[button_id, mapping] : config_it->second.button_mappings ) {
-    if ( !mapping.has_double_press() )
-      continue;
-
     auto &tracker = button_trackers_[button_id];
+
+    if ( !mapping.has_double_press() ) {
+      // A button still down when the config goes away: the manager detects the edges, so nothing
+      // else would ever produce the release that ends the press it already sent.
+      if ( tracker.pressed ) {
+        mapping.plugin->handleRelease( mapping.releaseFunction(), mapping.binding_id );
+        tracker.pressed = false;
+      }
+      continue;
+    }
+
     switch ( tracker.state ) {
     case PressState::Dispatched:
       mapping.plugin->handleRelease( mapping.releaseFunction(), mapping.binding_id );
