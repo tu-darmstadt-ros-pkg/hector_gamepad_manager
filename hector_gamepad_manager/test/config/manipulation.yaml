@@ -74,11 +74,17 @@ buttons:
 
   dpad_left:
     plugin: hector_gamepad_manager_plugins::MoveitPlugin
-    function: arm_group/back
+    function: go_to_pose
+    args:
+      group: arm_group
+      pose: back
 
   dpad_right:
     plugin: hector_gamepad_manager_plugins::MoveitPlugin
-    function: arm_group/front
+    function: go_to_pose
+    args:
+      group: arm_group
+      pose: front
 
   dpad_up:
     plugin: ''
@@ -86,7 +92,10 @@ buttons:
 
   dpad_down:
     plugin: hector_gamepad_manager_plugins::MoveitPlugin
-    function: arm_group/folded
+    function: go_to_pose
+    args:
+      group: arm_group
+      pose: folded
 
 # -------------------- All the axes can also be used as buttons if specified here --------------------
 axis_buttons:

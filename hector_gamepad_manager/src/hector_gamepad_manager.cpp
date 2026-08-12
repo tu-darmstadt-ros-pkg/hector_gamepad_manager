@@ -4,6 +4,7 @@
 #include "hector_gamepad_manager/gamepad_config.hpp"
 #include "hector_gamepad_manager/gamepad_mapping_builder.hpp"
 
+#include <algorithm>
 #include <filesystem>
 
 namespace hector_gamepad_manager
@@ -67,16 +68,17 @@ HectorGamepadManager::HectorGamepadManager( const rclcpp::Node::SharedPtr &node 
   feedback_manager_->createVibrationPattern( kConfigSwitchVibrationId, config_switch_vibration );
   controller_orchestrator_ =
       std::make_shared<controller_orchestrator::ControllerOrchestrator>( node_ );
-  // load meta switch config and all referenced config files
-  if ( loadConfigSwitchesConfig( config_switches_filename ) ) {
-    switchConfig( default_config_ );
-
+  if ( loadConfigSwitchesConfig( config_switches_filename ) && switchConfig( default_config_ ) ) {
     // Configs are immutable after load, so the mapping is published once and latched.
     mapping_publisher_->publish(
         buildGamepadMappingMsg( configs_, config_switch_button_mapping_, default_config_ ) );
 
     joy_subscription_ = node_->create_subscription<sensor_msgs::msg::Joy>(
         "joy", 1, std::bind( &HectorGamepadManager::joyCallback, this, std::placeholders::_1 ) );
+  } else {
+    RCLCPP_FATAL( node_->get_logger(),
+                  "Gamepad manager failed to start (see errors above): not subscribing to joy, "
+                  "ALL GAMEPAD INPUT WILL BE IGNORED." );
   }
 }
 
@@ -194,6 +196,30 @@ ActionMapping readAction( const YAML::Node &node, const std::string &description
   return { node["function"].as<std::string>( "" ),
            node["description"].as<std::string>( description_fallback ) };
 }
+
+// The first of `functions` the plugin does not declare, or "" if it handles them all. Empty names
+// are skipped (an unbound event), and a plugin declaring no functions at all opts out of the
+// check - see GamepadFunctionPlugin::handledFunctions().
+std::string firstUnhandledFunction( const hector_gamepad_plugin_interface::GamepadFunctionPlugin &plugin,
+                                    const std::vector<std::string> &functions )
+{
+  const std::vector<std::string> handled = plugin.handledFunctions();
+  if ( handled.empty() )
+    return "";
+  for ( const auto &function : functions ) {
+    if ( !function.empty() && std::find( handled.begin(), handled.end(), function ) == handled.end() )
+      return function;
+  }
+  return "";
+}
+
+// The plugin's declared functions, space-separated for an error message.
+std::string handledFunctionList( const hector_gamepad_plugin_interface::GamepadFunctionPlugin &plugin )
+{
+  std::string names;
+  for ( const auto &function : plugin.handledFunctions() ) names += " " + function;
+  return names;
+}
 } // namespace
 
 bool HectorGamepadManager::collectButtonEntries( const YAML::Node &config,
@@ -281,6 +307,20 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
     mapping.plugin = loadPlugin( plugin_name );
     if ( !mapping.plugin )
       return false;
+
+    // A function the plugin does not handle would dispatch into a no-op on every press, forever,
+    // so a typo fails the load instead - same as an unknown button name.
+    const std::string unhandled = firstUnhandledFunction(
+        *mapping.plugin, { mapping.on_press.function, mapping.on_double_press.function,
+                           mapping.on_hold.function, mapping.on_release.function } );
+    if ( !unhandled.empty() ) {
+      RCLCPP_ERROR( node_->get_logger(),
+                    "Button '%s' in config '%s' binds function '%s', which plugin %s does not "
+                    "handle. Handled functions:%s",
+                    entry.name.c_str(), config_name.c_str(), unhandled.c_str(), plugin_name.c_str(),
+                    handledFunctionList( *mapping.plugin ).c_str() );
+      return false;
+    }
     mappings[entry.id] = std::move( mapping );
   }
   return true;
@@ -316,6 +356,14 @@ bool HectorGamepadManager::initAxisMappings( const YAML::Node &config, const std
     const auto plugin = loadPlugin( plugin_name );
     if ( !plugin )
       return false;
+    if ( !firstUnhandledFunction( *plugin, { function } ).empty() ) {
+      RCLCPP_ERROR( node_->get_logger(),
+                    "Axis '%s' in config '%s' binds function '%s', which plugin %s does not "
+                    "handle. Handled functions:%s",
+                    name.c_str(), config_name.c_str(), function.c_str(), plugin_name.c_str(),
+                    handledFunctionList( *plugin ).c_str() );
+      return false;
+    }
     mappings[id] = { plugin, function, node["description"].as<std::string>( "" ), binding_id };
   }
   return true;
