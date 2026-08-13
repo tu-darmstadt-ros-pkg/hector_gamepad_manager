@@ -110,6 +110,11 @@ private:
   // Double-press window in seconds (ROS param `double_press_window_sec`, default 0.25).
   double double_press_window_sec_;
 
+  // Whether the last joy message came from a source with the expected layout. Only used to act
+  // once on the transition to a rejected source, not to remember a verdict: every message is
+  // checked on its own.
+  bool joy_source_ok_ = true;
+
   // Deadzone to consider an axis as pressed
   static constexpr float AXIS_DEADZONE = 0.5;
 
@@ -216,8 +221,12 @@ private:
    * @brief Check a Joy message against the layout game_controller_node publishes and log how to
    * fix the launch if it does not match. Runs on every message, so a source that is relaunched or
    * joined by a second publisher mid-session is caught too. Reporting is throttled.
+   *
+   * @return True if the message may be dispatched. A false means the ids in it address different
+   * controls than the ones the configs are written against, so acting on it would command
+   * whatever happens to sit at the same index - the message is dropped instead.
    */
-  void checkJoySource( const sensor_msgs::msg::Joy &msg );
+  bool checkJoySource( const sensor_msgs::msg::Joy &msg );
 
   /**
    * @brief Get the path of a file in a package. Assuming the file is in the config folder.

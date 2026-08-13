@@ -4,7 +4,6 @@
 #include "hector_gamepad_manager/gamepad_config.hpp"
 #include "hector_gamepad_manager/gamepad_mapping_builder.hpp"
 
-#include <algorithm>
 #include <filesystem>
 
 namespace hector_gamepad_manager
@@ -14,7 +13,7 @@ namespace
 // One-shot feedback pattern fired whenever the active gamepad config changes.
 constexpr char kConfigSwitchVibrationId[] = "config_switch_vibration";
 
-/// joy msgs with less buttons are ignored with a warning
+/// A joy message carrying fewer buttons than this is from another source and is dropped
 constexpr std::size_t kMinControllerButtons = 15;
 
 // How often a persistent joy-source mismatch is repeated
@@ -196,30 +195,6 @@ ActionMapping readAction( const YAML::Node &node, const std::string &description
   return { node["function"].as<std::string>( "" ),
            node["description"].as<std::string>( description_fallback ) };
 }
-
-// The first of `functions` the plugin does not declare, or "" if it handles them all. Empty names
-// are skipped (an unbound event), and a plugin declaring no functions at all opts out of the
-// check - see GamepadFunctionPlugin::handledFunctions().
-std::string firstUnhandledFunction( const hector_gamepad_plugin_interface::GamepadFunctionPlugin &plugin,
-                                    const std::vector<std::string> &functions )
-{
-  const std::vector<std::string> handled = plugin.handledFunctions();
-  if ( handled.empty() )
-    return "";
-  for ( const auto &function : functions ) {
-    if ( !function.empty() && std::find( handled.begin(), handled.end(), function ) == handled.end() )
-      return function;
-  }
-  return "";
-}
-
-// The plugin's declared functions, space-separated for an error message.
-std::string handledFunctionList( const hector_gamepad_plugin_interface::GamepadFunctionPlugin &plugin )
-{
-  std::string names;
-  for ( const auto &function : plugin.handledFunctions() ) names += " " + function;
-  return names;
-}
 } // namespace
 
 bool HectorGamepadManager::collectButtonEntries( const YAML::Node &config,
@@ -307,20 +282,6 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
     mapping.plugin = loadPlugin( plugin_name );
     if ( !mapping.plugin )
       return false;
-
-    // A function the plugin does not handle would dispatch into a no-op on every press, forever,
-    // so a typo fails the load instead - same as an unknown button name.
-    const std::string unhandled = firstUnhandledFunction(
-        *mapping.plugin, { mapping.on_press.function, mapping.on_double_press.function,
-                           mapping.on_hold.function, mapping.on_release.function } );
-    if ( !unhandled.empty() ) {
-      RCLCPP_ERROR( node_->get_logger(),
-                    "Button '%s' in config '%s' binds function '%s', which plugin %s does not "
-                    "handle. Handled functions:%s",
-                    entry.name.c_str(), config_name.c_str(), unhandled.c_str(), plugin_name.c_str(),
-                    handledFunctionList( *mapping.plugin ).c_str() );
-      return false;
-    }
     mappings[entry.id] = std::move( mapping );
   }
   return true;
@@ -356,14 +317,6 @@ bool HectorGamepadManager::initAxisMappings( const YAML::Node &config, const std
     const auto plugin = loadPlugin( plugin_name );
     if ( !plugin )
       return false;
-    if ( !firstUnhandledFunction( *plugin, { function } ).empty() ) {
-      RCLCPP_ERROR( node_->get_logger(),
-                    "Axis '%s' in config '%s' binds function '%s', which plugin %s does not "
-                    "handle. Handled functions:%s",
-                    name.c_str(), config_name.c_str(), function.c_str(), plugin_name.c_str(),
-                    handledFunctionList( *plugin ).c_str() );
-      return false;
-    }
     mappings[id] = { plugin, function, node["description"].as<std::string>( "" ), binding_id };
   }
   return true;
@@ -382,7 +335,7 @@ bool HectorGamepadManager::handleConfigurationSwitches( const GamepadInputs &inp
   return false;
 }
 
-void HectorGamepadManager::checkJoySource( const sensor_msgs::msg::Joy &msg )
+bool HectorGamepadManager::checkJoySource( const sensor_msgs::msg::Joy &msg )
 {
   // this function verifies whether the joy msgs is valid e.g. warns if msg from joy_node instead of gamepadnode
   const char *topic = joy_subscription_->get_topic_name();
@@ -398,7 +351,7 @@ void HectorGamepadManager::checkJoySource( const sensor_msgs::msg::Joy &msg )
         "Launch `game_controller_node` from the joy package instead (published by:%s).",
         topic, msg.axes.size(), msg.buttons.size(), kNumAxes, kMinControllerButtons,
         publisherNames( *node_, topic ).c_str() );
-    return;
+    return false;
   }
 
   // Second tell: the trigger convention, which catches a source of the right shape. A trigger
@@ -415,13 +368,28 @@ void HectorGamepadManager::checkJoySource( const sensor_msgs::msg::Joy &msg )
         "raw indices address different controls. Launch `game_controller_node` from the joy "
         "package instead (published by:%s).",
         axisName( id ).c_str(), topic, msg.axes[id], publisherNames( *node_, topic ).c_str() );
-    return;
+    return false;
   }
+  return true;
 }
 
 void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr msg )
 {
-  checkJoySource( *msg );
+  if ( !checkJoySource( *msg ) ) {
+    // Dropped rather than dispatched: the ids in a message of another layout mean different
+    // controls than the config was written against, so acting on it drives whatever happens to
+    // share the index - a resting joy_node trigger reads as a fully deflected canonical axis.
+    if ( joy_source_ok_ ) {
+      // Only on the transition. Nothing after this produces the release for a button that was
+      // down when the source went wrong, so it goes out now instead of leaving a plugin held.
+      flushPendingButtonState();
+      button_trackers_ = {};
+      joy_source_ok_ = false;
+    }
+    return;
+  }
+  joy_source_ok_ = true;
+
   const auto inputs = convertJoyToGamepadInputs( *msg );
   // ignore normal button / axis behavior if configuration switching is in progress
   if ( handleConfigurationSwitches( inputs ) )

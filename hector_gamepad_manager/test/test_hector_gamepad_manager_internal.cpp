@@ -294,26 +294,48 @@ TEST_F( HectorGamepadManagerInternalTest, ReportsAWrongJoySourceAndHowToFixIt )
                ::testing::Not( ::testing::HasSubstr( "always publishes" ) ) );
 }
 
-// A message shorter than the canonical layout means the joy source is not game_controller_node,
-// which checkJoySource() reports. Reading it must still be safe: entries missing from the message
-// count as "never pressed" rather than indexing past the end of the input arrays.
-TEST_F( HectorGamepadManagerInternalTest, ShortJoyMessageTreatsMissingEntriesAsNeutral )
+// A message of another layout is dropped, not dispatched. Its ids address different controls than
+// the config was written against, so acting on the ones that happen to be in range would command
+// whatever shares the index - the reason this is not "read what is there and pad the rest".
+TEST_F( HectorGamepadManagerInternalTest, JoyMessageOfAnotherLayoutIsDropped )
 {
+  // Not even a button that is present in the short message: id 0 is "a" to this manager, but in
+  // the layout that produced the message it is some other control. Same for the config switch,
+  // which is the one an operator would notice - a wrong source must not change the mode either.
   EXPECT_CALL( *pub_probe_press_, publish( ::testing::_ ) ).Times( 0 );
-  resetJoy();
+  EXPECT_CALL( *pub_config_, publish( ::testing::_ ) ).Times( 0 );
+  setButton( "a", 1, true );
+  setButton( "back", 1 );        // switches config, in a message the manager accepts
   joy_msg_.buttons.resize( 11 ); // no Share button
   joy_msg_.axes.resize( 2 );     // sticks only, no triggers / cross
   sendJoy();
-  ::testing::Mock::VerifyAndClearExpectations( pub_probe_press_.get() );
+  ::testing::Mock::VerifyAndClearExpectations( pub_config_.get() );
 
-  // Buttons that do exist in the short message still dispatch normally.
+  // The same press in a message of the expected layout does switch, so what the check rejects is
+  // the layout and not the press.
+  EXPECT_CALL( *pub_config_,
+               publish( ::testing::Field( &std_msgs::msg::String::data, "manager_internal_alt" ) ) )
+      .Times( 1 );
+  setButton( "back", 1, true );
+  sendJoy();
+}
+
+// A pad without paddles or a touchpad reports fewer buttons and is still game_controller_node, so
+// its messages are dispatched. Reading one must stay in bounds: the ids it does not carry count as
+// "never pressed" rather than indexing past the end of the message.
+TEST_F( HectorGamepadManagerInternalTest, PadWithoutExtraButtonsDispatchesAndReadsMissingAsNeutral )
+{
+  // paddle1 (id 16) is bound in this config and absent from the message; "a" is present.
+  EXPECT_CALL( *pub_probe_press_,
+               publish( ::testing::Field( &std_msgs::msg::String::data,
+                                          ::testing::HasSubstr( "press:extra" ) ) ) )
+      .Times( 0 );
   EXPECT_CALL( *pub_probe_press_,
                publish( ::testing::Field( &std_msgs::msg::String::data,
                                           ::testing::HasSubstr( "press:probe" ) ) ) )
       .Times( 1 );
   setButton( "a", 1, true );
-  joy_msg_.buttons.resize( 11 );
-  joy_msg_.axes.resize( 2 );
+  joy_msg_.buttons.resize( 15 ); // the standard buttons, no paddles and no touchpad
   sendJoy();
 }
 
