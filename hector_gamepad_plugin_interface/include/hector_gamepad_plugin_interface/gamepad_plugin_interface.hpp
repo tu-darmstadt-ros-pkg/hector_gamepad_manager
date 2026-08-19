@@ -4,10 +4,12 @@
 #include "blackboard.hpp"
 #include "feedback_manager.hpp"
 
-#include <algorithm>
 #include <controller_orchestrator/controller_orchestrator.hpp>
 #include <memory>
 #include <rclcpp/rclcpp.hpp>
+#include <string>
+#include <unordered_set>
+#include <vector>
 
 namespace hector_gamepad_plugin_interface
 {
@@ -28,34 +30,6 @@ public:
     controller_orchestrator_ = controller_orchestrator;
     setPluginId( plugin_id );
     initialize( node );
-  }
-
-  /**
-   * @brief Handle button input events.
-   *
-   * @param function The function name that is associated with the button.
-   * @param pressed True if the button is pressed, false otherwise.
-   */
-  virtual void handleButton( const std::string &function, const std::string &id, const bool pressed )
-  {
-    const std::string unique_function = function + "_" + id;
-    if ( button_states_.count( unique_function ) == 0 ) {
-      button_states_[unique_function] = false;
-    }
-
-    if ( pressed ) {
-      if ( button_states_[unique_function] ) {
-        handleHold( function, id );
-      } else {
-        handlePress( function, id );
-      }
-    } else {
-      if ( button_states_[unique_function] ) {
-        handleRelease( function, id );
-      }
-    }
-
-    button_states_[unique_function] = pressed;
   }
 
   /**
@@ -116,8 +90,20 @@ public:
   T getConfigValueOr( const std::string &id, const std::string &param,
                       const T &default_value = T() ) const
   {
-    std::string key = plugin_id_ + "_" + id + "/" + param;
-    return blackboard_->value_or<T>( key, default_value );
+    const std::string key = plugin_id_ + "_" + id + "/" + param;
+    if ( const T *value = blackboard_->try_get<T>( key ) )
+      return *value;
+    // A missing arg is the normal case for an optional one, so it passes quietly. An arg that IS
+    // set and still does not read is always a config mistake - a quoted number, a list where a
+    // scalar belongs - and the default it silently falls back to is the only trace it leaves.
+    // Said once per key: plugins read the same args on every press.
+    if ( blackboard_->contains( key ) && config_fallback_warned_.insert( key ).second ) {
+      RCLCPP_WARN( node_->get_logger(),
+                   "Config arg '%s' of binding '%s' is set but not as the type the plugin reads, "
+                   "so the default is used instead. Check the value in the config's args block.",
+                   param.c_str(), id.c_str() );
+    }
+    return default_value;
   }
 
   /**
@@ -239,11 +225,11 @@ protected:
   // Specifies if the plugin is active.
   bool active_ = false;
 
-  // The current state of the buttons per function.
-  std::unordered_map<std::string, bool> button_states_;
   std::string plugin_id_;
   std::string plugin_name_;
   std::string plugin_namespace_;
+  // Keys getConfigValueOr() already warned about, so each is reported only once.
+  mutable std::unordered_set<std::string> config_fallback_warned_;
   std::shared_ptr<Blackboard> blackboard_;
   std::shared_ptr<FeedbackManager> feedback_manager_;
   std::shared_ptr<controller_orchestrator::ControllerOrchestrator> controller_orchestrator_;

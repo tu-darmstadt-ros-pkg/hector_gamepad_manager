@@ -1,0 +1,73 @@
+#ifndef HECTOR_GAMEPAD_MANAGER_GAMEPAD_BUTTONS_HPP
+#define HECTOR_GAMEPAD_MANAGER_GAMEPAD_BUTTONS_HPP
+
+#include "hector_gamepad_manager/gamepad_config.hpp"
+
+#include <array>
+#include <string>
+
+namespace hector_gamepad_manager
+{
+// Canonical names for the gamepad's inputs - the identifier shared by the config files, the
+// published GamepadMapping message and whatever renders it. Ids stay inside the Joy adapter and
+// follow SDL's GameController layout, which `game_controller_node` publishes (never `joy_node`).
+
+//! One axis-derived virtual button: the "axis_buttons" key a config binds, the axis it reads, and
+//! the direction of deflection that counts as a press.
+struct AxisButton {
+  const char *name;
+  int axis;
+  float direction;
+};
+
+//! The axis-derived buttons, indexed by their offset from kVirtualButtonBase. Being one table
+//! rather than a name catalog beside a conversion rule is what keeps the two from drifting: the
+//! Joy adapter derives the button from the same row that names it.
+const std::array<AxisButton, kNumVirtualButtons> &axisButtons();
+
+//! Canonical name of a button id, or "" if the id has no canonical meaning.
+std::string buttonName( int id );
+
+//! Canonical name of an axis id, or "" if the id is out of range.
+std::string axisName( int id );
+
+//! Button id for a canonical name, physical or virtual, or -1 if the name is unknown.
+int buttonId( const std::string &name );
+
+//! Axis id for a canonical name, or -1 if the name is unknown.
+int axisId( const std::string &name );
+
+//! True if the id belongs to a button synthesized from a deflected axis rather than one the
+//! gamepad reports - i.e. whether it is configured under "axis_buttons" or under "buttons".
+bool isAxisButton( int id );
+
+//! True for the two trigger axes, which are the only axes the Joy adapter has to convert.
+//!
+//! A trigger reads 0 (released) to 1 (fully pressed); the sticks read -1 to 1. On the wire a
+//! pressed trigger arrives as -1 instead: SDL reports triggers as 0..32767 and never negative,
+//! and game_controller_node scales every axis by one negative factor. convertJoyToGamepadInputs()
+//! flips them back, so nothing downstream sees the wire sign.
+bool isTriggerAxis( int id );
+
+//! Every button name a config section accepts, space-separated for an error message: the
+//! axis-derived ones if `axis_derived`, the ones the gamepad reports otherwise.
+std::string buttonNameList( bool axis_derived );
+
+//! Every valid axis name, space-separated for an error message.
+std::string axisNameList();
+
+// Identity of one binding: it namespaces the binding's `args` on the blackboard at load time and
+// tells the plugin which binding fired at dispatch time. Those two sites are far apart, so both
+// go through these functions - a mismatch would store args under a key nothing ever reads.
+//
+// Button and axis ids are kept apart because the two share a name space: "left_trigger" is both
+// an axis and the virtual button derived from it, and a config may bind them differently.
+
+//! Blackboard/dispatch id of a button binding in `config_name`.
+std::string buttonBindingId( const std::string &config_name, const std::string &button_name );
+
+//! Blackboard/dispatch id of an axis binding in `config_name`.
+std::string axisBindingId( const std::string &config_name, const std::string &axis_name );
+} // namespace hector_gamepad_manager
+
+#endif // HECTOR_GAMEPAD_MANAGER_GAMEPAD_BUTTONS_HPP

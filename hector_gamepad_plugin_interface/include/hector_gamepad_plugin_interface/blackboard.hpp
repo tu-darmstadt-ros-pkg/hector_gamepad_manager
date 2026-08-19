@@ -240,7 +240,7 @@ public:
 
     for ( const auto &item : list ) {
       if ( item.IsMap() || item.IsSequence() ) {
-        return false; // you said: maps in sequences are not allowed
+        return false; // nested maps/sequences inside a sequence are not supported
       }
       if ( !is_bool( item ) )
         all_bool = false;

@@ -1,51 +1,43 @@
 description: Drive the robot and control the flippers
 
 axes:
-  0: # Left joystick left/right
+  left_stick_x:
     plugin: hector_gamepad_manager_plugins::DrivePlugin
     function: steer
     description: Steer
 
-  1: # Left joystick up/down
+  left_stick_y:
     plugin: hector_gamepad_manager_plugins::DrivePlugin
     function: drive
     description: Drive forward/backward
 
-  2: # LT
+  left_trigger:
     plugin: hector_gamepad_manager_plugins::FlipperPlugin
     function: flipper_back_down
     description: Lower back flippers
 
-  3: # Right joystick left/right
+  right_stick_x:
     plugin: hector_gamepad_manager_plugins::VirtualCameraPlugin
     function: camera_pan
     description: Pan camera
 
-  4: # Right joystick up/down
+  right_stick_y:
     plugin: hector_gamepad_manager_plugins::VirtualCameraPlugin
     function: camera_tilt
     description: Tilt camera
 
-  5: # RT
+  right_trigger:
     plugin: hector_gamepad_manager_plugins::FlipperPlugin
     function: flipper_front_down
     description: Lower front flippers
 
-  6: # Cross left/right
-    plugin: ''
-    function: ''
-
-  7: # Cross up/down
-    plugin: ''
-    function: ''
-
 buttons:
-  0: # Button A
+  a:
     plugin: hector_gamepad_manager_plugins::DrivePlugin
     function: slow
     description: Drive slowly (hold)
 
-  1: # Button B
+  b:
     plugin: hector_gamepad_manager_plugins::FlipperPlugin
     on_press:
       function: individual_front_flipper_control_mode
@@ -54,7 +46,7 @@ buttons:
       function: sync_front_flippers
       description: Sync front flippers
 
-  2: # Button X
+  x:
     plugin: hector_gamepad_manager_plugins::FlipperPlugin
     on_press:
       function: individual_back_flipper_control_mode
@@ -63,12 +55,12 @@ buttons:
       function: sync_back_flippers
       description: Sync back flippers
 
-  3: # Button Y
+  y:
     plugin: hector_gamepad_manager_plugins::DrivePlugin
     function: fast
     description: Drive fast (hold)
 
-  4: # Button LB
+  left_bumper:
     plugin: hector_gamepad_manager_plugins::FlipperPlugin
     on_press:
       function: flipper_back_up
@@ -77,7 +69,7 @@ buttons:
       function: flipper_back_upright
       description: Back flippers to upright position
 
-  5: # Button RB
+  right_bumper:
     plugin: hector_gamepad_manager_plugins::FlipperPlugin
     on_press:
       function: flipper_front_up
@@ -86,15 +78,15 @@ buttons:
       function: flipper_front_upright
       description: Front flippers to upright position
 
-  6: # Button Back
+  back:
     plugin: ''
     function: ''
 
-  7: # Button Start
+  start:
     plugin: ''
     function: ''
 
-  8: # Button Guide (Manufacturer Button)
+  guide: # Button Guide (Manufacturer Button)
     plugin: hector_gamepad_manager_plugins::BlackboardPlugin
     function: toggle
     description: Toggle inverted steering
@@ -102,7 +94,7 @@ buttons:
       name: invert_steering
       ocs_topic: joy_teleop_direction
 
-  9: # Left joystick press
+  left_stick_click:
     plugin: hector_gamepad_manager_plugins::BlackboardPlugin
     function: toggle
     description: Toggle software emergency stop
@@ -112,17 +104,49 @@ buttons:
       topic: gamepad_e_stop
 
 
-  10: # Right joystick press
+  right_stick_click:
     plugin: hector_gamepad_manager_plugins::VirtualCameraPlugin
     function: reset_camera
     description: Reset camera view
 
-  11: # Button Share (only on newer Xbox controllers)
+  share: # Button Share (only on newer Xbox controllers)
     plugin: hector_gamepad_manager_plugins::BlackboardPlugin
     function: toggle
     args:
       name: invert_steering
       ocs_topic: joy_teleop_direction
+
+  dpad_left:
+    plugin: hector_gamepad_manager_plugins::MoveitPlugin
+    function: go_to_pose
+    description: Flippers to tub pose
+    args:
+      group: flipper_group
+      pose: tub
+
+  dpad_right:
+    plugin: hector_gamepad_manager_plugins::MoveitPlugin
+    function: go_to_pose
+    description: Flippers to compact pose
+    args:
+      group: flipper_group
+      pose: compact
+
+  dpad_up:
+    plugin: hector_gamepad_manager_plugins::MoveitPlugin
+    function: go_to_pose
+    description: Flippers to up pose
+    args:
+      group: flipper_group
+      pose: up
+
+  dpad_down:
+    plugin: hector_gamepad_manager_plugins::MoveitPlugin
+    function: go_to_pose
+    description: Flippers to flat pose
+    args:
+      group: flipper_group
+      pose: flat
 
 # -------------------- All the axes can also be used as buttons if specified here --------------------
 axis_buttons:
@@ -165,35 +189,3 @@ axis_buttons:
   right_trigger:
     plugin: ''
     function: ''
-
-  cross_left:
-    plugin: hector_gamepad_manager_plugins::MoveitPlugin
-    function: go_to_pose
-    description: Flippers to tub pose
-    args:
-      group: flipper_group
-      pose: tub
-
-  cross_right:
-    plugin: hector_gamepad_manager_plugins::MoveitPlugin
-    function: go_to_pose
-    description: Flippers to compact pose
-    args:
-      group: flipper_group
-      pose: compact
-
-  cross_up:
-    plugin: hector_gamepad_manager_plugins::MoveitPlugin
-    function: go_to_pose
-    description: Flippers to up pose
-    args:
-      group: flipper_group
-      pose: up
-
-  cross_down:
-    plugin: hector_gamepad_manager_plugins::MoveitPlugin
-    function: go_to_pose
-    description: Flippers to flat pose
-    args:
-      group: flipper_group
-      pose: flat

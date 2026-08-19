@@ -66,12 +66,9 @@ public:
    */
   void setPatternActive( const std::string &id, const bool active )
   {
-    auto it = vibration_patterns_.find( id );
+    const auto it = vibration_patterns_.find( id );
     if ( it != vibration_patterns_.end() ) {
-      auto pattern = it->second.get();
-      if ( pattern ) {
-        pattern->setActive( active );
-      }
+      it->second->setActive( active );
     }
   }
 
@@ -83,19 +80,13 @@ public:
   double getVibrationIntensity()
   {
     double intensity = 0.0;
-    for ( auto it = vibration_patterns_.begin(); it != vibration_patterns_.end(); ) {
-      const auto &pattern = it->second;
-      if ( !pattern ) {
-        it = vibration_patterns_.erase( it );
-        continue;
-      }
+    for ( const auto &[id, pattern] : vibration_patterns_ ) {
       intensity = std::max( intensity, pattern->getIntensityNow() );
       // One-shot patterns turn themselves off once played through, so isActive() stays truthful
-      // and a later setPatternActive(true) restarts them instead of being a silent no-op.
+      // and a later setPatternActive(true) restarts them.
       if ( pattern->isFinished() ) {
         pattern->setActive( false );
       }
-      ++it;
     }
     if ( intensity <= 0.0 && last_intensity_ > 0.0 ) {
       last_intensity_ = intensity;
@@ -114,14 +105,7 @@ public:
   bool isActive( const std::string &id ) const
   {
     const auto it = vibration_patterns_.find( id );
-    if ( it == vibration_patterns_.end() ) {
-      return false;
-    }
-    const auto &pattern = it->second;
-    if ( pattern ) {
-      return pattern->isActive();
-    }
-    return false;
+    return it != vibration_patterns_.end() && it->second->isActive();
   }
 
 private:

@@ -1,31 +1,4 @@
 # Switches file that boots the malformed test config as default.
 default_config: manager_internal_malformed
 buttons:
-  0: {package: '', config: ''}
-  1: {package: '', config: ''}
-  2: {package: '', config: ''}
-  3: {package: '', config: ''}
-  4: {package: '', config: ''}
-  5: {package: '', config: ''}
-  6: {package: '', config: ''}
-  7: {package: hector_gamepad_manager, config: manager_internal_malformed}
-  8: {package: '', config: ''}
-  9: {package: '', config: ''}
-  10: {package: '', config: ''}
-  11: {package: '', config: ''}
-
-axis_buttons:
-  left_stick_left: {package: '', config: ''}
-  left_stick_right: {package: '', config: ''}
-  left_stick_up: {package: '', config: ''}
-  left_stick_down: {package: '', config: ''}
-  left_trigger: {package: '', config: ''}
-  right_stick_left: {package: '', config: ''}
-  right_stick_right: {package: '', config: ''}
-  right_stick_up: {package: '', config: ''}
-  right_stick_down: {package: '', config: ''}
-  right_trigger: {package: '', config: ''}
-  cross_left: {package: '', config: ''}
-  cross_right: {package: '', config: ''}
-  cross_up: {package: '', config: ''}
-  cross_down: {package: '', config: ''}
+  start: {package: hector_gamepad_manager, config: manager_internal_malformed}

@@ -13,6 +13,12 @@
 #include <std_msgs/msg/string.hpp>
 #include <yaml-cpp/yaml.h>
 
+#include <array>
+#include <map>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
 namespace hector_gamepad_manager
 {
 class HectorGamepadManager
@@ -23,20 +29,36 @@ public:
   explicit HectorGamepadManager( const rclcpp::Node::SharedPtr &node );
 
 private:
+  // What the manager owes the plugin for a double-press button. Buffering and Dispatched cannot
+  // both hold - a press is either still held back to see whether a second one follows, or it has
+  // gone out and the plugin is owed the release that ends it - which is what this buys over the
+  // two booleans it replaced.
+  enum class PressState {
+    Idle,       // nothing pending
+    Buffering,  // a first press is held back, waiting out the double-press window
+    Dispatched, // a press was sent; a release is outstanding
+  };
+
   // Per-button state for double-press detection
   struct ButtonTracker {
-    bool pressed = false;          // current physical state
-    bool press_dispatched = false; // was on_press already sent?
-    bool awaiting_double_press = false;
+    bool pressed = false; // current physical state
+    PressState state = PressState::Idle;
     rclcpp::Time last_press_time{ 0, 0, RCL_ROS_TIME };
   };
 
-  // Struct to store the inputs from the gamepad
-  struct GamepadInputs {
-    // Vector of axes values
-    std::array<float, kNumAxes> axes = std::array<float, kNumAxes>{ 0.0 };
+  // One entry of a config's "buttons"/"axis_buttons" section, resolved against the canonical
+  // catalog: the name is the binding's identity, the id only indexes GamepadInputs::buttons.
+  struct ButtonEntry {
+    int id;
+    std::string name;
+    YAML::Node node;
+  };
 
-    std::array<bool, kNumButtons> buttons = std::array<bool, kNumButtons>{ false };
+  // One Joy message translated into the canonical layout: axes in SDL order, buttons indexed by
+  // the ids of gamepad_buttons.hpp, physical and axis-derived alike.
+  struct GamepadInputs {
+    std::array<float, kNumAxes> axes = {};
+    std::array<bool, kNumButtons> buttons = {};
   };
 
   rclcpp::Node::SharedPtr node_;
@@ -81,11 +103,17 @@ private:
   // Controller Orchestrator for activating controllers
   std::shared_ptr<controller_orchestrator::ControllerOrchestrator> controller_orchestrator_;
 
-  // Per-button trackers for double-press detection
-  std::unordered_map<int, ButtonTracker> button_trackers_;
+  // Per-button trackers for double-press detection, indexed by button id and reset on every
+  // config switch. Small enough to hold one entry per known button outright.
+  std::array<ButtonTracker, kNumButtons> button_trackers_;
 
   // Double-press window in seconds (ROS param `double_press_window_sec`, default 0.25).
   double double_press_window_sec_;
+
+  // Whether the last joy message came from a source with the expected layout. Only used to act
+  // once on the transition to a rejected source, not to remember a verdict: every message is
+  // checked on its own.
+  bool last_joy_source_ok_ = true;
 
   // Deadzone to consider an axis as pressed
   static constexpr float AXIS_DEADZONE = 0.5;
@@ -128,28 +156,23 @@ private:
    * @return True if the mappings were initialized successfully, false otherwise.
    */
   bool initButtonMappings( const YAML::Node &config, const std::string &config_name,
-                           std::unordered_map<int, ButtonFunctionMapping> &mappings );
-
-  // Maps "axis_buttons" YAML keys to internal button ids (kVirtualButtonBase + offset).
-  static const std::map<std::string, int> &axisButtonIds();
+                           std::map<int, ButtonFunctionMapping> &mappings );
 
   /**
-   * @brief Resolve the physical "buttons" and named "axis_buttons" sections of a config into
-   * (internal button id, mapping node) pairs.
+   * @brief Resolve the "buttons" and "axis_buttons" sections of a config. Both are keyed by
+   * canonical name and differ only in whether the button is one the gamepad reports.
    *
-   * @return False if the "buttons" section is missing or an axis button name is unknown.
-   * Physical ids outside [0, kVirtualButtonBase) would overlap the virtual buttons and are
-   * skipped with a warning.
+   * @return False if the "buttons" section is missing, or a key is not a known button name, or it
+   * is written in the wrong one of the two sections.
    */
-  bool collectButtonEntries( const YAML::Node &config,
-                             std::vector<std::pair<int, YAML::Node>> &entries );
+  bool collectButtonEntries( const YAML::Node &config, std::vector<ButtonEntry> &entries );
 
   // Initialize the axis mappings from the "axes" section.
   bool initAxisMappings( const YAML::Node &config, const std::string &config_name,
-                         std::unordered_map<int, FunctionMapping> &mappings );
+                         std::map<int, FunctionMapping> &mappings );
 
-  // Load the named plugin into plugins_ if not already present. Returns false on failure.
-  bool ensurePluginLoaded( const std::string &plugin_name );
+  // The named plugin, loaded into plugins_ on first use. Null if it could not be loaded.
+  std::shared_ptr<GamepadFunctionPlugin> loadPlugin( const std::string &plugin_name );
 
   /**
    * @brief Activates all plugins present in the given config
@@ -162,7 +185,21 @@ private:
    */
   void deactivatePlugins();
 
-  // Synthesize the events needed to bring plugins back to a "no button held" state for double-press buttons before a config switch or shutdown.
+  /**
+   * @brief Emit the press a Buffering tracker was holding back, because it turned out to be a
+   * single press rather than the first half of a double one.
+   *
+   * @param still_held True if the button is down *from that press*, so the coming messages will
+   * produce its hold and release through the normal path. False pairs the press with an immediate
+   * release, which is what a quick tap needs and what a press superseded by a new one needs - the
+   * button being down again does not make the old press still held.
+   */
+  void dispatchBufferedPress( const ButtonFunctionMapping &mapping, ButtonTracker &tracker,
+                              bool still_held );
+
+  // Synthesize the events needed to bring plugins back to a "no button held" state before a
+  // config switch. Not wired to shutdown: the manager has no destructor hook, so a process going
+  // down leaves the last press unresolved.
   void flushPendingButtonState();
 
   /**
@@ -178,7 +215,18 @@ private:
    * @param msg The message containing the gamepad inputs.
    * @return the transformed gamepad inputs
    */
-  GamepadInputs convertJoyToGamepadInputs( const sensor_msgs::msg::Joy::SharedPtr &msg );
+  GamepadInputs convertJoyToGamepadInputs( const sensor_msgs::msg::Joy &msg );
+
+  /**
+   * @brief Check a Joy message against the layout game_controller_node publishes and log how to
+   * fix the launch if it does not match. Runs on every message, so a source that is relaunched or
+   * joined by a second publisher mid-session is caught too. Reporting is throttled.
+   *
+   * @return True if the message may be dispatched. A false means the ids in it address different
+   * controls than the ones the configs are written against, so acting on it would command
+   * whatever happens to sit at the same index - the message is dropped instead.
+   */
+  bool checkJoySource( const sensor_msgs::msg::Joy &msg );
 
   /**
    * @brief Get the path of a file in a package. Assuming the file is in the config folder.

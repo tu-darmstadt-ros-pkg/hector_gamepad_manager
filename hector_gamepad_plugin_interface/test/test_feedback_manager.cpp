@@ -60,9 +60,8 @@ TEST( FeedbackManager, EmitsSingleZeroAfterStopping )
   EXPECT_DOUBLE_EQ( manager.getVibrationIntensity(), -1.0 );
 }
 
-// A finished one-shot pattern turns itself off and can be retriggered with a later
-// setPatternActive(true). Previously the pattern stayed "active" forever after the first
-// playthrough, so every later activation was a silent no-op.
+// A finished one-shot pattern turns itself off, so a later setPatternActive(true) retriggers it
+// rather than being a no-op on a pattern that never stopped reporting itself active.
 TEST( FeedbackManager, OneShotPatternCanBeRetriggered )
 {
   auto node = makeNode( "feedback_retrigger" );

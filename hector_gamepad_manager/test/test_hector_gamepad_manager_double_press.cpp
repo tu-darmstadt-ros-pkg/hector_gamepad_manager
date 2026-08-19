@@ -22,8 +22,8 @@ using ::testing::Field;
 using ::testing::HasSubstr;
 
 constexpr int MAX_BUTTONS =
-    12; // physical buttons on the wire; axis-derived buttons are synthesized internally
-constexpr int MAX_AXES = 8;
+    21; // SDL GameController layout; axis-derived buttons are synthesized internally
+constexpr int MAX_AXES = 6;
 
 class HectorGamepadManagerDoublePressTest : public ::testing::Test
 {
@@ -83,8 +83,6 @@ protected:
   {
     joy_msg_.axes = std::vector<float>( MAX_AXES, 0.0f );
     joy_msg_.buttons = std::vector<int>( MAX_BUTTONS, 0 );
-    joy_msg_.axes[2] = 1.0f;
-    joy_msg_.axes[5] = 1.0f;
   }
 
   void setButton( int id, int value ) { joy_msg_.buttons[id] = value; }
@@ -286,7 +284,7 @@ TEST_F( HectorGamepadManagerDoublePressTest, InterleavedDoublePressButtonsTrackI
 // Config switch while a double-press button is pressed must synthesize a release.
 TEST_F( HectorGamepadManagerDoublePressTest, ConfigSwitchWhileHeldFlushesRelease )
 {
-  // Drive button 0 into press_dispatched=true via timeout flush while still held.
+  // Drive button 0 into the Dispatched state via the timeout flush while still held.
   setButton( 0, 1 );
   sendJoy();
   EXPECT_CALL( *pub_probe_press_,
@@ -423,8 +421,6 @@ protected:
 
     joy_msg_.axes = std::vector<float>( MAX_AXES, 0.0f );
     joy_msg_.buttons = std::vector<int>( MAX_BUTTONS, 0 );
-    joy_msg_.axes[2] = 1.0f;
-    joy_msg_.axes[5] = 1.0f;
   }
 
   void setButton( int id, int value ) { joy_msg_.buttons[id] = value; }
@@ -434,7 +430,7 @@ protected:
 // A zero-window press flushes immediately and pairs cleanly with a release on button-up.
 TEST_F( HectorGamepadManagerZeroWindowTest, ZeroWindowFlushesPressImmediately )
 {
-  // Press flushes immediately; button still held leaves press_dispatched=true.
+  // Press flushes immediately; the button still being held leaves the tracker Dispatched.
   EXPECT_CALL( *pub_probe_press_,
                publish( Field( &std_msgs::msg::String::data, HasSubstr( "press:probe:" ) ) ) )
       .Times( 1 );

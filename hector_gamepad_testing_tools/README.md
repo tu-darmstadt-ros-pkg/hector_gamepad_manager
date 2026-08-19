@@ -38,8 +38,20 @@ node.deflect(plugin, function, value)   # axis deflection
 node.clear_all()                        # reset all inputs
 ```
 
-* For **LT / RT** triggers (axes 2 and 5): values are in **\[0, 1]** (0 = neutral, 1 = fully pressed).
+* For **left_trigger / right_trigger**: values are in **\[0, 1]** (0 = released, 1 = fully pressed).
 * For other axes: values are in **\[-1, 1]**.
+
+### Holding an input for a block
+
+```python
+with node.holding("drive", "drive", 1.0):   # axis: pass the deflection
+    ...                                     # assertions happen while it is held
+with node.holding("flipper", "flipper_back_up"):   # button: omit the value
+    ...
+```
+
+Releases on the way out, including when the block raises - a test that fails in the middle
+would otherwise leave the robot driving into the next one.
 
 ### Timer control methods
 
@@ -94,6 +106,30 @@ rclpy.spin(node)
 ```
 
 ---
+
+## Running inside a test harness
+
+An integration harness generally keeps an rclpy context of its own, so that the system under
+test cannot wedge the test's own node. `better_launch_testing` does, and the fake gamepad is
+built against it and handed over to be spun:
+
+```python
+gamepad = env.attach_node(
+    FakeJoyPublisher(context=env.context, use_sim_time=True)
+)
+gamepad.drive(1.0)
+```
+
+* `context=` builds the node in that context. Without it the node belongs to the default
+  context, which that harness's executor does not spin - the symptom is a gamepad that
+  publishes nothing.
+* `use_sim_time=` stamps the Joy messages on the same clock as everything they cause, which is
+  what a test comparing a press against what the robot did afterwards is subtracting.
+
+The constructor asks the manager for `config_name` over the parameter service, and spins that
+call on an executor belonging to the node's own context rather than rclpy's global one - the
+global executor belongs to the default context, and in a process that never called
+`rclpy.init()` it does not exist at all.
 
 ## Testing
 

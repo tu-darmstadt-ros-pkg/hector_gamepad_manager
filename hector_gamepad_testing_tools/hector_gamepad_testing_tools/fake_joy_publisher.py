@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Dict, Tuple, Optional, Set, FrozenSet
 import time
 import re
 
 import rclpy
+from rclpy.executors import SingleThreadedExecutor
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 from rcl_interfaces.srv import GetParameters
@@ -30,18 +32,72 @@ class JoyLayout:
     def logical_to_raw(self, idx: int, val: float) -> float:
         # apply range clamping -> [-1, 1] for all axes
         val = max(-1.0, min(1.0, val))
-        return (1.0 - 2.0 * val) if idx in self.trigger_axes else val
+        # Triggers are logically 0 (released) to 1 (pressed) but go out on the wire negated.
+        return -val if idx in self.trigger_axes else val
 
     @classmethod
-    def xbox_default(cls) -> "JoyLayout":
-        axis_count = 8
-        neutrals = tuple(1.0 if i in (2, 5) else 0.0 for i in range(axis_count))
+    def game_controller(cls) -> "JoyLayout":
+        """What `game_controller_node` publishes: SDL's canonical GameController layout.
+
+        Every axis rests at 0 and the d-pad is four real buttons. A fully pressed trigger goes out
+        as -1; the manager flips it back to 0..1 (see isTriggerAxis in gamepad_buttons.hpp).
+        """
         return cls(
-            axis_count=axis_count,
-            button_count=12,  # physical buttons on the wire; virtual buttons are axis-derived
-            neutrals=neutrals,
-            trigger_axes=frozenset({2, 5}),
+            axis_count=6,
+            button_count=21,  # physical buttons on the wire; virtual buttons are axis-derived
+            neutrals=tuple(0.0 for _ in range(6)),
+            trigger_axes=frozenset(
+                {AXIS_IDS["left_trigger"], AXIS_IDS["right_trigger"]}
+            ),
         )
+
+
+# Canonical name -> wire index, mirroring hector_gamepad_manager's gamepad_buttons.hpp. Configs
+# are keyed by these names; the indices only exist on the Joy message.
+BUTTON_IDS: Dict[str, int] = {
+    "a": 0,
+    "b": 1,
+    "x": 2,
+    "y": 3,
+    "back": 4,
+    "guide": 5,
+    "start": 6,
+    "left_stick_click": 7,
+    "right_stick_click": 8,
+    "left_bumper": 9,
+    "right_bumper": 10,
+    "dpad_up": 11,
+    "dpad_down": 12,
+    "dpad_left": 13,
+    "dpad_right": 14,
+    "share": 15,
+    "paddle1": 16,
+    "paddle2": 17,
+    "paddle3": 18,
+    "paddle4": 19,
+    "touchpad": 20,
+}
+
+AXIS_IDS: Dict[str, int] = {
+    "left_stick_x": 0,
+    "left_stick_y": 1,
+    "right_stick_x": 2,
+    "right_stick_y": 3,
+    "left_trigger": 4,
+    "right_trigger": 5,
+}
+
+
+def _button_index(name: str, where: str) -> int:
+    if name not in BUTTON_IDS:
+        raise ValueError(f"Unknown button '{name}' in {where}")
+    return BUTTON_IDS[name]
+
+
+def _axis_index(name: str, where: str) -> int:
+    if name not in AXIS_IDS:
+        raise ValueError(f"Unknown axis '{name}' in {where}")
+    return AXIS_IDS[name]
 
 
 # Config "axis_buttons" name -> (axis index, logical deflection). Pressing such a virtual button
@@ -51,16 +107,13 @@ AXIS_BUTTON_TO_AXIS: Dict[str, Tuple[int, float]] = {
     "left_stick_right": (0, -1.0),
     "left_stick_up": (1, 1.0),
     "left_stick_down": (1, -1.0),
-    "left_trigger": (2, 1.0),
-    "right_stick_left": (3, 1.0),
-    "right_stick_right": (3, -1.0),
-    "right_stick_up": (4, 1.0),
-    "right_stick_down": (4, -1.0),
+    "right_stick_left": (2, 1.0),
+    "right_stick_right": (2, -1.0),
+    "right_stick_up": (3, 1.0),
+    "right_stick_down": (3, -1.0),
+    "left_trigger": (4, 1.0),
     "right_trigger": (5, 1.0),
-    "cross_left": (6, 1.0),
-    "cross_right": (6, -1.0),
-    "cross_up": (7, 1.0),
-    "cross_down": (7, -1.0),
+    # The d-pad is not here: SDL reports it as four real buttons, so it needs no deflection.
 }
 
 
@@ -109,23 +162,39 @@ def _request_params_sync(
     """
     service = f"{target_node_fqn}/get_parameters"
     client = node.create_client(GetParameters, service)
-    if not client.wait_for_service(timeout_sec=5.0):
-        raise RuntimeError(f"Parameter service not available: {service}")
+    try:
+        if not client.wait_for_service(timeout_sec=5.0):
+            raise RuntimeError(f"Parameter service not available: {service}")
 
-    req = GetParameters.Request()
-    req.names = list(names)
-    fut = client.call_async(req)
-    rclpy.spin_until_future_complete(node, fut, timeout_sec=5.0)
-    if not fut.done() or fut.result() is None:
-        raise RuntimeError(f"Failed to get parameters from {target_node_fqn}")
+        req = GetParameters.Request()
+        req.names = list(names)
+        fut = client.call_async(req)
 
-    out: Dict[str, Optional[str]] = {}
-    for n, v in zip(names, fut.result().values):
-        if v.type == PT.PARAMETER_STRING:
-            out[n] = v.string_value
-        else:
-            out[n] = None  # treat NOT_SET / wrong type as absent
-    return out
+        # An executor bound to this node's context, rather than rclpy's global one. The global
+        # executor belongs to the default context, so on a node built with `context=` - which
+        # is how a test harness runs one - spinning it here would wait on a context that has
+        # nothing to do with this node, and the call would time out with the service sitting
+        # right there.
+        executor = SingleThreadedExecutor(context=node.context)
+        try:
+            rclpy.spin_until_future_complete(node, fut, executor, timeout_sec=5.0)
+        finally:
+            executor.shutdown()
+
+        if not fut.done() or fut.result() is None:
+            raise RuntimeError(f"Failed to get parameters from {target_node_fqn}")
+
+        out: Dict[str, Optional[str]] = {}
+        for n, v in zip(names, fut.result().values):
+            if v.type == PT.PARAMETER_STRING:
+                out[n] = v.string_value
+            else:
+                out[n] = None  # treat NOT_SET / wrong type as absent
+        return out
+    finally:
+        # The client outlives this call otherwise, and a fake gamepad that is created once per
+        # test leaves one behind every time
+        node.destroy_client(client)
 
 
 def _rank_manager_candidate(my_ns: str, basename: str, name: str, ns: str) -> tuple:
@@ -196,8 +265,8 @@ class FakeJoyPublisher(Node):
       hold(plugin, function)
       release(plugin, function)
       deflect(plugin, function, value)
-        - For LT/RT (axes 2,5): value in [0,1]  (0 = neutral, 1 = fully pressed)
-        - For others:           value in [-1,1]
+        - For left_trigger/right_trigger: value in [0,1] (0 = released, 1 = fully pressed)
+        - For others:                     value in [-1,1]
 
     Timer control:
       start_publishing(rate_hz: float | None = None)
@@ -219,11 +288,31 @@ class FakeJoyPublisher(Node):
         manager_node_basename: str = "hector_gamepad_manager",
         joy_rate_hz: float = 50.0,
         layout: Optional[JoyLayout] = None,
+        context: Optional[rclpy.context.Context] = None,
+        use_sim_time: Optional[bool] = None,
     ):
-        super().__init__(node_name)
-        self.layout = layout or JoyLayout.xbox_default()
+        """
+        :param context: The rclpy context to build this node in. Needed to run inside a test
+            harness that keeps a context of its own - `better_launch_testing` does, so that the
+            system under test cannot wedge the test's own node:
+
+                gamepad = env.attach_node(FakeJoyPublisher(context=env.context))
+
+            None uses the default context, which is what a standalone run wants.
+        :param use_sim_time: Set the node's `use_sim_time` parameter. In simulation the Joy
+            messages should be stamped on the same clock as everything they cause, or a test
+            comparing a gamepad press with what the robot did afterwards is subtracting two
+            different clocks.
+        """
+        super().__init__(node_name, context=context)
+        self.layout = layout or JoyLayout.game_controller()
         self.declare_parameter("joy_rate_hz", float(joy_rate_hz))
         self._joy_rate_hz = float(self.get_parameter("joy_rate_hz").value)
+
+        if use_sim_time is not None:
+            self.set_parameters(
+                [rclpy.parameter.Parameter("use_sim_time", value=bool(use_sim_time))]
+            )
 
         # ---- Find the actual manager node FQN (handles random suffixes) ----
         manager_fqn = _find_manager_fqn(self, manager_node_basename)
@@ -247,7 +336,7 @@ class FakeJoyPublisher(Node):
         self._config_to_button: Dict[str, int] = {}
 
         for k, v in (meta.get("buttons") or {}).items():
-            idx = int(k)
+            idx = _button_index(k, f"meta config '{config_name}'")
             pkg = (v or {}).get("package", "") or ""
             cfg = (v or {}).get("config", "") or ""
             if pkg and cfg:
@@ -323,9 +412,40 @@ class FakeJoyPublisher(Node):
         self._held_buttons.add(Key(plugin, function))
 
     def release(self, plugin: str, function: str) -> None:
+        """Stop supplying this input, whether it is a button or an axis.
+
+        The axis half is not decoration: `holding()` deflects an axis and releases it in its
+        `finally`, so without this a `with gamepad.holding(drive, 1.0):` block leaves the stick
+        at full deflection when it exits and the robot drives on. That is invisible in a test
+        that only asserts the robot moved, and it is precisely what breaks the test after it.
+        """
         key = Key(plugin, function)
         self._held_buttons.discard(key)
         self._pending_one_shot_keys.discard(key)
+        self._deflected_axes.pop(key, None)
+
+    @contextmanager
+    def holding(self, plugin: str, function: str, value: Optional[float] = None):
+        """Hold an input for the duration of a `with` block, and let go afterwards.
+
+        The shape most tests want, because the interesting assertions happen *while* something
+        is held - and a test that fails in the middle would otherwise leave the robot driving
+        into the next one.
+
+            with gamepad.holding("drive", "drive"):
+                env.expect_motion("odom", "base_link", forward=0.2)
+
+        :param value: For an axis, how far to deflect it. Omit for a button.
+        """
+        if value is None:
+            self.hold(plugin, function)
+        else:
+            self.deflect(plugin, function, value)
+
+        try:
+            yield self
+        finally:
+            self.release(plugin, function)
 
     def deflect(self, plugin: str, function: str, value: float) -> None:
         self._deflected_axes[Key(plugin, function)] = float(value)
@@ -577,7 +697,7 @@ class FakeJoyPublisher(Node):
         axes = {}
         virtual_buttons = {}
         for k, v in (cfg.get("buttons") or {}).items():
-            idx = int(k)
+            idx = _button_index(k, f"config '{name}'")
             if idx in reserved_buttons:
                 continue
             plugin = (v or {}).get("plugin", "") or ""
@@ -592,7 +712,7 @@ class FakeJoyPublisher(Node):
             if plugin and func:
                 virtual_buttons[Key(plugin, func)] = k
         for k, v in (cfg.get("axes") or {}).items():
-            idx = int(k)
+            idx = _axis_index(k, f"config '{name}'")
             plugin = (v or {}).get("plugin", "") or ""
             func = (v or {}).get("function", "") or ""
             if plugin and func:

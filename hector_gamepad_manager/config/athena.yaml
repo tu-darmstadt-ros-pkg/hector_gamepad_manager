@@ -3,53 +3,69 @@
 # The buttons used here will block the button mappings for these buttons in ALL other configs
 default_config: driving   # config used at startup
 buttons:
-  0: # Button A
+  a:
     package: ''
     config: ''
 
-  1: # Button B
+  b:
     package: ''
     config: ''
 
-  2: # Button X
+  x:
     package: ''
     config: ''
 
-  3: # Button Y
+  y:
     package: ''
     config: ''
 
-  4: # Button LB
+  left_bumper:
     package: ''
     config: ''
 
-  5: # Button RB
+  right_bumper:
     package: ''
     config: ''
 
-  6: # Button Back
+  back:
     package: hector_gamepad_manager
     config: manipulation
     description: Switch to manipulation mode
 
-  7: # Button Start
+  start:
     package: hector_gamepad_manager
     config: driving
     description: Switch to driving mode
 
-  8: # Button Guide (Manufacturer Button)
+  guide: # Button Guide (Manufacturer Button)
     package: ''
     config: ''
 
-  9: # Left joystick press
+  left_stick_click:
     package: ''
     config: ''
 
-  10: # Right joystick press
+  right_stick_click:
     package: ''
     config: ''
 
-  11: # Button Share (only on newer Xbox controllers)
+  share: # Button Share (only on newer Xbox controllers)
+    package: ''
+    config: ''
+
+  dpad_left:
+    package: ''
+    config: ''
+
+  dpad_right:
+    package: ''
+    config: ''
+
+  dpad_up:
+    package: ''
+    config: ''
+
+  dpad_down:
     package: ''
     config: ''
 
@@ -92,21 +108,5 @@ axis_buttons:
     config: ''
 
   right_trigger:
-    package: ''
-    config: ''
-
-  cross_left:
-    package: ''
-    config: ''
-
-  cross_right:
-    package: ''
-    config: ''
-
-  cross_up:
-    package: ''
-    config: ''
-
-  cross_down:
     package: ''
     config: ''
