@@ -16,7 +16,7 @@ constexpr char kConfigSwitchVibrationId[] = "config_switch_vibration";
 /// A joy message carrying fewer buttons than this is from another source and is dropped
 constexpr std::size_t kMinControllerButtons = 15;
 
-// How often a persistent joy-source mismatch is repeated
+// The interval at which to report an invalid joy source to the console
 constexpr int kJoySourceReportIntervalMs = 10000;
 
 // Nodes publishing on `topic`, to point at which node to fix. The node's *name* proves nothing -
@@ -376,19 +376,18 @@ bool HectorGamepadManager::checkJoySource( const sensor_msgs::msg::Joy &msg )
 void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr msg )
 {
   if ( !checkJoySource( *msg ) ) {
-    // Dropped rather than dispatched: the ids in a message of another layout mean different
-    // controls than the config was written against, so acting on it drives whatever happens to
-    // share the index - a resting joy_node trigger reads as a fully deflected canonical axis.
-    if ( joy_source_ok_ ) {
+    // Ignore invalid messages, e.g. joy_node instead of game_controller_node.
+    // since the indices of axes and buttos differ between them
+    if ( last_joy_source_ok_ ) {
       // Only on the transition. Nothing after this produces the release for a button that was
       // down when the source went wrong, so it goes out now instead of leaving a plugin held.
       flushPendingButtonState();
       button_trackers_ = {};
-      joy_source_ok_ = false;
+      last_joy_source_ok_ = false;
     }
     return;
   }
-  joy_source_ok_ = true;
+  last_joy_source_ok_ = true;
 
   const auto inputs = convertJoyToGamepadInputs( *msg );
   // ignore normal button / axis behavior if configuration switching is in progress

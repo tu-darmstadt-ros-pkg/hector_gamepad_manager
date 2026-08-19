@@ -113,7 +113,7 @@ private:
   // Whether the last joy message came from a source with the expected layout. Only used to act
   // once on the transition to a rejected source, not to remember a verdict: every message is
   // checked on its own.
-  bool joy_source_ok_ = true;
+  bool last_joy_source_ok_ = true;
 
   // Deadzone to consider an axis as pressed
   static constexpr float AXIS_DEADZONE = 0.5;
