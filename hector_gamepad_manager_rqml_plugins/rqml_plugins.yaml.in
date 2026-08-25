@@ -1,0 +1,6 @@
+plugins:
+  - id: hector_gamepad_manager_rqml_plugins.virtual_gamepad
+    name: "Virtual Gamepad"
+    group: "Control"
+    path: "share/@PROJECT_NAME@/qml/VirtualGamepad.qml"
+    single_instance: false
