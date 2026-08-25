@@ -11,28 +11,46 @@ TestCase {
   width: 200
   height: 200
 
-  StickPad {
-    id: pad
-    width: 80
-    deadzone: 0.5
+  // Both read-outs are rebuilt for every test, so no deflection can carry over.
+  readonly property var pad: padLoader.item
+  readonly property var trigger: triggerLoader.item
+
+  ItemFinder {
+    id: finder
   }
 
-  TriggerBar {
-    id: trigger
-    width: 130
-    deadzone: 0.5
+  Loader {
+    id: padLoader
+    sourceComponent: Component {
+      StickPad {
+        width: 80
+        deadzone: 0.5
+      }
+    }
+  }
+
+  Loader {
+    id: triggerLoader
+    sourceComponent: Component {
+      TriggerBar {
+        width: 130
+        deadzone: 0.5
+      }
+    }
   }
 
   function init() {
-    pad.xValue = 0
-    pad.yValue = 0
-    trigger.value = 0
+    padLoader.active = false
+    padLoader.active = true
+    triggerLoader.active = false
+    triggerLoader.active = true
   }
 
+  //! The deflection dot, which carries no objectName: it is the only round child of its size.
   function dot() {
-    var dots = []
-    collect(pad, function (child) { return child.radius !== undefined && child.width === 9 }, dots)
-    return dots[0]
+    return finder.first(pad, function (child) {
+      return child.radius !== undefined && child.width === 9
+    })
   }
 
   function test_centered_dot_sits_in_the_middle() {
@@ -81,17 +99,5 @@ TestCase {
     verify(!trigger.pressed)
     trigger.value = 0.6
     verify(trigger.pressed)
-  }
-
-  function collect(item, predicate, out) {
-    if (!item || !item.children)
-      return out
-    for (var i = 0; i < item.children.length; ++i) {
-      var child = item.children[i]
-      if (predicate(child))
-        out.push(child)
-      collect(child, predicate, out)
-    }
-    return out
   }
 }

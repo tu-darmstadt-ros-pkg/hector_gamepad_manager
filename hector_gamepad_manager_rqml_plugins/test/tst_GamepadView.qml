@@ -11,29 +11,51 @@ TestCase {
   width: 900
   height: 600
 
-  GamepadView {
-    id: view
-    width: testCase.width
-    height: testCase.height
-    controlLabels: ({
-      "a": [{ badge: "", text: "Drive fast" }],
-      "lstick": [{ badge: "", text: "Drive" }, { badge: "hold", text: "Boost" }],
-      "back": [{ badge: "", text: "Switch mode" }],
-      "share": [{ badge: "", text: "Invert steering" }],
-      "dpad_up": [{ badge: "2x", text: "Flipper up" }]
-    })
-    reservedControls: ["back"]
+  // Both subjects are rebuilt for every test, so one test cannot leave a control map or a tint
+  // behind for the next.
+  readonly property var view: viewLoader.item
+  readonly property var icon: iconLoader.item
+
+  ItemFinder {
+    id: finder
   }
 
-  GamepadButtonIcon {
-    id: icon
-    controlKey: "a"
-    size: 32
+  Loader {
+    id: viewLoader
+    sourceComponent: Component {
+      GamepadView {
+        width: testCase.width
+        height: testCase.height
+        controlLabels: ({
+          "a": [{ badge: "", text: "Drive fast" }],
+          "lstick": [{ badge: "", text: "Drive" }, { badge: "hold", text: "Boost" }],
+          "back": [{ badge: "", text: "Switch mode" }],
+          "share": [{ badge: "", text: "Invert steering" }],
+          "dpad_up": [{ badge: "2x", text: "Flipper up" }]
+        })
+        reservedControls: ["back"]
+      }
+    }
+  }
+
+  Loader {
+    id: iconLoader
+    sourceComponent: Component {
+      GamepadButtonIcon {
+        controlKey: "a"
+        size: 32
+      }
+    }
+  }
+
+  function init() {
+    viewLoader.active = false
+    viewLoader.active = true
+    iconLoader.active = false
+    iconLoader.active = true
   }
 
   function test_controller_artwork_loads() {
-    var image = findChild(view, "")
-    // The artwork is the view's only Image child; find it by type rather than by name.
     var images = collectImages(view)
     verify(images.length > 0, "no Image found in GamepadView")
     for (var i = 0; i < images.length; ++i)
@@ -56,7 +78,6 @@ TestCase {
       compare(images[0].status, Image.Ready,
               "glyph for '" + key + "' (" + icon.glyphFiles[key] + ") did not load")
     }
-    icon.controlKey = "a"
   }
 
   function test_share_has_a_glyph() {
@@ -73,19 +94,16 @@ TestCase {
   // Before any mapping arrives there are no bound actions, but the keycaps must still show so the
   // diagram is useful on its own.
   function test_keycaps_show_without_any_bindings() {
-    var labels = view.controlLabels
     view.controlLabels = ({})
     view.controlKeys = ({ "a": "A", "lt": "W" })
     var caps = keycapLabels(view)
     verify(caps.indexOf("A") >= 0, "keycaps vanish when nothing is bound")
     verify(caps.indexOf("W") >= 0)
-    view.controlLabels = labels
   }
 
   // A stick bound as two axes is reached by two different key pairs, so each row needs its own
   // cap rather than one combined cap spanning both.
   function test_rows_carry_their_own_keycap() {
-    var labels = view.controlLabels
     view.controlKeys = ({ "lstick": "fallback" })
     view.controlLabels = ({
       "lstick": [{ badge: "", text: "Drive forward/backward", key: "W / S" },
@@ -95,21 +113,17 @@ TestCase {
     verify(caps.indexOf("W / S") >= 0, "the drive row must show its own axis keys")
     verify(caps.indexOf("A / D") >= 0, "the steer row must show its own axis keys")
     verify(caps.indexOf("fallback") < 0, "a row naming its key must not fall back to the control")
-    view.controlLabels = labels
   }
 
   function test_rows_without_a_key_fall_back_to_the_control() {
-    var labels = view.controlLabels
     view.controlKeys = ({ "a": "↓" })
     view.controlLabels = ({ "a": [{ badge: "", text: "Drive slowly" }] })
     compare(keycapLabels(view), ["↓"])
-    view.controlLabels = labels
   }
 
   // The undirected "dpad" control is an alias for the same physical control as the four
   // directions. Once those are bound it must not add an empty fifth row just to show its key.
   function test_an_alias_adds_no_empty_row_beside_bound_siblings() {
-    var labels = view.controlLabels
     view.controlKeys = ({ "dpad": "T/G F/H", "dpad_up": "T", "dpad_down": "G" })
     view.controlLabels = ({
       "dpad_up": [{ badge: "", text: "Flippers up", key: "T" }],
@@ -118,25 +132,14 @@ TestCase {
     var caps = keycapLabels(view)
     verify(caps.indexOf("T/G F/H") < 0, "the undirected d-pad added an orphan row")
     compare(caps.length, 2)
-    view.controlLabels = labels
   }
 
   function test_no_keycaps_when_none_are_supplied() {
-    var labels = view.controlLabels
     view.controlKeys = ({})
     view.controlLabels = ({})
     compare(collectIcons(view).length, 0,
             "with neither bindings nor keycaps the diagram draws no callouts at all")
     compare(keycapLabels(view).length, 0)
-    view.controlLabels = labels
-  }
-
-  // Item.visible is composed with every ancestor's, and a TestCase's scene is never shown, so it
-  // is always false here. Match the keycap delegate by the property only it declares instead.
-  function keycapLabels(item) {
-    return collect(item, function (child) { return child.keyLabel !== undefined })
-      .map(function (cap) { return cap.keyLabel })
-      .filter(function (label) { return label !== "" })
   }
 
   function test_groups_are_laid_out() {
@@ -155,25 +158,20 @@ TestCase {
     compare(icon.tint, before)
   }
 
+  // Item.visible is composed with every ancestor's, and a TestCase's scene is never shown, so it
+  // is always false here. Match the keycap delegate by the property only it declares instead.
+  function keycapLabels(item) {
+    return finder.collect(item, function (child) { return child.keyLabel !== undefined })
+      .map(function (cap) { return cap.keyLabel })
+      .filter(function (label) { return label !== "" })
+  }
+
   function collectImages(item) {
-    return collect(item, function (child) { return child instanceof Image })
+    return finder.collect(item, function (child) { return child instanceof Image })
   }
 
+  // GamepadButtonIcon is a QML type, so match on a property only it declares.
   function collectIcons(item) {
-    // GamepadButtonIcon is a QML type, so match on a property only it declares.
-    return collect(item, function (child) { return child.controlKey !== undefined })
-  }
-
-  function collect(item, predicate) {
-    var found = []
-    if (!item || !item.children)
-      return found
-    for (var i = 0; i < item.children.length; ++i) {
-      var child = item.children[i]
-      if (predicate(child))
-        found.push(child)
-      found = found.concat(collect(child, predicate))
-    }
-    return found
+    return finder.collect(item, function (child) { return child.controlKey !== undefined })
   }
 }
