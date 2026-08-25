@@ -45,6 +45,19 @@ TestCase {
     }
   }
 
+  // A config switch is synthesized rather than typed, so it rides on the stream alone: the chips
+  // that request one have to follow this and not the capture state.
+  function test_streaming_ignores_the_keyboard() {
+    capture.panelFocused = false
+    capture.typing = true
+    verify(capture.streaming, "the stream is up whether or not the panel has the keyboard")
+    capture.topicValid = false
+    verify(!capture.streaming, "nothing goes out without a publisher")
+    capture.topicValid = true
+    capture.publishing = false
+    verify(!capture.streaming)
+  }
+
   // Key releases are only delivered to the active window, so a deflection held across an alt-tab
   // would never be released. Losing the window has to count as losing the keyboard.
   function test_inactive_window_is_not_capturing() {

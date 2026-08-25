@@ -38,4 +38,8 @@ QtObject {
 
   //! True exactly when a key press drives the robot.
   readonly property bool capturing: state === "live"
+
+  //! The Joy stream is going out. Weaker than capturing - it says nothing about the keyboard - and
+  //! it is what anything synthesized rather than typed depends on, such as a config switch.
+  readonly property bool streaming: publishing && topicValid
 }

@@ -392,7 +392,7 @@ Rectangle {
   Timer {
     interval: context.rate > 0 ? 1000 / context.rate : 1000
     repeat: true
-    running: capture.publishing && capture.topicValid
+    running: capture.streaming
     onTriggered: d.publish()
   }
 
@@ -680,7 +680,7 @@ Rectangle {
                 opacity: capture.state === "off" ? 0.4 : 1
 
                 SequentialAnimation on opacity {
-                  running: capture.publishing && capture.topicValid
+                  running: capture.streaming
                   loops: Animation.Infinite
                   alwaysRunToEnd: true
                   NumberAnimation { to: 0.25; duration: 500; easing.type: Easing.InOutQuad }
@@ -700,7 +700,7 @@ Rectangle {
               }
               // Where the stream is going, beside the state that describes it.
               Caption {
-                visible: capture.publishing && capture.topicValid
+                visible: capture.streaming
                 color: d.statusTextColor
                 text: context.joyTopic + qsTr(" @ %1 Hz").arg(context.rate ?? 30)
               }
@@ -808,8 +808,8 @@ Rectangle {
                 // The active mode stays enabled: a greyed chip reads as unavailable, which is the
                 // opposite of what it means here, and pressing it is harmless - the switcher drops
                 // a request for the profile already active. A switch is a synthesized button
-                // press, so it only reaches the robot while the stream runs.
-                enabled: capture.publishing && d.pendingProfile === ""
+                // press, so it needs a stream to travel on, not just the Enable button.
+                enabled: capture.streaming && d.pendingProfile === ""
                 focusPolicy: Qt.NoFocus
                 // Filled in the live colour, with the dot repeating it for anyone who cannot rely
                 // on colour.
@@ -820,6 +820,7 @@ Rectangle {
                 ToolTip.visible: hovered
                 ToolTip.text: isActive ? qsTr("The robot is in this mode")
                              : !capture.publishing ? qsTr("Enable publishing to switch modes")
+                             : !capture.topicValid ? qsTr("Set a valid joy topic to switch modes")
                              : qsTr("Switch the robot to %1").arg(modelData)
                 onClicked: switcher.request(modelData)
               }
