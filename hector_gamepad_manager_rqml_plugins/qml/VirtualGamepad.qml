@@ -51,6 +51,9 @@ Rectangle {
     //! Config the manager currently has active, as reported on joy_teleop_profile.
     property string activeProfile: ""
 
+    // Switches made on a real gamepad or another panel only show up here.
+    onActiveProfileChanged: gamepad.resetAxes()
+
     //! Config whose bindings are on show. Always the active one - there is no separate "viewing"
     //! state to fall out of sync with the robot. Before the first profile message arrives the
     //! mapping's default is the best guess.
@@ -378,6 +381,9 @@ Rectangle {
     id: gamepad
     step: context.step ?? 0.1
     sticky: context.sticky ?? true
+    // The manager reads the axes again as soon as the switch is released, possibly before the new
+    // profile arrives here, so a held deflection is cleared on the press.
+    axisResetButtons: switcher.switchAwayButtons
   }
 
   Component.onCompleted: {

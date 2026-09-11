@@ -28,6 +28,13 @@ QtObject {
 
   readonly property bool busy: pendingProfile !== ""
 
+  //! Canonical names of the switch buttons that lead away from the active profile.
+  readonly property var switchAwayButtons: configSwitches.filter(function (configSwitch) {
+    return configSwitch.config !== activeProfile
+  }).map(function (configSwitch) {
+    return configSwitch.name
+  })
+
   //! The caller should press this button as if it came from the gamepad.
   signal pressRequested(string buttonName)
 

@@ -2,7 +2,7 @@ import QtQuick
 import Qt5Compat.GraphicalEffects
 
 // Button-glyph badge for a single gamepad control key. Renders the matching Zacksly controller icon
-// (svgs/buttons, CC BY 3.0 — see svgs/ATTRIBUTION.md) tinted to fit the theme: face buttons take
+// (svgs/buttons, CC BY 3.0 - see svgs/ATTRIBUTION.md) tinted to fit the theme: face buttons take
 // muted, colour-coded hues; every other control follows contentColor. Reserved config-switch
 // buttons are drawn in accentColor.
 //

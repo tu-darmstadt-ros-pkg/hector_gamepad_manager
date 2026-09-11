@@ -435,7 +435,7 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
         tracker.last_press_time = now;
       }
     } else if ( pressed ) {
-      // Held — only dispatch hold if press was already dispatched
+      // Held - only dispatch hold if press was already dispatched
       if ( tracker.state == PressState::Dispatched ) {
         mapping.plugin->handleHold( mapping.holdFunction(), id );
       }
@@ -444,7 +444,7 @@ void HectorGamepadManager::joyCallback( const sensor_msgs::msg::Joy::SharedPtr m
         mapping.plugin->handleRelease( mapping.releaseFunction(), id );
         tracker.state = PressState::Idle;
       }
-      // While Buffering, keep waiting — the second press can still arrive after the release.
+      // While Buffering, keep waiting - the second press can still arrive after the release.
     }
 
     // The window ran out with no second press: the tap was a single press after all.
@@ -508,7 +508,7 @@ void HectorGamepadManager::dispatchBufferedPress( const ButtonFunctionMapping &m
 
 void HectorGamepadManager::flushPendingButtonState()
 {
-  // Operates on the OUTGOING config — must run before active_config_ is reassigned.
+  // Operates on the OUTGOING config - must run before active_config_ is reassigned.
   if ( active_config_.empty() )
     return;
   auto config_it = configs_.find( active_config_ );

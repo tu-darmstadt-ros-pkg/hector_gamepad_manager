@@ -94,6 +94,12 @@ TestCase {
     compare(failures.length, 0, "already being there is not a failure")
   }
 
+  function test_switch_away_buttons_follow_the_active_profile() {
+    compare(switcher.switchAwayButtons, ["start", "left_trigger"])
+    switcher.activeProfile = "manipulation"
+    compare(switcher.switchAwayButtons, ["back", "left_trigger"])
+  }
+
   function test_a_second_request_is_ignored_while_one_is_in_flight() {
     verify(switcher.request("manipulation"))
     verify(!switcher.request("inspection"))

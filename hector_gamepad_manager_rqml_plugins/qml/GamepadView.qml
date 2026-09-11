@@ -393,7 +393,7 @@ Item {
 
       // Spine center, and with it the connector's origin, in group coordinates. The spine sits in
       // the strip outside the plate so that it, the dot and the connector all share the canvas'
-      // halo — on the plate it would be the only part of the run without one.
+      // halo - on the plate it would be the only part of the run without one.
       readonly property real dotX: !verticalSpine ? width / 2
                                  : (side === "right" ? width - d.spineWidth / 2 : d.spineWidth / 2)
       readonly property real dotY: verticalSpine ? height / 2

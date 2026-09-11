@@ -13,6 +13,7 @@ TestCase {
   function init() {
     gamepad.step = 0.1
     gamepad.sticky = true
+    gamepad.axisResetButtons = []
     gamepad.reset()
   }
 
@@ -237,6 +238,24 @@ TestCase {
     gamepad.pressKey(Qt.Key_Space, Qt.NoModifier, false)
     compare(gamepad.leftStickY, 0)
     verify(gamepad.isButtonPressed("a"))
+  }
+
+  function test_an_axis_reset_button_centers_every_axis() {
+    gamepad.axisResetButtons = ["back"]
+    gamepad.pressKey(Qt.Key_W, Qt.NoModifier, false)
+    gamepad.pressKey(Qt.Key_J, Qt.NoModifier, false)
+    gamepad.pressKey(Qt.Key_O, Qt.NoModifier, false)
+    gamepad.pressKey(Qt.Key_F2, Qt.NoModifier, false) // back
+    var axes = gamepad.joyAxes()
+    for (var i = 0; i < axes.length; ++i) compare(axes[i], 0, "axis " + i + " must be centered")
+    verify(gamepad.isButtonPressed("back"), "the switch press itself must still go out")
+  }
+
+  function test_other_buttons_leave_the_axes_alone() {
+    gamepad.axisResetButtons = ["back"]
+    gamepad.pressKey(Qt.Key_W, Qt.NoModifier, false)
+    gamepad.pressKey(Qt.Key_F3, Qt.NoModifier, false) // start
+    fuzzyCompare(gamepad.leftStickY, 0.1, 1e-6)
   }
 
   function test_unknown_keys_are_not_consumed() {

@@ -33,6 +33,9 @@ QtObject {
   //! bindings on it re-evaluate.
   property var buttonStates: ({})
 
+  //! Buttons whose press centers every axis, e.g. the config switches.
+  property var axisResetButtons: []
+
   //! Mirrors HectorGamepadManager::AXIS_DEADZONE, so the UI marks an axis as triggering its
   //! virtual button at the same point the manager does.
   readonly property real axisDeadzone: 0.5
@@ -185,6 +188,8 @@ QtObject {
   }
 
   function setButton(name, pressed) {
+    if (pressed && axisResetButtons.indexOf(name) >= 0)
+      resetAxes()
     var next = ({})
     for (var key in buttonStates) next[key] = buttonStates[key]
     if (pressed)

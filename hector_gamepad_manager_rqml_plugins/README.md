@@ -7,11 +7,11 @@ RQml plugins for the `hector_gamepad_manager`.
 *Control → Virtual Gamepad*
 
 Drives a gamepad manager from the keyboard when no gamepad is at hand, and shows what the active
-config binds each control to. It publishes `sensor_msgs/Joy` exactly as a real joy driver would —
-same axis order, same sign conventions, same trigger encoding — so the manager, its plugins and
+config binds each control to. It publishes `sensor_msgs/Joy` exactly as a real joy driver would -
+same axis order, same sign conventions, same trigger encoding - so the manager, its plugins and
 config switching all behave as usual.
 
-<!-- Screenshot: the panel driving a robot — green banner and frame, a mapping selected, the mode
+<!-- Screenshot: the panel driving a robot - green banner and frame, a mapping selected, the mode
      chips showing the active config, and the controller diagram with a control pressed. -->
 ![The Virtual Gamepad panel driving a robot](doc/virtual_gamepad.png)
 
@@ -28,7 +28,7 @@ neutral message on the way down.
 
 **Sticky axes** (the default) make the sticks and triggers behave like a throttle: a key press
 moves the axis by one step and it stays there, and holding the key ramps it. Switch it off for
-momentary behaviour — held is fully deflected, released is centered. The pads and bars show the
+momentary behaviour - held is fully deflected, released is centered. The pads and bars show the
 live axis values, with the manager's deadzone marked so you can see where an axis starts counting
 as a pressed virtual button.
 
@@ -41,7 +41,7 @@ first thing standing between a key press and the robot, and the one action that 
 | Colour | State | What it means |
 |---|---|---|
 | Grey | Not publishing | Press **Enable** to start the stream. |
-| Red | No valid joy topic | Enable is on but nothing is going out — check the joy topic. |
+| Red | No valid joy topic | Enable is on but nothing is going out - check the joy topic. |
 | Amber | Keyboard not captured | The stream runs, the keys go elsewhere. Click the panel. |
 | Blue | Typing in a text field | The field has the keys. `Enter` or a click below the toolbar. |
 | Green | Driving | Key presses reach the robot. |
@@ -62,9 +62,11 @@ canonical input `name` in the mapping, not its index. Controls the keyboard cann
 a row, marked `-`, and a clipped name or description can be read in full by hovering it.
 
 **Mode chips** are one per config, the active one filled green and marked `●`. They are both the
-indicator of what the robot is in and the control that changes it, so the two cannot disagree — a
+indicator of what the robot is in and the control that changes it, so the two cannot disagree - a
 switch made on a real gamepad moves the chips too. Clicking one presses that config's reserved
 switch button and waits for the manager to republish the profile as the acknowledgement.
+Any mode switch - a chip, its key or a real gamepad - centers the sticks and triggers, so a
+deflection held in one mode never drives the next.
 
 ### Notes
 
@@ -77,7 +79,7 @@ switch button and waits for the manager to republish the profile as the acknowle
 - **Picking another robot stops the stream**, so the robot being left gets its neutral message.
 - `joy_mapping` and `joy_teleop_profile` are latched, so the bindings appear regardless of start
   order.
-- Button glyphs are by Zacksly (CC BY 3.0) — see `qml/svgs/ATTRIBUTION.md`.
+- Button glyphs are by Zacksly (CC BY 3.0) - see `qml/svgs/ATTRIBUTION.md`.
 
 ## Tests
 
