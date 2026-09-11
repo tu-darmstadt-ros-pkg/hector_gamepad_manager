@@ -85,7 +85,7 @@ TEST_F( FlipperPluginTest, BackUprightSendsGoalWithBackGroup )
   EXPECT_EQ( sent_goal.group_name, "flipper_back" );
 }
 
-// When the action server isn't ready, no goal is sent — the plugin only logs a warning.
+// When the action server isn't ready, no goal is sent - the plugin only logs a warning.
 TEST_F( FlipperPluginTest, UprightSkippedWhenServerNotReady )
 {
   EXPECT_CALL( *drive_mock_, action_server_is_ready() ).WillRepeatedly( Return( false ) );
@@ -111,7 +111,7 @@ TEST_F( FlipperPluginTest, SyncFrontSendsGoalWithFrontGroup )
   EXPECT_EQ( sent_goal.group_names[0], "flipper_front" );
 }
 
-// sync_all_flippers sends an empty group_names list — the contract for "all groups".
+// sync_all_flippers sends an empty group_names list - the contract for "all groups".
 TEST_F( FlipperPluginTest, SyncAllSendsGoalWithEmptyGroupList )
 {
   EXPECT_CALL( *sync_mock_, action_server_is_ready() ).WillRepeatedly( Return( true ) );
