@@ -23,7 +23,6 @@ TestCase {
     sourceComponent: Component {
       StickPad {
         width: 80
-        deadzone: 0.5
       }
     }
   }
@@ -31,10 +30,7 @@ TestCase {
   Loader {
     id: triggerLoader
     sourceComponent: Component {
-      TriggerBar {
-        width: 130
-        deadzone: 0.5
-      }
+      TriggerBar {}
     }
   }
 
@@ -85,17 +81,18 @@ TestCase {
     verify(dot().y + dot().height <= pad.width)
   }
 
-  function test_deflected_follows_the_managers_deadzone() {
-    pad.yValue = 0.5
-    verify(!pad.deflected, "0.5 is not yet past the deadzone")
-    pad.yValue = 0.6
+  function test_any_deflection_highlights() {
+    verify(!pad.deflected, "a centered stick is not deflected")
+    pad.yValue = 0.1
+    verify(pad.deflected)
+    pad.yValue = 0
+    pad.xValue = -0.1
     verify(pad.deflected)
   }
 
-  function test_trigger_pressed_follows_the_deadzone() {
-    trigger.value = 0.5
-    verify(!trigger.pressed)
-    trigger.value = 0.6
+  function test_any_trigger_travel_highlights() {
+    verify(!trigger.pressed, "a released trigger is not pressed")
+    trigger.value = 0.1
     verify(trigger.pressed)
   }
 }

@@ -116,7 +116,32 @@ Rectangle {
     // GamepadAction.event -> badge. EVENT_PRESS carries none.
     readonly property var eventBadge: ({ 0: "", 1: "2x", 2: "hold", 3: "release" })
 
-    //! One row per bound action of the shown config: keyboard key, gamepad control, description.
+    // Table sections in pad order, each listing its inputs in pad order.
+    readonly property var tableSections: [
+      { title: qsTr("Sticks"), names: [
+          "left_stick_y", "left_stick_x", "left_stick_up", "left_stick_down", "left_stick_left",
+          "left_stick_right", "left_stick_click",
+          "right_stick_y", "right_stick_x", "right_stick_up", "right_stick_down",
+          "right_stick_left", "right_stick_right", "right_stick_click"] },
+      { title: qsTr("Triggers and bumpers"),
+        names: ["left_trigger", "left_bumper", "right_trigger", "right_bumper"] },
+      { title: qsTr("Face buttons"), names: ["y", "x", "b", "a"] },
+      { title: qsTr("D-pad"), names: ["dpad_up", "dpad_down", "dpad_left", "dpad_right"] },
+      { title: qsTr("System"), names: ["guide", "back", "start", "share"] }
+    ]
+
+    //! Canonical input name -> { section, order } in the table.
+    readonly property var inputPositions: {
+      var result = ({})
+      tableSections.forEach(function (section, s) {
+        section.names.forEach(function (name, i) {
+          result[name] = { section: section.title, order: s * 100 + i }
+        })
+      })
+      return result
+    }
+
+    //! One row per bound action of the shown config, in pad order: key, control, description.
     readonly property var bindings: {
       var rows = []
       var config = findConfig(shownProfile)
@@ -135,13 +160,34 @@ Rectangle {
         mapping.config_switches.forEach(function (config_switch) {
           rows.push(makeRow(config_switch.name, "switch", "Switch to " + config_switch.config))
         })
-      rows.sort(function (a, b) {
-        if (a.bound !== b.bound)
-          return a.bound ? -1 : 1 // controls with no key on the keyboard sink to the bottom
-        return a.control < b.control ? -1 : (a.control > b.control ? 1 : 0)
+      // Array.sort is not stable here, so the push order breaks ties: an input's actions keep the
+      // config's order.
+      rows.forEach(function (row, i) { row.sequence = i })
+      rows.sort(function (a, b) { return a.order - b.order || a.sequence - b.sequence })
+      return rows
+    }
+
+    //! Table rows: the bindings, with each double press folded into its control's press row.
+    readonly property var tableRows: {
+      var rows = []
+      var pressRows = ({})
+      bindings.forEach(function (binding) {
+        var pressRow = pressRows[binding.name]
+        if (binding.badge === "2x" && pressRow && pressRow.doublePress === "") {
+          pressRow.doublePress = binding.text
+          return
+        }
+        var row = Object.assign({ doublePress: "" }, binding)
+        if (binding.badge === "")
+          pressRows[binding.name] = row
+        rows.push(row)
       })
       return rows
     }
+
+    readonly property bool hasDoublePress: tableRows.some(function (row) {
+      return row.doublePress !== ""
+    })
 
     // Canonical input name -> GamepadView control key. Axes and their virtual buttons share one.
     readonly property var nameToControl: ({
@@ -258,13 +304,16 @@ Rectangle {
 
     function makeRow(name, badge, text) {
       var key = gamepad.keyLabels[name] || ""
+      var position = inputPositions[name] || { section: qsTr("Other"), order: 10000 }
       return ({
         name: name || "",
         key: key,
         bound: key !== "",
         control: prettyName(name),
         badge: badge,
-        text: text
+        text: text,
+        section: position.section,
+        order: position.order
       })
     }
 
@@ -656,7 +705,7 @@ Rectangle {
             }
           }
 
-          // Axis readouts. Pressed buttons show in the diagram and the table.
+          // Axis readouts, one hand per side. Pressed buttons show in the diagram and the table.
           Rectangle {
             Layout.fillWidth: true
             implicitHeight: readouts.implicitHeight + 16
@@ -668,61 +717,44 @@ Rectangle {
             RowLayout {
               id: readouts
               anchors.centerIn: parent
-              spacing: 16
+              spacing: 12
+
+              TriggerBar {
+                label: qsTr("LT")
+                keyHint: gamepad.keyLabels["left_trigger"]
+                value: gamepad.leftTrigger
+                trackHeight: leftStickPad.width
+                contentColor: palette.text
+                activeColor: d.liveForeground
+              }
 
               StickPad {
+                id: leftStickPad
                 label: qsTr("Left stick")
                 keyHint: gamepad.keyLabels["left_stick_y"] + "  " + gamepad.keyLabels["left_stick_x"]
                 xValue: gamepad.leftStickX
                 yValue: gamepad.leftStickY
-                deadzone: gamepad.axisDeadzone
                 contentColor: palette.text
                 activeColor: d.liveForeground
               }
 
-              ColumnLayout {
-                spacing: 8
-                TriggerBar {
-                  Layout.fillWidth: true
-                  label: qsTr("LT")
-                  keyHint: gamepad.keyLabels["left_trigger"]
-                  value: gamepad.leftTrigger
-                  deadzone: gamepad.axisDeadzone
-                  contentColor: palette.text
-                  activeColor: d.liveForeground
-                }
-                TriggerBar {
-                  Layout.fillWidth: true
-                  label: qsTr("RT")
-                  keyHint: gamepad.keyLabels["right_trigger"]
-                  value: gamepad.rightTrigger
-                  deadzone: gamepad.axisDeadzone
-                  contentColor: palette.text
-                  activeColor: d.liveForeground
-                }
-              }
-
               StickPad {
+                id: rightStickPad
+                // A wider gap between the two hands.
+                Layout.leftMargin: 24
                 label: qsTr("Right stick")
                 keyHint: gamepad.keyLabels["right_stick_y"] + "  " + gamepad.keyLabels["right_stick_x"]
                 xValue: gamepad.rightStickX
                 yValue: gamepad.rightStickY
-                deadzone: gamepad.axisDeadzone
                 contentColor: palette.text
                 activeColor: d.liveForeground
               }
 
-              StickPad {
-                label: qsTr("D-pad")
-                keyHint: gamepad.keyLabels["dpad_up"] + " / " + gamepad.keyLabels["dpad_down"]
-                         + "  " + gamepad.keyLabels["dpad_left"] + " / " + gamepad.keyLabels["dpad_right"]
-                // Four buttons, so there is no deadzone.
-                discrete: true
-                xValue: (gamepad.isButtonPressed("dpad_left") ? 1 : 0)
-                        - (gamepad.isButtonPressed("dpad_right") ? 1 : 0)
-                yValue: (gamepad.isButtonPressed("dpad_up") ? 1 : 0)
-                        - (gamepad.isButtonPressed("dpad_down") ? 1 : 0)
-                deadzone: gamepad.axisDeadzone
+              TriggerBar {
+                label: qsTr("RT")
+                keyHint: gamepad.keyLabels["right_trigger"]
+                value: gamepad.rightTrigger
+                trackHeight: rightStickPad.width
                 contentColor: palette.text
                 activeColor: d.liveForeground
               }
@@ -791,7 +823,7 @@ Rectangle {
               id: diagramButton
               ButtonGroup.group: viewGroup
               checkable: true
-              checked: context.showDiagram ?? false
+              checked: context.showDiagram ?? true
               focusPolicy: Qt.NoFocus
               objectName: "diagramButton"
               text: qsTr("Diagram")
@@ -823,9 +855,16 @@ Rectangle {
             ColumnLayout {
               id: table
 
-              //! Widths of the key and control columns, shared by the header and the rows.
+              //! Column widths, shared by the header and the rows. Next to a double press column
+              //! the action column stops at actionWidth; in narrow panels both shrink alike.
               readonly property real keyWidth: 70
-              readonly property real controlWidth: 120
+              readonly property real controlWidth: 144
+              readonly property real actionWidth: 280
+              readonly property real actionMaximumWidth: d.hasDoublePress ? actionWidth
+                                                                          : Number.POSITIVE_INFINITY
+              //! Rows stop short of the scroll bar, and the header keeps the same width.
+              readonly property real scrollBarWidth: bindingList.ScrollBar.vertical.visible
+                                                     ? bindingList.ScrollBar.vertical.width : 0
 
               anchors.fill: parent
               visible: !diagram.visible
@@ -833,6 +872,8 @@ Rectangle {
 
               RowLayout {
                 Layout.fillWidth: true
+                Layout.leftMargin: 8
+                Layout.rightMargin: 8 + table.scrollBarWidth
                 visible: d.bindings.length > 0
                 opacity: 0.6
                 spacing: 8
@@ -849,8 +890,17 @@ Rectangle {
                 }
                 Label {
                   Layout.fillWidth: true
+                  Layout.preferredWidth: table.actionWidth
+                  Layout.maximumWidth: table.actionMaximumWidth
                   font.bold: true
                   text: qsTr("Action")
+                }
+                Label {
+                  Layout.fillWidth: true
+                  Layout.preferredWidth: table.actionWidth
+                  visible: d.hasDoublePress
+                  font.bold: true
+                  text: qsTr("Double press")
                 }
               }
 
@@ -859,7 +909,7 @@ Rectangle {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 clip: true
-                model: d.bindings
+                model: d.tableRows
                 ScrollBar.vertical: ScrollBar {
                   policy: bindingList.contentHeight > bindingList.height ? ScrollBar.AlwaysOn
                                                                          : ScrollBar.AlwaysOff
@@ -870,18 +920,41 @@ Rectangle {
                   onPressedChanged: if (pressed) keyFocus.forceActiveFocus()
                 }
 
+                section.property: "section"
+                section.delegate: Label {
+                  required property string section
+
+                  width: bindingList.width
+                  leftPadding: 8
+                  topPadding: 12
+                  bottomPadding: 4
+                  font.bold: true
+                  text: section
+                }
+
                 delegate: Rectangle {
+                  id: rowItem
+
                   readonly property bool active: gamepad.isActive(modelData.name)
 
-                  width: ListView.view.width
-                  height: bindingRow.implicitHeight + 4
-                  color: active ? d.liveColor : "transparent"
+                  width: bindingList.width - table.scrollBarWidth
+                  height: bindingRow.implicitHeight + 8
+                  color: active ? d.liveColor
+                       : hover.hovered ? Qt.rgba(palette.highlight.r, palette.highlight.g,
+                                                 palette.highlight.b, 0.2)
+                       : index % 2 === 0 ? palette.base : palette.alternateBase
+
+                  HoverHandler {
+                    id: hover
+                  }
 
                   RowLayout {
                     id: bindingRow
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
+                    anchors.leftMargin: 8
+                    anchors.rightMargin: 8
                     spacing: 8
 
                     Label {
@@ -892,20 +965,51 @@ Rectangle {
                       opacity: modelData.bound ? 1 : 0.6
                       text: modelData.bound ? modelData.key : "-"
                     }
-                    TruncatedLabel {
+                    RowLayout {
+                      // A nested layout takes fillWidth from its label and would grow otherwise.
+                      Layout.fillWidth: false
                       Layout.preferredWidth: table.controlWidth
-                      color: active ? "white" : palette.text
-                      text: modelData.control
+                      spacing: 6
+
+                      GamepadButtonIcon {
+                        // Stick axes and directions have a glyph of their own, the rest show
+                        // their control's.
+                        controlKey: glyphFiles[modelData.name]
+                                    ? modelData.name : (d.nameToControl[modelData.name] || "")
+                        size: Math.round(controlName.implicitHeight * 1.4)
+                        active: rowItem.active
+                        activeColor: "white"
+                      }
+                      TruncatedLabel {
+                        id: controlName
+                        Layout.fillWidth: true
+                        color: active ? "white" : palette.text
+                        text: modelData.control
+                      }
                     }
-                    Caption {
-                      visible: modelData.badge !== ""
-                      color: active ? "white" : palette.text
-                      text: modelData.badge
+                    RowLayout {
+                      Layout.fillWidth: true
+                      Layout.preferredWidth: table.actionWidth
+                      Layout.maximumWidth: table.actionMaximumWidth
+                      spacing: 8
+
+                      Caption {
+                        visible: modelData.badge !== ""
+                        color: active ? "white" : palette.text
+                        text: modelData.badge
+                      }
+                      TruncatedLabel {
+                        Layout.fillWidth: true
+                        color: active ? "white" : palette.text
+                        text: modelData.text
+                      }
                     }
                     TruncatedLabel {
                       Layout.fillWidth: true
+                      Layout.preferredWidth: table.actionWidth
+                      visible: d.hasDoublePress
                       color: active ? "white" : palette.text
-                      text: modelData.text
+                      text: modelData.doublePress
                     }
                   }
                 }

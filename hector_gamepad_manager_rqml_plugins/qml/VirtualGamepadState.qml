@@ -112,17 +112,17 @@ QtObject {
   })
 
   // Virtual axis button -> source axis and activating sign, as in convertJoyToGamepadInputs().
+  // The triggers are left out: their virtual buttons share the axis name, and a trigger counts as
+  // active as soon as it moves.
   readonly property var virtualButtonSources: ({
     "left_stick_left": ({ axis: "left_stick_x", dir: 1 }),
     "left_stick_right": ({ axis: "left_stick_x", dir: -1 }),
     "left_stick_up": ({ axis: "left_stick_y", dir: 1 }),
     "left_stick_down": ({ axis: "left_stick_y", dir: -1 }),
-    "left_trigger": ({ axis: "left_trigger", dir: 1 }),
     "right_stick_left": ({ axis: "right_stick_x", dir: 1 }),
     "right_stick_right": ({ axis: "right_stick_x", dir: -1 }),
     "right_stick_up": ({ axis: "right_stick_y", dir: 1 }),
-    "right_stick_down": ({ axis: "right_stick_y", dir: -1 }),
-    "right_trigger": ({ axis: "right_trigger", dir: 1 })
+    "right_stick_down": ({ axis: "right_stick_y", dir: -1 })
   })
 
   function axisValue(name) {

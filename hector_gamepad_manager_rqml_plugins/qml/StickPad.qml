@@ -1,20 +1,15 @@
 import QtQuick
+import QtQuick.Controls
 import RQml.Elements
 
-// Two-axis readout: a dot in a square with the manager's deadzone marked. Positive x is left and
-// positive y is up (ROS joy convention).
+// Two-axis readout: a dot in a square. Positive x is left and positive y is up (ROS joy
+// convention).
 Item {
   id: pad
 
   //! Axis values, -1..1 each.
   property real xValue: 0
   property real yValue: 0
-
-  //! Deflection past which the manager treats the axis as a pressed virtual button.
-  property real deadzone: 0.5
-
-  //! Hide the deadzone ring, for inputs like the d-pad that have none.
-  property bool discrete: false
 
   //! Caption under the pad, e.g. "Left stick".
   property string label: ""
@@ -25,10 +20,12 @@ Item {
   property color contentColor: palette.text
   property color activeColor: palette.highlight
 
-  readonly property bool deflected: Math.abs(xValue) > deadzone || Math.abs(yValue) > deadzone
+  //! The stick is off center; the pad is then drawn in activeColor.
+  readonly property bool deflected: xValue !== 0 || yValue !== 0
 
-  implicitWidth: 72
-  implicitHeight: 72 + caption.implicitHeight + 2
+  // Sized from the key hint's font, so it grows with the text.
+  implicitWidth: Math.round(keyText.implicitHeight * 6)
+  implicitHeight: width + caption.implicitHeight + 2
 
   Rectangle {
     id: field
@@ -38,19 +35,6 @@ Item {
     color: "transparent"
     border.width: 1
     border.color: pad.deflected ? pad.activeColor : pad.contentColor
-
-    // Deadzone ring.
-    Rectangle {
-      visible: !pad.discrete
-      anchors.centerIn: parent
-      width: field.width * pad.deadzone
-      height: width
-      radius: width / 2
-      color: "transparent"
-      border.width: 1
-      border.color: pad.contentColor
-      opacity: 0.35
-    }
 
     // Cross-hair.
     Rectangle {
@@ -70,8 +54,8 @@ Item {
 
     Rectangle {
       id: dot
-      width: 9
-      height: 9
+      width: Math.round(pad.width * 0.11)
+      height: width
       radius: width / 2
       color: pad.deflected ? pad.activeColor : pad.contentColor
       // Positive x is left and positive y is up, so both subtract.
@@ -92,10 +76,12 @@ Item {
       horizontalAlignment: Text.AlignHCenter
       text: pad.label
     }
-    Caption {
+    Label {
+      id: keyText
       width: parent.width
       horizontalAlignment: Text.AlignHCenter
       font.bold: true
+      elide: Text.ElideRight
       visible: pad.keyHint !== ""
       color: pad.deflected ? pad.activeColor : pad.contentColor
       text: pad.keyHint

@@ -42,7 +42,14 @@ Item {
     "lstick_click": "Left Stick Click.svg", "rstick_click": "Right Stick Click.svg",
     "dpad": "D-Pad.svg", "dpad_up": "D-Pad Up.svg", "dpad_down": "D-Pad Down.svg",
     "dpad_left": "D-Pad Left.svg", "dpad_right": "D-Pad Right.svg",
-    "back": "View.svg", "start": "Menu.svg", "guide": "Home.svg", "share": "Share.svg"
+    "back": "View.svg", "start": "Menu.svg", "guide": "Home.svg", "share": "Share.svg",
+    // Stick axes and directions by canonical input name, for the bindings table.
+    "left_stick_y": "Left Stick Up-Down.svg", "left_stick_x": "Left Stick Left-Right.svg",
+    "left_stick_up": "Left Stick Up.svg", "left_stick_down": "Left Stick Down.svg",
+    "left_stick_left": "Left Stick Left.svg", "left_stick_right": "Left Stick Right.svg",
+    "right_stick_y": "Right Stick Up-Down.svg", "right_stick_x": "Right Stick Left-Right.svg",
+    "right_stick_up": "Right Stick Up.svg", "right_stick_down": "Right Stick Down.svg",
+    "right_stick_left": "Right Stick Left.svg", "right_stick_right": "Right Stick Right.svg"
   })
 
   readonly property color tint: active ? activeColor

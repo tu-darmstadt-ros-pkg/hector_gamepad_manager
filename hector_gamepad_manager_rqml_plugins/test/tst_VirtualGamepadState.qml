@@ -250,6 +250,13 @@ TestCase {
     verify(gamepad.pressKey(Qt.Key_W, Qt.NoModifier, false))
   }
 
+  function test_a_trigger_is_active_as_soon_as_it_moves() {
+    verify(!gamepad.isActive("left_trigger"))
+    gamepad.setAxis("left_trigger", 0.1)
+    verify(gamepad.isActive("left_trigger"))
+    verify(!gamepad.isActive("right_trigger"))
+  }
+
   function test_virtual_button_activates_at_the_managers_deadzone() {
     gamepad.setAxis("left_stick_y", 0.5)
     verify(!gamepad.isActive("left_stick_up"), "0.5 is not yet past the deadzone")

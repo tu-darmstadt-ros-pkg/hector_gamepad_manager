@@ -29,8 +29,7 @@ axis behaviour.
 **Sticky axes** (the default) make the sticks and triggers behave like a throttle: a key press
 moves the axis by one step and it stays there, and holding the key ramps it. Switch it off in the
 settings for momentary behaviour: held is fully deflected, released is centered. The pads and bars
-show the live axis values, with the manager's deadzone marked so you can see where an axis starts
-counting as a pressed virtual button.
+show the live axis values and turn green as soon as the stick or trigger moves.
 
 
 ### What the banner says
@@ -54,15 +53,15 @@ cannot be left behind.
 
 The **Table / Diagram** switch sits at the end of the mode row.
 
-**Table** (the default) lists every binding of the active config: key, control, action. Rows are
-keyed off the canonical input `name` in the mapping, not its index. Controls the keyboard cannot
-reach still get a row, marked `-`, and a clipped name or description can be read in full by
-hovering it.
+**Diagram** (the default) is a labelled controller schematic. Each control carries its keyboard key
+as a keycap beside the glyph, and the control being pressed is tinted green. It needs a large
+panel: while its callouts do not fit, the table is shown instead. It draws the layout even with no
+mapping selected, which makes it a quick way to check that key presses are getting through.
 
-**Diagram** is a labelled controller schematic. Each control carries its keyboard key as a keycap
-beside the glyph, and the control being pressed is tinted green. It needs a large panel: while its
-callouts do not fit, the table is shown instead. It draws the layout even with no mapping selected,
-which makes it a quick way to check that key presses are getting through.
+**Table** lists every binding of the active config, grouped by where the control sits on the pad:
+key, control, action. Rows are keyed off the canonical input `name` in the mapping, not its index.
+Controls the keyboard cannot reach still get a row, marked `-`, and a clipped name or description
+can be read in full by hovering it.
 
 **Mode chips** are one per config, the active one filled green and marked `●`. They are both the
 indicator of what the robot is in and the control that changes it, so the two cannot disagree - a
