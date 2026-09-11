@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import QtQuick.Window
 import Ros2
 import RQml.Elements
+import RQml.Fonts
 
 // Drives a hector_gamepad_manager from the keyboard by publishing sensor_msgs/Joy, and shows what
 // the active config binds each control to.
@@ -14,9 +15,6 @@ Rectangle {
   property var kddockwidgets_min_size: Qt.size(420, 460)
 
   color: palette.base
-
-  border.width: capture.state === "off" ? 0 : 2
-  border.color: d.status.color
 
   QtObject {
     id: d
@@ -243,7 +241,7 @@ Rectangle {
                     title: qsTr("No valid joy topic"),
                     hint: qsTr("Nothing is being published - check the joy topic") }),
       "off": ({ color: root.palette.mid, title: qsTr("Not publishing"),
-                hint: qsTr("Press Enable to start the joy stream") })
+                hint: qsTr("Press play to start the joy stream") })
     })
 
     readonly property var status: statusStyles[capture.state]
@@ -339,6 +337,91 @@ Rectangle {
     z: 100
   }
 
+  Dialog {
+    id: settingsDialog
+    objectName: "settingsDialog"
+    anchors.centerIn: parent
+    width: Math.min(parent.width * 0.8, 400)
+    title: qsTr("Virtual Gamepad Settings")
+    standardButtons: Dialog.Ok
+    modal: true
+    // The panel's controls never take the focus, so hand it back to the gamepad explicitly.
+    onClosed: keyFocus.forceActiveFocus()
+
+    GridLayout {
+      anchors.fill: parent
+      columns: 2
+      columnSpacing: 8
+      rowSpacing: 8
+
+      Label {
+        text: qsTr("Joy topic:")
+      }
+      TextField {
+        id: joyTopicField
+        Layout.fillWidth: true
+        objectName: "joyTopicField"
+        // Editing the topic by hand pins it, e.g. to publish through the joy_satellite.
+        Component.onCompleted: text = context.joyTopic ?? "/joy"
+        onTextEdited: {
+          context.joyTopic = text
+          context.joyTopicPinned = true
+        }
+        onAccepted: settingsDialog.accept()
+      }
+
+      Label {
+        text: qsTr("Rate (Hz):")
+      }
+      SpinBox {
+        // On creation the SpinBox clamps its initial 0 up to `from`; that must not be stored.
+        property bool restored: false
+
+        editable: true
+        from: 1
+        to: 100
+        objectName: "rateSpinBox"
+        Component.onCompleted: {
+          value = context.rate ?? 30
+          restored = true
+        }
+        onValueChanged: if (restored) context.rate = value
+      }
+
+      CheckBox {
+        Layout.columnSpan: 2
+        objectName: "stickyCheckBox"
+        checked: true
+        Component.onCompleted: checked = context.sticky ?? true
+        text: qsTr("Sticky axes")
+        ToolTip.delay: 500
+        ToolTip.visible: hovered
+        ToolTip.text: qsTr("Axes hold their value between key presses. Off: held key = full deflection.")
+        onCheckedChanged: {
+          context.sticky = checked
+          gamepad.resetAxes()
+        }
+      }
+
+      Label {
+        text: qsTr("Step:")
+      }
+      DecimalSpinBox {
+        property bool restored: false
+
+        objectName: "stepSpinBox"
+        decimals: 2
+        from: 0.01
+        to: 1.0
+        stepSize: 0.05
+        Component.onCompleted: {
+          value = context.step ?? 0.1
+          restored = true
+        }
+        onValueChanged: if (restored) context.step = value
+      }
+    }
+  }
 
   CaptureState {
     id: capture
@@ -421,7 +504,7 @@ Rectangle {
     ColumnLayout {
       anchors.fill: parent
       anchors.margins: 8
-      spacing: 6
+      spacing: 8
 
       RowLayout {
         Layout.fillWidth: true
@@ -462,53 +545,14 @@ Rectangle {
         }
         RefreshButton {
           focusPolicy: Qt.NoFocus
-          onClicked: mappingTopicSelect.refresh()
-        }
-      }
-
-      RowLayout {
-        Layout.fillWidth: true
-
-        Label {
-          text: qsTr("Joy topic:")
-        }
-        TextField {
-          id: joyTopicField
-          Layout.fillWidth: true
-          objectName: "joyTopicField"
-          // Editing the topic by hand pins it, e.g. to publish through the joy_satellite.
-          Component.onCompleted: text = context.joyTopic ?? "/joy"
-          onTextEdited: {
-            context.joyTopic = text
-            context.joyTopicPinned = true
+          onClicked: {
+            animate = true
+            mappingTopicSelect.refresh()
+            animate = false
           }
-          // Enter hands the keyboard back to the gamepad.
-          onAccepted: keyFocus.forceActiveFocus()
         }
-        Label {
-          text: qsTr("Rate:")
-        }
-        SpinBox {
-          // On creation the SpinBox clamps its initial 0 up to `from`; that must not be stored.
-          property bool restored: false
-
-          editable: true
-          from: 1
-          to: 100
-          objectName: "rateSpinBox"
-          Component.onCompleted: {
-            value = context.rate ?? 30
-            restored = true
-          }
-          onValueChanged: if (restored) context.rate = value
-        }
-      }
-
-      // Enable streams continuously, neutral when idle, so the manager never holds a stale value.
-      RowLayout {
-        Layout.fillWidth: true
-
-        Button {
+        // Streams continuously, neutral when idle, so the manager never holds a stale value.
+        IconButton {
           id: enableButton
 
           //! Set after restoring, so only a click takes the keyboard.
@@ -517,12 +561,13 @@ Rectangle {
           objectName: "enableButton"
           checkable: true
           focusPolicy: Qt.NoFocus
+          text: checked ? IconFont.iconPause : IconFont.iconPlay
+          tooltipText: checked ? qsTr("Stop publishing") : qsTr("Start publishing")
           // A binding would loop, since the handler writes context.enabled.
           Component.onCompleted: {
             checked = context.enabled ?? true
             restored = true
           }
-          text: checked ? qsTr("Publishing") : qsTr("Enable")
           onCheckedChanged: {
             context.enabled = checked
             // Start and stop the stream from rest.
@@ -536,56 +581,12 @@ Rectangle {
               d.publishState()
           }
         }
-        CheckBox {
-          objectName: "stickyCheckBox"
-          checked: true
+        IconButton {
+          objectName: "settingsButton"
           focusPolicy: Qt.NoFocus
-          Component.onCompleted: checked = context.sticky ?? true
-          text: qsTr("Sticky axes")
-          ToolTip.delay: 500
-          ToolTip.visible: hovered
-          ToolTip.text: qsTr("Axes hold their value between key presses. Off: held key = full deflection.")
-          onCheckedChanged: {
-            context.sticky = checked
-            gamepad.resetAxes()
-          }
-        }
-        Label {
-          text: qsTr("Step:")
-        }
-        DecimalSpinBox {
-          property bool restored: false
-
-          objectName: "stepSpinBox"
-          decimals: 2
-          from: 0.01
-          to: 1.0
-          stepSize: 0.05
-          Component.onCompleted: {
-            value = context.step ?? 0.1
-            restored = true
-          }
-          onValueChanged: if (restored) context.step = value
-        }
-        Button {
-          id: diagramButton
-          objectName: "diagramButton"
-          checkable: true
-          focusPolicy: Qt.NoFocus
-          Component.onCompleted: checked = context.showDiagram ?? true
-          text: checked ? qsTr("Table") : qsTr("Diagram")
-          ToolTip.delay: 500
-          ToolTip.visible: hovered
-          ToolTip.text: qsTr("Switch between the bindings table and the controller diagram")
-          onCheckedChanged: context.showDiagram = checked
-        }
-        Item {
-          Layout.fillWidth: true
-        }
-        Label {
-          visible: d.configNames.length === 0
-          text: qsTr("No profile")
-          font.bold: true
+          text: IconFont.iconSettings
+          tooltipText: qsTr("Settings")
+          onClicked: settingsDialog.open()
         }
       }
 
@@ -602,7 +603,7 @@ Rectangle {
 
         ColumnLayout {
           anchors.fill: parent
-          spacing: 6
+          spacing: 8
 
           Rectangle {
             Layout.fillWidth: true
@@ -661,8 +662,8 @@ Rectangle {
             implicitHeight: readouts.implicitHeight + 16
             radius: 4
             color: palette.alternateBase
-            border.width: 2
-            border.color: d.status.color
+            border.width: 1
+            border.color: palette.mid
 
             RowLayout {
               id: readouts
@@ -680,7 +681,7 @@ Rectangle {
               }
 
               ColumnLayout {
-                spacing: 6
+                spacing: 8
                 TriggerBar {
                   Layout.fillWidth: true
                   label: qsTr("LT")
@@ -731,110 +732,193 @@ Rectangle {
           // One chip per config, the active one filled. Clicking one presses its switch button.
           RowLayout {
             Layout.fillWidth: true
-            visible: d.configNames.length > 0
             spacing: 4
 
-            Label {
-              text: qsTr("Mode:")
-            }
+            // A RowLayout misses Repeater items created in the same frame as a resize (Qt 6.4), so
+            // the chips sit in a Row.
+            Row {
+              visible: d.configNames.length > 0
+              spacing: 4
 
-            Repeater {
-              model: d.configNames
+              Label {
+                anchors.verticalCenter: parent.verticalCenter
+                text: qsTr("Mode:")
+              }
 
-              delegate: Button {
-                readonly property bool isActive: modelData === d.activeProfile
-                readonly property bool isPending: modelData === d.pendingProfile
+              Repeater {
+                model: d.configNames
 
-                objectName: "modeChip_" + modelData
-                // The active chip stays enabled: greyed out it would read as unavailable.
-                enabled: capture.streaming && d.pendingProfile === ""
-                focusPolicy: Qt.NoFocus
-                // The dot marks the active chip without relying on colour.
-                highlighted: isActive
-                Material.accent: d.liveColor
-                text: isActive ? "● " + modelData : (isPending ? modelData + " …" : modelData)
-                ToolTip.delay: 500
-                ToolTip.visible: hovered
-                ToolTip.text: isActive ? qsTr("The robot is in this mode")
-                             : !capture.publishing ? qsTr("Enable publishing to switch modes")
-                             : !capture.topicValid ? qsTr("Set a valid joy topic to switch modes")
-                             : qsTr("Switch the robot to %1").arg(modelData)
-                onClicked: switcher.request(modelData)
+                delegate: Button {
+                  readonly property bool isActive: modelData === d.activeProfile
+                  readonly property bool isPending: modelData === d.pendingProfile
+
+                  objectName: "modeChip_" + modelData
+                  // The active chip stays enabled: greyed out it would read as unavailable.
+                  enabled: capture.streaming && d.pendingProfile === ""
+                  focusPolicy: Qt.NoFocus
+                  // The dot marks the active chip without relying on colour.
+                  highlighted: isActive
+                  Material.accent: d.liveColor
+                  text: isActive ? "● " + modelData : (isPending ? modelData + " …" : modelData)
+                  ToolTip.delay: 500
+                  ToolTip.visible: hovered
+                  ToolTip.text: isActive ? qsTr("The robot is in this mode")
+                               : !capture.publishing ? qsTr("Start publishing to switch modes")
+                               : !capture.topicValid ? qsTr("Set a valid joy topic to switch modes")
+                               : qsTr("Switch the robot to %1").arg(modelData)
+                  onClicked: switcher.request(modelData)
+                }
               }
             }
 
             Item {
               Layout.fillWidth: true
             }
+
+            ButtonGroup {
+              id: viewGroup
+            }
+            Button {
+              ButtonGroup.group: viewGroup
+              checkable: true
+              checked: !diagramButton.checked
+              focusPolicy: Qt.NoFocus
+              objectName: "tableButton"
+              text: qsTr("Table")
+              onClicked: context.showDiagram = false
+            }
+            Button {
+              id: diagramButton
+              ButtonGroup.group: viewGroup
+              checkable: true
+              checked: context.showDiagram ?? false
+              focusPolicy: Qt.NoFocus
+              objectName: "diagramButton"
+              text: qsTr("Diagram")
+              onClicked: context.showDiagram = true
+            }
           }
 
-          GamepadView {
+          // The diagram when it fits, otherwise the table. Both stay sized to this item, so the
+          // diagram can tell whether it fits while it is hidden.
+          Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            // Also shown without a mapping, to check that key presses arrive.
-            visible: diagramButton.checked
-            controlLabels: d.controlLabels
-            controlKeys: d.controlKeys
-            reservedControls: d.reservedControls
-            activeControls: d.activeControls
-            contentColor: palette.text
-            labelBackgroundColor: palette.base
-            accentColor: palette.highlight
-            activeColor: d.liveForeground
-          }
 
-          ListView {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            visible: !diagramButton.checked
-            clip: true
-            model: d.bindings
-            ScrollBar.vertical: ScrollBar {}
-
-            // The Flickable takes presses before the working area's handler sees them.
-            TapHandler {
-              onPressedChanged: if (pressed) keyFocus.forceActiveFocus()
+            GamepadView {
+              id: diagram
+              anchors.fill: parent
+              // Also shown without a mapping, to check that key presses arrive.
+              visible: diagramButton.checked && fits
+              controlLabels: d.controlLabels
+              controlKeys: d.controlKeys
+              reservedControls: d.reservedControls
+              activeControls: d.activeControls
+              contentColor: palette.text
+              labelBackgroundColor: palette.base
+              accentColor: palette.highlight
+              activeColor: d.liveForeground
             }
 
-            delegate: Rectangle {
-              readonly property bool active: gamepad.isActive(modelData.name)
+            ColumnLayout {
+              id: table
 
-              width: ListView.view.width
-              height: bindingRow.implicitHeight + 4
-              color: active ? d.liveColor : "transparent"
+              //! Widths of the key and control columns, shared by the header and the rows.
+              readonly property real keyWidth: 70
+              readonly property real controlWidth: 120
+
+              anchors.fill: parent
+              visible: !diagram.visible
+              spacing: 4
 
               RowLayout {
-                id: bindingRow
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: 6
+                Layout.fillWidth: true
+                visible: d.bindings.length > 0
+                opacity: 0.6
+                spacing: 8
 
                 Label {
-                  Layout.preferredWidth: 70
+                  Layout.preferredWidth: table.keyWidth
                   font.bold: true
-                  color: active ? "white" : palette.text
-                  // Dims controls the keyboard cannot reach.
-                  opacity: modelData.bound ? 1 : 0.6
-                  text: modelData.bound ? modelData.key : "-"
+                  text: qsTr("Key")
                 }
-                TruncatedLabel {
-                  Layout.preferredWidth: 120
-                  color: active ? "white" : palette.text
-                  text: modelData.control
+                Label {
+                  Layout.preferredWidth: table.controlWidth
+                  font.bold: true
+                  text: qsTr("Control")
                 }
-                Caption {
-                  visible: modelData.badge !== ""
-                  color: active ? "white" : palette.text
-                  text: modelData.badge
-                }
-                TruncatedLabel {
+                Label {
                   Layout.fillWidth: true
-                  color: active ? "white" : palette.text
-                  text: modelData.text
+                  font.bold: true
+                  text: qsTr("Action")
+                }
+              }
+
+              ListView {
+                id: bindingList
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                model: d.bindings
+                ScrollBar.vertical: ScrollBar {
+                  policy: bindingList.contentHeight > bindingList.height ? ScrollBar.AlwaysOn
+                                                                         : ScrollBar.AlwaysOff
+                }
+
+                // The Flickable takes presses before the working area's handler sees them.
+                TapHandler {
+                  onPressedChanged: if (pressed) keyFocus.forceActiveFocus()
+                }
+
+                delegate: Rectangle {
+                  readonly property bool active: gamepad.isActive(modelData.name)
+
+                  width: ListView.view.width
+                  height: bindingRow.implicitHeight + 4
+                  color: active ? d.liveColor : "transparent"
+
+                  RowLayout {
+                    id: bindingRow
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 8
+
+                    Label {
+                      Layout.preferredWidth: table.keyWidth
+                      font.bold: true
+                      color: active ? "white" : palette.text
+                      // Dims controls the keyboard cannot reach.
+                      opacity: modelData.bound ? 1 : 0.6
+                      text: modelData.bound ? modelData.key : "-"
+                    }
+                    TruncatedLabel {
+                      Layout.preferredWidth: table.controlWidth
+                      color: active ? "white" : palette.text
+                      text: modelData.control
+                    }
+                    Caption {
+                      visible: modelData.badge !== ""
+                      color: active ? "white" : palette.text
+                      text: modelData.badge
+                    }
+                    TruncatedLabel {
+                      Layout.fillWidth: true
+                      color: active ? "white" : palette.text
+                      text: modelData.text
+                    }
+                  }
                 }
               }
             }
+          }
+
+          Hint {
+            Layout.fillWidth: true
+            visible: diagramButton.checked && !diagram.fits
+            horizontalAlignment: Text.AlignHCenter
+            opacity: 0.85
+            text: qsTr("Enlarge the panel to see the diagram.")
           }
 
           Hint {

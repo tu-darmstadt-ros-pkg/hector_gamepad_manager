@@ -139,6 +139,15 @@ TestCase {
     verify(icons.length > 0, "no button glyphs were drawn for the given controlLabels")
   }
 
+  function test_fits_needs_room_for_the_callouts() {
+    view.width = 300
+    view.height = 200
+    tryVerify(function () { return !view.fits }, 1000, "the callouts cannot fit into 300x200")
+    view.width = 1600
+    view.height = 900
+    tryVerify(function () { return view.fits }, 1000, "a few callouts fit into 1600x900")
+  }
+
   function test_active_controls_retint_the_glyph() {
     var before = icon.tint
     icon.active = true

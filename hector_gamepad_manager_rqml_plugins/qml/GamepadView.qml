@@ -34,6 +34,9 @@ Item {
   //! Plate behind each group and halo under the connectors.
   property color labelBackgroundColor: palette.base
 
+  //! The callouts fit at their preferred positions, clear of each other and of the artwork.
+  readonly property bool fits: d.calloutsFit()
+
   //! Layout unit: a tenth of the font's line height, so the geometry scales with the font.
   function unit(size) { return size * fontMetrics.height / 10 }
 
@@ -72,15 +75,22 @@ Item {
         anchor: { x: 1090, y: 600 } }
     ]
 
-    // Artwork geometry, centered with room for callouts on every side.
-    property real imgW: Math.min(control.width * 0.42, control.height * 0.5 * aspect)
+    // Artwork geometry. The artwork takes the width the side callouts leave, capped by the height,
+    // and moves down when the top callouts need more room than centering leaves them.
+    property real imgW: Math.max(control.unit(150), Math.min(
+      control.width - sideWidth - 2 * leaderGap - 2 * margin, control.height * 0.5 * aspect))
+    // The artwork is centered, so both sides need the room of the widest column.
+    readonly property real sideWidth: 2 * Math.max(topLeftBand.width, leftBand.width,
+                                                   topRightBand.width, rightBand.width)
     property real imgH: imgW / aspect
     property real imgX: (control.width - imgW) / 2
-    property real imgY: (control.height - imgH) / 2
+    property real imgY: Math.max((control.height - imgH) / 2, margin + topBandsHeight + leaderGap)
+    readonly property real topBandsHeight: Math.max(topLeftBand.height, topCenterBand.height,
+                                                    topRightBand.height)
 
     property real margin: control.unit(6)
     property real leaderGap: control.unit(10)
-    property real badgeSize: control.unit(26)
+    property real badgeSize: control.unit(16)
     property real maxTextWidth: control.unit(130)
     property real spineWidth: control.unit(2)
     property real spineGap: control.unit(6)
@@ -160,6 +170,37 @@ Item {
     // Keep a band on-screen.
     function clampX(v, w) { return Math.max(margin, Math.min(v, control.width - w - margin)) }
     function clampY(v, h) { return Math.max(margin, Math.min(v, control.height - h - margin)) }
+
+    // Every band at its preferred position stays inside the view and clear of the other bands and
+    // the artwork. The bottom band sits between the grips, over the artwork, by design.
+    function calloutsFit() {
+      var bands = [topLeftBand, topCenterBand, topRightBand, leftBand, rightBand, bottomBand]
+      var artwork = Qt.rect(imgX, imgY, imgW, imgH)
+      var placed = []
+      for (var i = 0; i < bands.length; ++i) {
+        var band = bands[i]
+        if (band.width <= 0 || band.height <= 0)
+          continue
+        var rect = Qt.rect(band.preferredX, band.preferredY, band.width, band.height)
+        // Half a pixel of slack: the widest side column sits exactly on the margin.
+        if (rect.x < margin - 0.5 || rect.y < margin - 0.5
+            || rect.x + rect.width > control.width - margin + 0.5
+            || rect.y + rect.height > control.height - margin + 0.5)
+          return false
+        if (band !== bottomBand && overlaps(rect, artwork))
+          return false
+        for (var j = 0; j < placed.length; ++j)
+          if (overlaps(rect, placed[j]))
+            return false
+        placed.push(rect)
+      }
+      return true
+    }
+
+    function overlaps(a, b) {
+      return a.x < b.x + b.width && b.x < a.x + a.width
+          && a.y < b.y + b.height && b.y < a.y + a.height
+    }
   }
 
   Image {
@@ -177,49 +218,61 @@ Item {
 
   ColumnLayout {
     id: topLeftBand
+    readonly property real preferredX: d.imgX - d.leaderGap - width
+    readonly property real preferredY: d.topBandY - height / 2
     spacing: control.unit(12)
-    x: d.clampX(d.imgX - d.leaderGap - width, width)
-    y: d.clampY(d.topBandY - height / 2, height)
+    x: d.clampX(preferredX, width)
+    y: d.clampY(preferredY, height)
     Repeater { id: topLeftRep; model: d.groupsInBand("topLeft"); delegate: groupComponent }
   }
 
   ColumnLayout {
     id: topCenterBand
+    readonly property real preferredX: d.imgX + d.imgW / 2 - width / 2
+    readonly property real preferredY: d.topBandY - height / 2
     spacing: control.unit(12)
-    x: d.clampX(d.imgX + d.imgW / 2 - width / 2, width)
-    y: d.clampY(d.topBandY - height / 2, height)
+    x: d.clampX(preferredX, width)
+    y: d.clampY(preferredY, height)
     Repeater { id: topCenterRep; model: d.groupsInBand("topCenter"); delegate: groupComponent }
   }
 
   ColumnLayout {
     id: topRightBand
+    readonly property real preferredX: d.imgX + d.imgW + d.leaderGap
+    readonly property real preferredY: d.topBandY - height / 2
     spacing: control.unit(12)
-    x: d.clampX(d.imgX + d.imgW + d.leaderGap, width)
-    y: d.clampY(d.topBandY - height / 2, height)
+    x: d.clampX(preferredX, width)
+    y: d.clampY(preferredY, height)
     Repeater { id: topRightRep; model: d.groupsInBand("topRight"); delegate: groupComponent }
   }
 
   ColumnLayout {
     id: leftBand
+    readonly property real preferredX: d.imgX - d.leaderGap - width
+    readonly property real preferredY: control.height / 2 - height / 2
     spacing: control.unit(12)
-    x: d.clampX(d.imgX - d.leaderGap - width, width)
-    y: d.clampY(control.height / 2 - height / 2, height)
+    x: d.clampX(preferredX, width)
+    y: d.clampY(preferredY, height)
     Repeater { id: leftRep; model: d.groupsInBand("left"); delegate: groupComponent }
   }
 
   ColumnLayout {
     id: rightBand
+    readonly property real preferredX: d.imgX + d.imgW + d.leaderGap
+    readonly property real preferredY: control.height / 2 - height / 2
     spacing: control.unit(12)
-    x: d.clampX(d.imgX + d.imgW + d.leaderGap, width)
-    y: d.clampY(control.height / 2 - height / 2, height)
+    x: d.clampX(preferredX, width)
+    y: d.clampY(preferredY, height)
     Repeater { id: rightRep; model: d.groupsInBand("right"); delegate: groupComponent }
   }
 
   ColumnLayout {
     id: bottomBand
+    readonly property real preferredX: d.imgX + d.imgW / 2 - width / 2
+    readonly property real preferredY: d.imgY + 0.8 * d.imgH + d.leaderGap
     spacing: control.unit(12)
-    x: d.clampX(d.imgX + d.imgW / 2 - width / 2, width)
-    y: d.clampY(d.imgY + 0.8 * d.imgH + d.leaderGap, height)
+    x: d.clampX(preferredX, width)
+    y: d.clampY(preferredY, height)
     Repeater { id: bottomRep; model: d.groupsInBand("bottom"); delegate: groupComponent }
   }
 
