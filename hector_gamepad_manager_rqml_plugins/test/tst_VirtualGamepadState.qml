@@ -17,15 +17,14 @@ TestCase {
     gamepad.reset()
   }
 
-  // A released trigger is 0 on the wire, so rest really is all-zero.
+  // Released triggers are 0 on the wire too.
   function test_neutral_axes_are_all_zero() {
     var axes = gamepad.joyAxes()
     compare(axes.length, 6)
     for (var i = 0; i < axes.length; ++i) compare(axes[i], 0, "axis " + i + " must rest at 0")
   }
 
-  // Logically a trigger runs 0 to 1, but game_controller_node publishes it negated, so that is
-  // what the wire format has to carry for the manager to normalize it back.
+  // game_controller_node publishes triggers negated, and the manager flips them back.
   function test_fully_pressed_trigger_goes_out_negated() {
     gamepad.pressKey(Qt.Key_Q, Qt.NoModifier, false)
     gamepad.setAxis("left_trigger", 1.0)
@@ -67,8 +66,6 @@ TestCase {
     fuzzyCompare(gamepad.leftStickY, 0.1, 1e-6)
   }
 
-  // The two-hand split: the left stick is on WASD, the right stick on IJKL, so both can be driven
-  // at once without either hand leaving its cluster.
   function test_both_sticks_are_independent() {
     gamepad.pressKey(Qt.Key_I, Qt.NoModifier, false)
     fuzzyCompare(gamepad.rightStickY, 0.1, 1e-6)
@@ -78,9 +75,6 @@ TestCase {
     fuzzyCompare(gamepad.rightStickY, 0.1, 1e-6, "the right stick is unaffected by the left")
   }
 
-  // The arrow keys carry the face buttons in the pad's own arrangement: Y on top, A at the bottom,
-  // X on the left, B on the right. Getting one of these backwards would be invisible in use until
-  // the wrong robot action fired.
   function test_arrow_keys_are_the_face_button_diamond() {
     gamepad.pressKey(Qt.Key_Up, Qt.NoModifier, false)
     verify(gamepad.isButtonPressed("y"), "up must be Y")
@@ -109,7 +103,7 @@ TestCase {
     compare(gamepad.leftStickY, 0)
   }
 
-  // Positive is left/up, matching the ROS joy convention the manager reads.
+  // ROS joy convention: positive is left/up.
   function test_left_is_positive_on_the_x_axis() {
     gamepad.pressKey(Qt.Key_A, Qt.NoModifier, false)
     verify(gamepad.leftStickX > 0)
@@ -121,8 +115,6 @@ TestCase {
     verify(gamepad.rightStickX > 0)
   }
 
-  // SDL reports the d-pad as four real buttons, so it behaves like any other button rather than
-  // as a pair of axes that need recentering.
   function test_dpad_is_a_button() {
     gamepad.pressKey(Qt.Key_T, Qt.NoModifier, false)
     verify(gamepad.isButtonPressed("dpad_up"))
@@ -131,8 +123,6 @@ TestCase {
     verify(!gamepad.isButtonPressed("dpad_up"))
   }
 
-  // A trigger only travels one way, but in sticky mode it still has to be walkable back down -
-  // otherwise the only way off a held trigger is Space, which zeroes the sticks too.
   function test_triggers_can_be_stepped_back_down() {
     gamepad.pressKey(Qt.Key_Q, Qt.NoModifier, false)
     gamepad.pressKey(Qt.Key_Q, Qt.NoModifier, false)
@@ -145,8 +135,6 @@ TestCase {
     compare(gamepad.rightTrigger, 0)
   }
 
-  // Every axis must be reachable in both directions, or it can be driven somewhere it cannot be
-  // brought back from without also zeroing everything else.
   function test_every_axis_can_be_stepped_both_ways() {
     var seen = ({})
     for (var key in gamepad.axisKeys) {
@@ -197,9 +185,7 @@ TestCase {
     compare(gamepad.joyButtons()[15], 1)
   }
 
-  // The four system buttons sit on F1-F4 in the order the controller diagram stacks them, and
-  // deliberately not on Enter, Backspace, Home or End: those mean something to a text field, and
-  // the panel has one of its own.
+  // Enter, Backspace, Home and End belong to the panel's text fields.
   function test_system_buttons_are_the_function_keys() {
     var expected = [{ key: Qt.Key_F1, name: "guide" }, { key: Qt.Key_F2, name: "back" },
                     { key: Qt.Key_F3, name: "start" }, { key: Qt.Key_F4, name: "share" }]
@@ -264,8 +250,6 @@ TestCase {
     verify(gamepad.pressKey(Qt.Key_W, Qt.NoModifier, false))
   }
 
-  // isActive() has to agree with the manager about when an axis becomes a virtual button,
-  // otherwise the bindings table highlights the wrong row.
   function test_virtual_button_activates_at_the_managers_deadzone() {
     gamepad.setAxis("left_stick_y", 0.5)
     verify(!gamepad.isActive("left_stick_up"), "0.5 is not yet past the deadzone")
@@ -274,7 +258,6 @@ TestCase {
     verify(!gamepad.isActive("left_stick_down"))
   }
 
-  // Guards against a future rebind quietly stealing a key that already drives something else.
   function test_no_key_drives_both_an_axis_and_a_button() {
     for (var key in gamepad.axisKeys)
       verify(gamepad.buttonKeys[key] === undefined,

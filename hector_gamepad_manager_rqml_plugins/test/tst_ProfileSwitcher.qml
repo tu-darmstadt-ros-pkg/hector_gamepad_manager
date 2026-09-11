@@ -13,7 +13,7 @@ TestCase {
 
   ProfileSwitcher {
     id: switcher
-    // Short enough to let a test actually wait for it.
+    // Short enough to wait for in a test.
     timeoutMs: 120
     configSwitches: [{ config: "driving", name: "back" },
                      { config: "manipulation", name: "start" },
@@ -42,8 +42,6 @@ TestCase {
     verify(switcher.busy)
   }
 
-  // The whole point of the rework: the robot reporting the requested profile clears the request,
-  // so nothing is left pinned to a stale selection.
   function test_the_profile_message_confirms_the_request() {
     switcher.request("manipulation")
     switcher.activeProfile = "manipulation"
@@ -53,7 +51,6 @@ TestCase {
     compare(failures.length, 0)
   }
 
-  // A confirmation must not later be undone by the timeout that was running for it.
   function test_a_confirmed_switch_does_not_also_time_out() {
     switcher.request("manipulation")
     switcher.activeProfile = "manipulation"
@@ -70,8 +67,6 @@ TestCase {
     compare(succeeded.length, 0)
   }
 
-  // A profile the virtual gamepad cannot reach has to say so rather than doing nothing, which is
-  // what the old code did.
   function test_a_switch_on_a_virtual_axis_button_reports_why() {
     verify(!switcher.request("inspection"))
     compare(failures.length, 1)
@@ -107,15 +102,13 @@ TestCase {
     compare(switcher.pendingProfile, "manipulation")
   }
 
-  // Someone switching on a real gamepad moves the active profile without us asking; that must not
-  // be reported as our success.
+  // E.g. a switch made on a real gamepad.
   function test_an_unrequested_profile_change_is_not_a_confirmation() {
     switcher.activeProfile = "manipulation"
     compare(succeeded.length, 0)
     compare(switcher.pendingProfile, "")
   }
 
-  // A change to some third profile while we wait leaves the request pending until it times out.
   function test_a_different_profile_does_not_confirm_the_request() {
     switcher.request("manipulation")
     switcher.activeProfile = "inspection"

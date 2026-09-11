@@ -11,8 +11,7 @@ if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()
 
-  # VirtualGamepadState.qml imports nothing but QtQuick, so its tests run
-  # without the Ros2 mocks the rqml plugin test harness needs.
+  # Tests the ROS-free QML components, which need no Ros2 module.
   find_package(Qt6 QUIET COMPONENTS QuickTest)
   if(Qt6QuickTest_FOUND)
     add_executable(test_virtual_gamepad test/test_qml.cpp)

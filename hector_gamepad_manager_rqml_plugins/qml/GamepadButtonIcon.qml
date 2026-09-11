@@ -1,13 +1,8 @@
 import QtQuick
+import QtQuick.Controls.Material
 import Qt5Compat.GraphicalEffects
 
-// Button-glyph badge for a single gamepad control key. Renders the matching Zacksly controller icon
-// (svgs/buttons, CC BY 3.0 - see svgs/ATTRIBUTION.md) tinted to fit the theme: face buttons take
-// muted, colour-coded hues; every other control follows contentColor. Reserved config-switch
-// buttons are drawn in accentColor.
-//
-// The glyphs are shape-positive with their label cut out as a transparent hole, so the label reads
-// as whatever sits behind the badge.
+// Tinted glyph for one gamepad control. Icons by Zacksly (CC BY 3.0), see svgs/ATTRIBUTION.md.
 Item {
   id: icon
 
@@ -15,24 +10,30 @@ Item {
   property string controlKey
 
   //! Tint for the monochrome (non-face) glyphs.
-  property color contentColor: "#37474F"
+  property color contentColor: palette.text
 
-  //! Tint applied to the whole badge when reserved.
-  property color accentColor: "#2196F3"
+  //! Tint for a reserved control.
+  property color accentColor: palette.highlight
 
-  //! Draw the badge in accentColor to mark a reserved config-switch button.
+  //! The control is a config-switch button.
   property bool reserved: false
 
-  //! Tint applied to the whole badge while the control is deflected or pressed.
-  property color activeColor: "#43A047"
+  //! Tint while the control is pressed or deflected.
+  property color activeColor: palette.highlight
 
-  //! Draw the badge in activeColor to mark a control the operator is currently using.
+  //! The control is pressed or deflected.
   property bool active: false
 
-  //! Badge edge length (the source glyphs are square).
+  //! Edge length of the square glyph.
   property real size: 20
 
-  readonly property var faceColors: ({ "a": "#009E73", "b": "#C0392B", "x": "#0072B2", "y": "#E69F00" })
+  //! A, B, X and Y keep the colours of the physical pad.
+  readonly property var faceColors: ({
+    "a": Material.color(Material.Green, Material.Shade700),
+    "b": Material.color(Material.Red, Material.Shade700),
+    "x": Material.color(Material.Blue, Material.Shade700),
+    "y": Material.color(Material.Amber, Material.Shade700)
+  })
   readonly property var glyphFiles: ({
     "a": "A.svg", "b": "B.svg", "x": "X.svg", "y": "Y.svg",
     "lb": "Left Bumper.svg", "rb": "Right Bumper.svg",

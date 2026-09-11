@@ -1,13 +1,11 @@
 import QtQuick
-import QtQuick.Controls
+import RQml.Elements
 
-// One-way readout for a trigger: a bar filling 0 -> 1, with the manager's deadzone marked so you
-// can see where it starts counting as a pressed virtual button.
+// Trigger readout: a bar filling from 0 to 1 with the manager's deadzone marked.
 Item {
   id: bar
 
-  //! Trigger travel, 0 (released) to 1 (fully pressed). This is the logical value, not the
-  //! inverted one that goes on the wire.
+  //! Trigger travel from 0 (released) to 1 (fully pressed), not the negated wire value.
   property real value: 0
 
   //! Travel past which the manager treats the trigger as a pressed virtual button.
@@ -27,12 +25,11 @@ Item {
   implicitWidth: 130
   implicitHeight: Math.max(track.implicitHeight, name.implicitHeight)
 
-  Label {
+  Caption {
     id: name
     anchors.left: parent.left
     anchors.verticalCenter: parent.verticalCenter
     width: 18
-    font.pixelSize: 11
     font.bold: true
     color: bar.pressed ? bar.activeColor : bar.contentColor
     text: bar.label
@@ -72,12 +69,11 @@ Item {
     }
   }
 
-  Label {
+  Caption {
     id: hint
     anchors.right: parent.right
     anchors.verticalCenter: parent.verticalCenter
     horizontalAlignment: Text.AlignRight
-    font.pixelSize: 11
     font.bold: true
     color: bar.pressed ? bar.activeColor : bar.contentColor
     text: bar.keyHint

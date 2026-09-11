@@ -1,13 +1,8 @@
 import QtQuick
-import QtQuick.Controls
+import RQml.Elements
 
-// Two-axis readout drawn the way the stick actually moves: a dot inside a square, with the
-// manager's deadzone marked so you can see the exact point an axis starts acting as a virtual
-// button. Read-only: the keyboard drives the gamepad, and a draggable stick would be a way around
-// the panel's capture rules.
-//
-// Positive x is left and positive y is up, matching the ROS joy convention, so the dot moves the
-// way the physical stick would.
+// Two-axis readout: a dot in a square with the manager's deadzone marked. Positive x is left and
+// positive y is up (ROS joy convention).
 Item {
   id: pad
 
@@ -18,13 +13,13 @@ Item {
   //! Deflection past which the manager treats the axis as a pressed virtual button.
   property real deadzone: 0.5
 
-  //! Draw the dot only at the nine positions a d-pad can report, and skip the deadzone ring.
+  //! Hide the deadzone ring, for inputs like the d-pad that have none.
   property bool discrete: false
 
   //! Caption under the pad, e.g. "Left stick".
   property string label: ""
 
-  //! Keys that drive the axes, shown beside the caption.
+  //! Keys that drive the axes, shown under the caption.
   property string keyHint: ""
 
   property color contentColor: palette.text
@@ -44,7 +39,7 @@ Item {
     border.width: 1
     border.color: pad.deflected ? pad.activeColor : pad.contentColor
 
-    // Deadzone ring: inside it the manager sees no virtual button press.
+    // Deadzone ring.
     Rectangle {
       visible: !pad.discrete
       anchors.centerIn: parent
@@ -57,7 +52,7 @@ Item {
       opacity: 0.35
     }
 
-    // Cross-hair through the centre, so a small deflection is still visible against something.
+    // Cross-hair.
     Rectangle {
       anchors.centerIn: parent
       width: parent.width - 8
@@ -79,7 +74,7 @@ Item {
       height: 9
       radius: width / 2
       color: pad.deflected ? pad.activeColor : pad.contentColor
-      // Positive x is left, so it subtracts; positive y is up, so it subtracts too.
+      // Positive x is left and positive y is up, so both subtract.
       x: (field.width - width) / 2 - pad.xValue * (field.width - width) / 2
       y: (field.height - height) / 2 - pad.yValue * (field.height - height) / 2
     }
@@ -92,19 +87,15 @@ Item {
     width: parent.width
     spacing: 0
 
-    Label {
+    Caption {
       width: parent.width
       horizontalAlignment: Text.AlignHCenter
-      font.pixelSize: 11
-      elide: Text.ElideRight
       text: pad.label
     }
-    Label {
+    Caption {
       width: parent.width
       horizontalAlignment: Text.AlignHCenter
-      font.pixelSize: 11
       font.bold: true
-      elide: Text.ElideRight
       visible: pad.keyHint !== ""
       color: pad.deflected ? pad.activeColor : pad.contentColor
       text: pad.keyHint

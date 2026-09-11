@@ -1,8 +1,6 @@
 import QtQuick
 
-// Descendant search for the tests. QtTest's own findChild() covers lookup by objectName; this
-// covers the items that carry no name of their own - an Image inside the ported diagram, the dot
-// inside a StickPad - and are matched by type or by a property instead.
+// Descendant search by predicate, for items without an objectName.
 QtObject {
   //! Every descendant of `item` the predicate accepts, depth first.
   function collect(item, predicate) {

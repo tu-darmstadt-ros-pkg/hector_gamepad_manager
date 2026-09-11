@@ -6,13 +6,8 @@ import QtQuick.Window
 import Ros2
 import RQml.Elements
 
-// Drive a hector_gamepad_manager from the keyboard when no gamepad is at hand, and show what the
-// active config binds each control to.
-//
-// The plugin publishes sensor_msgs/Joy exactly as a real joy driver would, so the manager, its
-// plugins and the config switching all behave as usual. Pick the robot by its joy_mapping topic;
-// the joy topic is derived from it and can be overridden to publish to the operator station's
-// local joy topic instead, letting the joy_satellite forward it.
+// Drives a hector_gamepad_manager from the keyboard by publishing sensor_msgs/Joy, and shows what
+// the active config binds each control to.
 Rectangle {
   id: root
 
@@ -20,8 +15,6 @@ Rectangle {
 
   color: palette.base
 
-  // Frames the panel in the state colour, so the capture state is readable at a glance and from
-  // across the room when several panels are open. No frame while not publishing.
   border.width: capture.state === "off" ? 0 : 2
   border.color: d.status.color
 
@@ -54,16 +47,13 @@ Rectangle {
     // Switches made on a real gamepad or another panel only show up here.
     onActiveProfileChanged: gamepad.resetAxes()
 
-    //! Config whose bindings are on show. Always the active one - there is no separate "viewing"
-    //! state to fall out of sync with the robot. Before the first profile message arrives the
-    //! mapping's default is the best guess.
+    //! Config whose bindings are shown: the active one, or the mapping's default until it is known.
     readonly property string shownProfile: activeProfile || (mapping ? mapping.default_config : "")
 
     //! Config a switch has been requested for and not yet confirmed, "" when idle.
     readonly property string pendingProfile: switcher.pendingProfile
 
-    //! Remaining publish ticks a synthesized config-switch press is held for. A single tick can be
-    //! missed if it coincides with the manager's own callback, so hold it over a few.
+    //! Publish ticks left on a synthesized switch press, held for a few in case one is missed.
     property int switchTicksLeft: 0
     property string switchButton: ""
 
@@ -128,9 +118,7 @@ Rectangle {
     // GamepadAction.event -> badge. EVENT_PRESS carries none.
     readonly property var eventBadge: ({ 0: "", 1: "2x", 2: "hold", 3: "release" })
 
-    //! One row per bound action of the selected config: which key drives it, which gamepad control
-    //! that is, and what it does. This is the whole point of the help view - the manager's own
-    //! mapping never mentions a keyboard.
+    //! One row per bound action of the shown config: keyboard key, gamepad control, description.
     readonly property var bindings: {
       var rows = []
       var config = findConfig(shownProfile)
@@ -157,9 +145,7 @@ Rectangle {
       return rows
     }
 
-    // Canonical input name -> GamepadView control key. Virtual axis buttons and the raw axis both
-    // fold onto the glyph of the control they read from, so a stick bound as an axis and as four
-    // directions reads as one control on the diagram.
+    // Canonical input name -> GamepadView control key. Axes and their virtual buttons share one.
     readonly property var nameToControl: ({
       "a": "a", "b": "b", "x": "x", "y": "y",
       "left_bumper": "lb", "right_bumper": "rb",
@@ -176,10 +162,7 @@ Rectangle {
       "right_stick_x": "rstick", "right_stick_y": "rstick"
     })
 
-    //! controlLabels for GamepadView, built from the same rows the table shows. Each row carries
-    //! the key of the input it actually came from, so a stick bound as two axes shows "W / S" on
-    //! its drive row and "A / D" on its steer row rather than one combined cap for both. Rows
-    //! whose control has no place on the artwork are simply left out; the table still lists them.
+    //! GamepadView labels from the table rows. Rows without a place on the drawing are left out.
     readonly property var controlLabels: {
       var result = ({})
       bindings.forEach(function (row) {
@@ -191,7 +174,7 @@ Rectangle {
         var rows = result[key]
         for (var i = 0; i < rows.length; ++i)
           if (rows[i].badge === row.badge && rows[i].text === row.text)
-            return // an axis bound as both axis and virtual buttons would repeat itself
+            return // an axis bound as axis and as virtual buttons would appear twice
         rows.push({ badge: row.badge, text: row.text, key: row.key })
       })
       return result
@@ -208,9 +191,7 @@ Rectangle {
       return keys
     }
 
-    // Which canonical input each diagram control takes its keycap from when no binding row names a
-    // key of its own - the unbound case, where the diagram still shows the layout. A stick names
-    // both of its axes; everything else is a single input.
+    // Diagram control -> inputs whose keys label it when no binding row names a key.
     readonly property var controlKeySources: ({
       "a": ["a"], "b": ["b"], "x": ["x"], "y": ["y"],
       "lb": ["left_bumper"], "rb": ["right_bumper"],
@@ -223,8 +204,7 @@ Rectangle {
       "dpad_left": ["dpad_left"], "dpad_right": ["dpad_right"]
     })
 
-    //! Control key -> keyboard keycap text for the diagram, so it carries the same key column the
-    //! bindings table does.
+    //! Diagram control key -> keycap text.
     readonly property var controlKeys: {
       var result = ({})
       for (var key in controlKeySources) {
@@ -248,17 +228,19 @@ Rectangle {
       return keys
     }
 
-    //! Colour and wording per capture state, in one table so the two cannot drift apart. The hint
-    //! names the single action that clears the state. The colours are semantic rather than palette
-    //! roles: they have to read the same way in every theme.
+    //! Colour, title and hint per capture state. The hint names the action that clears the state.
     readonly property var statusStyles: ({
-      "live": ({ color: "#2E7D32", title: qsTr("Driving - keyboard captured"),
+      "live": ({ color: Material.color(Material.Green, Material.Shade800),
+                 title: qsTr("Driving - keyboard captured"),
                  hint: qsTr("Space centers the axes, Esc stops everything") }),
-      "idle": ({ color: "#EF6C00", title: qsTr("Keyboard not captured"),
+      "idle": ({ color: Material.color(Material.Orange, Material.Shade800),
+                 title: qsTr("Keyboard not captured"),
                  hint: qsTr("Click anywhere in this panel to drive") }),
-      "typing": ({ color: "#1565C0", title: qsTr("Typing in a text field"),
+      "typing": ({ color: Material.color(Material.Blue, Material.Shade800),
+                   title: qsTr("Typing in a text field"),
                    hint: qsTr("Press Enter or click below the toolbar to drive again") }),
-      "invalid": ({ color: "#C62828", title: qsTr("No valid joy topic"),
+      "invalid": ({ color: Material.color(Material.Red, Material.Shade800),
+                    title: qsTr("No valid joy topic"),
                     hint: qsTr("Nothing is being published - check the joy topic") }),
       "off": ({ color: root.palette.mid, title: qsTr("Not publishing"),
                 hint: qsTr("Press Enable to start the joy stream") })
@@ -266,13 +248,14 @@ Rectangle {
 
     readonly property var status: statusStyles[capture.state]
 
-    //! The colour that means "this is live", shared by the banner, the panel frame, the mode chip,
-    //! the read-outs, the diagram's pressed control and the active binding row. Nothing else in the
-    //! panel uses it; palette.highlight covers selection and meta, such as the reserved
-    //! config-switch glyphs.
+    //! Live fill behind white text: the driving banner, the active mode and pressed table rows.
     readonly property color liveColor: statusStyles["live"].color
 
-    //! White carries every state colour; only the unarmed grey needs the theme's own text colour.
+    //! Live colour for lines and text on the panel background, lighter on dark themes.
+    readonly property color liveForeground: Material.color(Material.Green,
+      root.palette.base.hslLightness < 0.5 ? Material.Shade300 : Material.Shade800)
+
+    //! Text on the status colour: white, except on the neutral "off" colour.
     readonly property color statusTextColor: capture.state === "off" ? root.palette.text : "white"
 
     function makeRow(name, badge, text) {
@@ -296,8 +279,7 @@ Rectangle {
       return name.charAt(0).toUpperCase() + name.substring(1).replace(/_/g, " ")
     }
 
-    //! Does this item want the keyboard for itself? Duck-typed rather than compared against
-    //! TextInput/TextEdit so it covers whatever a Controls style puts inside a SpinBox too.
+    //! The item takes text input. Duck-typed to also catch the text input inside a SpinBox.
     function isTextEntry(item) {
       return !!item && item.selectedText !== undefined && item.cursorPosition !== undefined
     }
@@ -319,8 +301,7 @@ Rectangle {
       return qsTr("No gamepad button switches to %1.").arg(config)
     }
 
-    //! One Joy message carrying the current state. The neutral message that closes the stream is
-    //! the same message with everything at rest.
+    //! Publish the current state once. Also sends the neutral message when the stream stops.
     function publishState() {
       publisher.publish({
         "header": { "stamp": Ros2.now(), "frame_id": "" },
@@ -344,8 +325,6 @@ Rectangle {
 
     configSwitches: d.mapping ? d.mapping.config_switches : []
     pressableButtons: gamepad.buttonIndices
-    // The manager republishes the profile on every switch, including ones made on a real gamepad,
-    // so this both confirms our request and keeps the chips honest about someone else's change.
     activeProfile: d.activeProfile
 
     onPressRequested: name => d.pressSwitchButton(name)
@@ -366,14 +345,12 @@ Rectangle {
 
     publishing: !!context.enabled
     topicValid: d.publisher !== null
-    // The scope has active focus whenever any of its descendants does, so any element counts.
+    // True while any element of the panel has the focus.
     panelFocused: captureScope.activeFocus
-    // Key releases are only delivered to the active window, so a deflection held across an
-    // alt-tab would never be released.
     windowActive: root.Window.active
     typing: d.isTextEntry(root.Window.activeFocusItem)
 
-    // Keys held when capture ends never report their release, whatever ended it.
+    // Keys held when capture ends never report their release.
     onCapturingChanged: if (!capturing) gamepad.reset()
   }
 
@@ -406,8 +383,6 @@ Rectangle {
     topic: context.mappingTopic || ""
     messageType: "hector_gamepad_manager_msgs/msg/GamepadMapping"
     qos: Ros2.QoS().transient_local().reliable().keep_last(1)
-    // shownProfile falls back to the mapping's default until a profile message arrives, so
-    // nothing needs seeding here.
     onNewMessage: message => d.mapping = d.parseMapping(message)
   }
 
@@ -418,11 +393,8 @@ Rectangle {
     onNewMessage: message => d.activeProfile = message.data
   }
 
-  // The whole plugin is the capture area: key events bubble up from whichever element holds the
-  // focus to this scope, so only leaving the panel costs the keyboard. Every control is declared
-  // focusPolicy: Qt.NoFocus, which keeps the focus on keyFocus when one is clicked and stops Space
-  // and the arrows from being taken as button activation and focus navigation. The text fields are
-  // the exception: they take the focus normally, and capture reads "typing" while they hold it.
+  // Key events bubble up to this scope from whichever element has the focus. Controls use
+  // Qt.NoFocus so Space and the arrow keys never activate them; only the text fields take focus.
   FocusScope {
     id: captureScope
     anchors.fill: parent
@@ -438,9 +410,7 @@ Rectangle {
       event.accepted = gamepad.releaseKey(event.key, event.isAutoRepeat)
     }
 
-    // Something inside the scope has to own the focus for the scope to have it, and it must not be
-    // one of the controls. This empty item takes the role; a click anywhere in the working area
-    // hands the keyboard back to it.
+    // Holds the focus while no text field has it, since the controls never take it.
     Item {
       id: keyFocus
       objectName: "keyFocus"
@@ -459,16 +429,14 @@ Rectangle {
         FuzzySelector {
           id: mappingTopicSelect
 
-          //! Set once the stored topic and the auto-selection are in, so neither counts as a
-          //! retarget.
+          //! Set after the stored topic is restored, so restoring does not count as a retarget.
           property bool restored: false
 
           function refresh() {
             var topics = Ros2.queryTopics("hector_gamepad_manager_msgs/msg/GamepadMapping")
             topics.sort()
             model = topics
-            // A single robot is not a choice, and the panel shows nothing until one is picked.
-            // Two or more stays empty: choosing could point the keyboard at the wrong robot.
+            // Pick the only robot automatically. With several, the user has to choose.
             if (!context.mappingTopic && topics.length === 1)
               text = topics[0]
           }
@@ -481,8 +449,7 @@ Rectangle {
           onTextChanged: {
             if (text === context.mappingTopic)
               return
-            // Retargeting stops the stream before the topics change, so the robot being left gets
-            // its neutral message on context.joyTopic, which still points at it here.
+            // Stop the stream first, so the previous robot gets its neutral message.
             if (restored)
               enableButton.checked = false
             context.mappingTopic = text
@@ -509,24 +476,20 @@ Rectangle {
           id: joyTopicField
           Layout.fillWidth: true
           objectName: "joyTopicField"
-          // Set by hand to the operator station's local joy topic to publish through the
-          // joy_satellite instead of straight to the robot. Only a hand-edit pins it; the field is
-          // assigned imperatively so selecting a robot can keep steering it.
+          // Editing the topic by hand pins it, e.g. to publish through the joy_satellite.
           Component.onCompleted: text = context.joyTopic ?? "/joy"
           onTextEdited: {
             context.joyTopic = text
             context.joyTopicPinned = true
           }
-          // Enter means "done here", which for this panel means giving the keyboard back.
+          // Enter hands the keyboard back to the gamepad.
           onAccepted: keyFocus.forceActiveFocus()
         }
         Label {
           text: qsTr("Rate:")
         }
         SpinBox {
-          // A SpinBox starts at 0 and clamps itself up to `from` during creation. Writing that back
-          // to the context before Component.onCompleted reads it would pin the rate at 1 Hz for
-          // good, so the handler stays quiet until the stored value has been restored.
+          // On creation the SpinBox clamps its initial 0 up to `from`; that must not be stored.
           property bool restored: false
 
           editable: true
@@ -541,27 +504,20 @@ Rectangle {
         }
       }
 
-      // Publishing and focus are separate on purpose. Enabling starts the stream, which keeps the
-      // manager fed with a neutral gamepad even when nothing is pressed - a stream that simply
-      // ended would leave the manager holding the last value it saw. Keys only drive while this
-      // panel has the keyboard, which is where an unnoticed focus loss would otherwise silently
-      // strand a deflection.
+      // Enable streams continuously, neutral when idle, so the manager never holds a stale value.
       RowLayout {
         Layout.fillWidth: true
 
         Button {
           id: enableButton
 
-          //! Set once the stored state is in: only a deliberate press takes the keyboard, not a
-          //! saved layout being restored.
+          //! Set after restoring, so only a click takes the keyboard.
           property bool restored: false
 
           objectName: "enableButton"
           checkable: true
           focusPolicy: Qt.NoFocus
-          // Assigned once, not bound: the handler writes context.enabled, so a binding on it would
-          // loop. The two toggles beside it are the same. A fresh panel opens publishing, since
-          // opening the plugin is already the decision to drive.
+          // A binding would loop, since the handler writes context.enabled.
           Component.onCompleted: {
             checked = context.enabled ?? true
             restored = true
@@ -569,12 +525,11 @@ Rectangle {
           text: checked ? qsTr("Publishing") : qsTr("Enable")
           onCheckedChanged: {
             context.enabled = checked
-            // Never hand over the last deflection when the stream stops or starts.
+            // Start and stop the stream from rest.
             gamepad.reset()
-            // A synthesized press only reaches the robot while the stream runs, so a request in
-            // flight here would sit until it timed out for the wrong reason.
+            // A pending switch press cannot reach the robot without the stream.
             switcher.abort()
-            // Take the keyboard on a deliberate press, so driving does not need a second click.
+            // Take the keyboard, so driving needs no second click.
             if (checked && restored)
               keyFocus.forceActiveFocus()
             if (!checked && d.publisher)
@@ -612,11 +567,6 @@ Rectangle {
           }
           onValueChanged: if (restored) context.step = value
         }
-        // The diagram needs a lot of room, so it replaces the table rather than sharing with it.
-        // It is the default: it reads at a glance and draws the layout even before a mapping
-        // arrives, which is also why this toggle lives here rather than next to the profile
-        // switcher - it stays reachable before a mapping topic has been picked. The table is the
-        // fallback for the full list, including the controls the diagram has no place for.
         Button {
           id: diagramButton
           objectName: "diagramButton"
@@ -632,7 +582,6 @@ Rectangle {
         Item {
           Layout.fillWidth: true
         }
-        // Only worth saying when there are no mode chips to say it instead.
         Label {
           visible: d.configNames.length === 0
           text: qsTr("No profile")
@@ -640,16 +589,13 @@ Rectangle {
         }
       }
 
-      // Everything below the toolbar is safe to click for focus: it holds no text field, so a
-      // press anywhere in it can hand the keyboard back without a rule about where it landed.
+      // Below the toolbar there are no text fields, so any click here hands the keyboard back.
       Item {
         objectName: "workingArea"
         Layout.fillWidth: true
         Layout.fillHeight: true
 
-        // On press rather than on tap, so a press that turns into a flick still captures the
-        // keyboard. DragThreshold (the default) keeps this to a passive grab, which leaves the
-        // table's flicking untouched.
+        // Reacts on press so flicks capture too; its passive grab leaves flicking to the table.
         TapHandler {
           onPressedChanged: if (pressed) keyFocus.forceActiveFocus()
         }
@@ -658,8 +604,6 @@ Rectangle {
           anchors.fill: parent
           spacing: 6
 
-          // Answers "are my keys reaching the robot?" in one colour, and when they are not, names
-          // the reason and the action that clears it.
           Rectangle {
             Layout.fillWidth: true
             objectName: "statusBanner"
@@ -675,8 +619,7 @@ Rectangle {
               anchors.margins: 8
               spacing: 8
 
-              // Beats while the stream is actually going out, so a dead publisher cannot look
-              // like a live one.
+              // Pulses while messages are going out.
               Rectangle {
                 Layout.alignment: Qt.AlignVCenter
                 width: 10
@@ -704,7 +647,6 @@ Rectangle {
                 opacity: 0.9
                 text: d.status.hint
               }
-              // Where the stream is going, beside the state that describes it.
               Caption {
                 visible: capture.streaming
                 color: d.statusTextColor
@@ -713,16 +655,13 @@ Rectangle {
             }
           }
 
-          // Live state, shown the way the controls move rather than as eight numbers. Button state
-          // is deliberately not repeated here: the diagram tints a pressed control and the table
-          // highlights its row, so both views already show it.
+          // Axis readouts. Pressed buttons show in the diagram and the table.
           Rectangle {
             Layout.fillWidth: true
             implicitHeight: readouts.implicitHeight + 16
             radius: 4
             color: palette.alternateBase
             border.width: 2
-            // Same colour as the banner, so the box watched while driving carries the state too.
             border.color: d.status.color
 
             RowLayout {
@@ -737,7 +676,7 @@ Rectangle {
                 yValue: gamepad.leftStickY
                 deadzone: gamepad.axisDeadzone
                 contentColor: palette.text
-                activeColor: d.liveColor
+                activeColor: d.liveForeground
               }
 
               ColumnLayout {
@@ -749,7 +688,7 @@ Rectangle {
                   value: gamepad.leftTrigger
                   deadzone: gamepad.axisDeadzone
                   contentColor: palette.text
-                  activeColor: d.liveColor
+                  activeColor: d.liveForeground
                 }
                 TriggerBar {
                   Layout.fillWidth: true
@@ -758,7 +697,7 @@ Rectangle {
                   value: gamepad.rightTrigger
                   deadzone: gamepad.axisDeadzone
                   contentColor: palette.text
-                  activeColor: d.liveColor
+                  activeColor: d.liveForeground
                 }
               }
 
@@ -769,15 +708,14 @@ Rectangle {
                 yValue: gamepad.rightStickY
                 deadzone: gamepad.axisDeadzone
                 contentColor: palette.text
-                activeColor: d.liveColor
+                activeColor: d.liveForeground
               }
 
               StickPad {
                 label: qsTr("D-pad")
                 keyHint: gamepad.keyLabels["dpad_up"] + " / " + gamepad.keyLabels["dpad_down"]
                          + "  " + gamepad.keyLabels["dpad_left"] + " / " + gamepad.keyLabels["dpad_right"]
-                // Four real buttons rather than an axis pair, so the dot only ever sits on one of
-                // nine spots and there is no deadzone to draw.
+                // Four buttons, so there is no deadzone.
                 discrete: true
                 xValue: (gamepad.isButtonPressed("dpad_left") ? 1 : 0)
                         - (gamepad.isButtonPressed("dpad_right") ? 1 : 0)
@@ -785,15 +723,12 @@ Rectangle {
                         - (gamepad.isButtonPressed("dpad_down") ? 1 : 0)
                 deadzone: gamepad.axisDeadzone
                 contentColor: palette.text
-                activeColor: d.liveColor
+                activeColor: d.liveForeground
               }
             }
           }
 
-          // Mode chips. One per config, the active one filled: this is both the indicator of what
-          // the robot is in and the control that changes it, so the two can never disagree.
-          // Clicking a chip presses that config's reserved switch button; the bindings below always
-          // follow whatever the robot reports, including switches made on a real gamepad.
+          // One chip per config, the active one filled. Clicking one presses its switch button.
           RowLayout {
             Layout.fillWidth: true
             visible: d.configNames.length > 0
@@ -811,14 +746,10 @@ Rectangle {
                 readonly property bool isPending: modelData === d.pendingProfile
 
                 objectName: "modeChip_" + modelData
-                // The active mode stays enabled: a greyed chip reads as unavailable, which is the
-                // opposite of what it means here, and pressing it is harmless - the switcher drops
-                // a request for the profile already active. A switch is a synthesized button
-                // press, so it needs a stream to travel on, not just the Enable button.
+                // The active chip stays enabled: greyed out it would read as unavailable.
                 enabled: capture.streaming && d.pendingProfile === ""
                 focusPolicy: Qt.NoFocus
-                // Filled in the live colour, with the dot repeating it for anyone who cannot rely
-                // on colour.
+                // The dot marks the active chip without relying on colour.
                 highlighted: isActive
                 Material.accent: d.liveColor
                 text: isActive ? "● " + modelData : (isPending ? modelData + " …" : modelData)
@@ -840,8 +771,7 @@ Rectangle {
           GamepadView {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            // Shown even with no mapping: an unlabelled controller still reflects live input,
-            // which is the quickest way to check that the keyboard is getting through.
+            // Also shown without a mapping, to check that key presses arrive.
             visible: diagramButton.checked
             controlLabels: d.controlLabels
             controlKeys: d.controlKeys
@@ -849,9 +779,8 @@ Rectangle {
             activeControls: d.activeControls
             contentColor: palette.text
             labelBackgroundColor: palette.base
-            // accentColor marks reserved config-switch glyphs and modifier badges, not live input.
             accentColor: palette.highlight
-            activeColor: d.liveColor
+            activeColor: d.liveForeground
           }
 
           ListView {
@@ -862,9 +791,7 @@ Rectangle {
             model: d.bindings
             ScrollBar.vertical: ScrollBar {}
 
-            // A Flickable consumes the press before an ancestor's handler sees it, so the table
-            // needs its own copy of the working area's click-to-capture. Flicking still works:
-            // this only takes a passive grab.
+            // The Flickable takes presses before the working area's handler sees them.
             TapHandler {
               onPressedChanged: if (pressed) keyFocus.forceActiveFocus()
             }
@@ -887,13 +814,10 @@ Rectangle {
                   Layout.preferredWidth: 70
                   font.bold: true
                   color: active ? "white" : palette.text
-                  // A control the keyboard cannot reach still gets a row, just without a key.
-                  // Dimmed by opacity: palette.mid is a frame colour and reads at about 2:1 on
-                  // palette.base.
+                  // Dims controls the keyboard cannot reach.
                   opacity: modelData.bound ? 1 : 0.6
                   text: modelData.bound ? modelData.key : "-"
                 }
-                // A clipped control name or description can be read in full by hovering it.
                 TruncatedLabel {
                   Layout.preferredWidth: 120
                   color: active ? "white" : palette.text

@@ -2,8 +2,7 @@ import QtQuick
 import QtTest
 import "../qml"
 
-// The pads replace a column of numbers, so the thing worth testing is that the dot moves the way
-// the physical stick does: positive x is left and positive y is up, per the ROS joy convention.
+// The dot moves like the physical stick: positive x is left, positive y is up (ROS joy convention).
 TestCase {
   id: testCase
   name: "StickPad"
@@ -11,7 +10,7 @@ TestCase {
   width: 200
   height: 200
 
-  // Both read-outs are rebuilt for every test, so no deflection can carry over.
+  // Both are rebuilt in init(), so no deflection carries over between tests.
   readonly property var pad: padLoader.item
   readonly property var trigger: triggerLoader.item
 
@@ -46,7 +45,7 @@ TestCase {
     triggerLoader.active = true
   }
 
-  //! The deflection dot, which carries no objectName: it is the only round child of its size.
+  //! The dot has no objectName; it is the only child of its size with a radius.
   function dot() {
     return finder.first(pad, function (child) {
       return child.radius !== undefined && child.width === 9
@@ -86,7 +85,6 @@ TestCase {
     verify(dot().y + dot().height <= pad.width)
   }
 
-  // The highlight has to flip at the same point the manager starts seeing a virtual button.
   function test_deflected_follows_the_managers_deadzone() {
     pad.yValue = 0.5
     verify(!pad.deflected, "0.5 is not yet past the deadzone")

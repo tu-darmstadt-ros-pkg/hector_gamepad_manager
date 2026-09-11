@@ -2,8 +2,7 @@ import QtQuick
 import QtTest
 import "../qml"
 
-// Smoke tests for the Qt6 port of the controller diagram: the ported imports resolve, the bundled
-// SVGs actually load, and the callout groups lay out. None of this needs ROS.
+// Smoke tests: the imports resolve, the bundled SVGs load and the callout groups lay out.
 TestCase {
   id: testCase
   name: "GamepadView"
@@ -11,8 +10,7 @@ TestCase {
   width: 900
   height: 600
 
-  // Both subjects are rebuilt for every test, so one test cannot leave a control map or a tint
-  // behind for the next.
+  // Both are rebuilt in init(), so no state carries over between tests.
   readonly property var view: viewLoader.item
   readonly property var icon: iconLoader.item
 
@@ -69,8 +67,7 @@ TestCase {
     compare(images[0].status, Image.Ready, "failed to load " + images[0].source)
   }
 
-  // Every glyph the icon knows must resolve, so a renamed or missing SVG fails here rather than
-  // silently rendering an empty badge.
+  // A renamed or missing SVG would render an empty badge.
   function test_every_glyph_file_resolves() {
     for (var key in icon.glyphFiles) {
       icon.controlKey = key
@@ -85,14 +82,11 @@ TestCase {
            "the Share button needs a glyph or its bindings render without a badge")
   }
 
-  // The diagram carries the same keyboard column the bindings table does.
   function test_keycaps_are_drawn_next_to_their_glyph() {
     view.controlKeys = ({ "a": "A", "lt": "W" })
     verify(keycapLabels(view).indexOf("A") >= 0, "no keycap drawn for the A button")
   }
 
-  // Before any mapping arrives there are no bound actions, but the keycaps must still show so the
-  // diagram is useful on its own.
   function test_keycaps_show_without_any_bindings() {
     view.controlLabels = ({})
     view.controlKeys = ({ "a": "A", "lt": "W" })
@@ -101,8 +95,6 @@ TestCase {
     verify(caps.indexOf("W") >= 0)
   }
 
-  // A stick bound as two axes is reached by two different key pairs, so each row needs its own
-  // cap rather than one combined cap spanning both.
   function test_rows_carry_their_own_keycap() {
     view.controlKeys = ({ "lstick": "fallback" })
     view.controlLabels = ({
@@ -121,8 +113,7 @@ TestCase {
     compare(keycapLabels(view), ["↓"])
   }
 
-  // The undirected "dpad" control is an alias for the same physical control as the four
-  // directions. Once those are bound it must not add an empty fifth row just to show its key.
+  // "dpad" is an alias for the four directions and must not add an empty row once they are bound.
   function test_an_alias_adds_no_empty_row_beside_bound_siblings() {
     view.controlKeys = ({ "dpad": "T/G F/H", "dpad_up": "T", "dpad_down": "G" })
     view.controlLabels = ({
@@ -144,7 +135,6 @@ TestCase {
 
   function test_groups_are_laid_out() {
     verify(view.width > 0 && view.height > 0)
-    // A labelled group draws at least one glyph, so some icon must have a non-zero size.
     var icons = collectIcons(view)
     verify(icons.length > 0, "no button glyphs were drawn for the given controlLabels")
   }
@@ -158,8 +148,7 @@ TestCase {
     compare(icon.tint, before)
   }
 
-  // Item.visible is composed with every ancestor's, and a TestCase's scene is never shown, so it
-  // is always false here. Match the keycap delegate by the property only it declares instead.
+  // Item.visible is always false inside a TestCase, so match the keycap by its keyLabel property.
   function keycapLabels(item) {
     return finder.collect(item, function (child) { return child.keyLabel !== undefined })
       .map(function (cap) { return cap.keyLabel })

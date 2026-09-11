@@ -2,8 +2,6 @@ import QtQuick
 import QtTest
 import "../qml"
 
-// Green means the keys reach the robot, which is only true if this truth table is, so it is
-// checked here rather than by looking at the running plugin.
 TestCase {
   id: testCase
   name: "CaptureState"
@@ -12,7 +10,7 @@ TestCase {
     id: capture
   }
 
-  // Everything in order: the only combination that may report driving.
+  // The only combination that reports "live".
   function init() {
     capture.publishing = true
     capture.topicValid = true
@@ -26,8 +24,6 @@ TestCase {
     verify(capture.capturing)
   }
 
-  // Each state names the first thing standing between a key press and the robot, so the more
-  // fundamental problem has to win over one further down the chain.
   function test_state_reports_the_first_blocker() {
     var cases = [
       { publishing: false, topicValid: false, panelFocused: false, typing: true, state: "off" },
@@ -45,8 +41,7 @@ TestCase {
     }
   }
 
-  // A config switch is synthesized rather than typed, so it rides on the stream alone: the chips
-  // that request one have to follow this and not the capture state.
+  // Config switches are synthesized, so they only need the stream.
   function test_streaming_ignores_the_keyboard() {
     capture.panelFocused = false
     capture.typing = true
@@ -58,16 +53,13 @@ TestCase {
     verify(!capture.streaming)
   }
 
-  // Key releases are only delivered to the active window, so a deflection held across an alt-tab
-  // would never be released. Losing the window has to count as losing the keyboard.
+  // Key releases are only delivered to the active window.
   function test_inactive_window_is_not_capturing() {
     capture.windowActive = false
     compare(capture.state, "idle")
     verify(!capture.capturing)
   }
 
-  // The whole point of the focus scope: the panel drives no matter which of its elements holds
-  // the keyboard, and stops as soon as none of them does.
   function test_capture_follows_the_panel_focus() {
     capture.panelFocused = false
     verify(!capture.capturing)

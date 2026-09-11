@@ -1,65 +1,44 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Layouts
+import RQml.Elements
 
-// Schematic of an Xbox-style gamepad with callouts describing the function bound to each control.
-// The controller artwork is the bundled xbox-series-controller.svg. Controls that sit together
-// on the device share a callout group: the group is a plate stacking one glyph (GamepadButtonIcon)
-// per control beside a text row per bound action, with a spine along the edge facing the artwork
-// and a single right-angled connector from the spine's midpoint to the group's anchor on the
-// drawing.
-// This control is data-only: it takes plain JS objects and has no ROS or config dependency.
-//
-// Qt6 port of Hector.Controls.GamepadView from hector_qml_controls. It differs in two points: the
-// Hector.Utils Units dependency is covered by the local pt() below, and activeControls lets the
-// diagram show live gamepad state rather than only the static mapping. Keep the two in sync.
+// Controller drawing with a callout per control group listing the actions bound to it.
+// Qt5 counterpart: Hector.Controls.GamepadView in hector_qml_controls.
 Item {
   id: control
 
-  //! Map of control key -> array of rows {badge: string, text: string, key: string}.
-  //! `key` is optional and names the keyboard key for that row specifically, which matters where
-  //! one control carries several bindings reached by different keys - a stick bound as two axes
-  //! shows "W / S" beside its drive row and "A / D" beside its steer row. Without it the row falls
-  //! back to the control's entry in controlKeys.
-  //! Keys: "a","b","x","y","lb","rb","lt","rt","back","start","guide","share","lstick",
-  //! "lstick_click","rstick","rstick_click","dpad","dpad_up","dpad_down","dpad_left","dpad_right".
-  //! Controls absent from the map are left out of their group; a group without any labelled control
-  //! is not drawn at all.
+  //! Control key -> [{ badge, text, key }]. `key` is the row's keycap; rows without one use
+  //! controlKeys. Keys: a b x y lb rb lt rt back start guide share lstick lstick_click rstick
+  //! rstick_click dpad dpad_up dpad_down dpad_left dpad_right.
   property var controlLabels: ({})
 
-  //! Control keys to highlight as reserved config-switch buttons (their glyph is drawn in
-  //! accentColor).
+  //! Control keys of the config-switch buttons, drawn in accentColor.
   property var reservedControls: []
 
-  //! Control keys currently deflected or pressed, drawn in activeColor. Leave empty for a purely
-  //! static mapping diagram.
+  //! Control keys currently pressed or deflected, drawn in activeColor.
   property var activeControls: []
 
-  //! Map of control key -> the keyboard key that drives it, e.g. { "lt": "Q", "a": "↓" }. Drawn as
-  //! an outlined keycap beside the control's glyph, and used as the fallback for rows that name no
-  //! key of their own. Leave empty when a real gamepad is being described, where there is no
-  //! keyboard key to name.
+  //! Control key -> keyboard key, e.g. { "lt": "Q" }, drawn as a keycap beside the glyph.
   property var controlKeys: ({})
 
-  //! Color of the callout text, spines and connectors. Also tints the monochrome button glyphs.
-  property color contentColor: "#37474F"
+  //! Callout text, lines and monochrome glyphs.
+  property color contentColor: palette.text
 
-  //! Highlight color for reserved config-switch buttons and action modifier badges.
-  property color accentColor: "#2196F3"
+  //! Reserved buttons and modifier badges.
+  property color accentColor: palette.highlight
 
-  //! Tint for controls listed in activeControls. Takes precedence over every other glyph color.
-  property color activeColor: "#43A047"
+  //! Glyphs in activeControls. Overrides every other glyph color.
+  property color activeColor: palette.highlight
 
-  //! Plate drawn behind each group, and as a halo under the connectors, so they stay readable on a
-  //! transparent or busy background. Set to "transparent" to draw the groups bare.
-  property color labelBackgroundColor: Qt.rgba(1, 1, 1, 0.8)
+  //! Plate behind each group and halo under the connectors.
+  property color labelBackgroundColor: palette.base
 
-  //! Point size in pixels, mirroring Hector.Utils' Units.pt() so the ported layout constants below
-  //! keep their original proportions without pulling in that module.
-  function pt(pointSize) { return pointSize * ptMetrics.height / 1000 }
+  //! Layout unit: a tenth of the font's line height, so the geometry scales with the font.
+  function unit(size) { return size * fontMetrics.height / 10 }
 
   FontMetrics {
-    id: ptMetrics
-    font.pointSize: 1000
+    id: fontMetrics
   }
 
   QtObject {
@@ -72,13 +51,9 @@ Item {
     readonly property real vbH: 1202.2335
     readonly property real aspect: vbW / vbH
 
-    // Callout groups. `keys` stack top to bottom. `anchor` is the point on the artwork the group's
-    // connector ends at, in viewBox coordinates. `side` is the group edge the spine runs along, and
-    // always faces the artwork: a group beside the drawing gets a vertical spine, one above or
-    // below it a horizontal one. The connector leaves the spine's midpoint away from the group,
-    // turns to the anchor's height and runs in; `turnX` sets the viewBox x it turns at and defaults
-    // to the anchor's own x, which collapses the last leg. It only needs setting to route a
-    // connector around the controller body.
+    // Callout groups. `keys` stack top to bottom, `anchor` is where the connector ends on the
+    // artwork (viewBox coordinates), `side` is the group edge facing the artwork, and `turnX` is
+    // the viewBox x where the connector turns (default: the anchor's x).
     readonly property var groups: [
       { band: "topLeft", side: "right", turnX: 280, keys: ["lt", "lb"],
         anchor: { x: 400, y: 42 } },
@@ -97,33 +72,23 @@ Item {
         anchor: { x: 1090, y: 600 } }
     ]
 
-    // Painted image geometry (PreserveAspectFit, centered) with margins on all sides for callouts.
+    // Artwork geometry, centered with room for callouts on every side.
     property real imgW: Math.min(control.width * 0.42, control.height * 0.5 * aspect)
     property real imgH: imgW / aspect
     property real imgX: (control.width - imgW) / 2
     property real imgY: (control.height - imgH) / 2
 
-    property real margin: control.pt(6)
-    property real leaderGap: control.pt(10)
-    property real badgeSize: control.pt(26)
-    property real maxTextWidth: control.pt(130)
-    property real spineWidth: control.pt(2)
-    property real spineGap: control.pt(6)
-    property real groupPadding: control.pt(5)
-    property real lineWidth: control.pt(1.5)
-    property real haloWidth: control.pt(2)
-    property real dotRadius: control.pt(2.5)
-    property real plateRadius: control.pt(3)
-
-    // Function-label font: larger and bold so the bindings read clearly next to the glyphs.
-    readonly property font labelFont: Qt.font({ pointSize: 10, bold: true })
-
-    // Modifier-badge font: small enough to sit beside a label without competing with it.
-    readonly property font badgeFont: Qt.font({ pointSize: 8 })
-
-    //! Keycap font: bold so a single letter stays legible inside its outline, but small enough
-    //! that the cap does not compete with the control's own glyph.
-    readonly property font keycapFont: Qt.font({ pointSize: 8, bold: true })
+    property real margin: control.unit(6)
+    property real leaderGap: control.unit(10)
+    property real badgeSize: control.unit(26)
+    property real maxTextWidth: control.unit(130)
+    property real spineWidth: control.unit(2)
+    property real spineGap: control.unit(6)
+    property real groupPadding: control.unit(5)
+    property real lineWidth: control.unit(1.5)
+    property real haloWidth: control.unit(2)
+    property real dotRadius: control.unit(2.5)
+    property real plateRadius: control.unit(3)
 
     // Vertical center of the band above the artwork.
     property real topBandY: imgY * 0.5
@@ -136,15 +101,8 @@ Item {
     function pxX(vx) { return imgX + (vx - vbX) / vbW * imgW }
     function pxY(vy) { return imgY + (vy - vbY) / vbH * imgH }
 
-    // One entry per bound action, flattened over the group's keys in stacking order, each carrying
-    // the grid row it occupies and the keycap that drives it. A row may name its own keycap - an
-    // axis binding knows which keys move that particular axis, which the control as a whole does
-    // not - and falls back to the control's cap otherwise.
-    //
-    // When the group has no bound action at all, its controls each get one blank row so the
-    // diagram can still name their keys. Groups that do have bindings show only those, which is
-    // what keeps an alias like the undirected "dpad" from adding an empty fifth row beneath the
-    // four directions that are actually bound.
+    // One row per bound action with its grid row and keycap. A group without bindings gets one
+    // blank row per control that has a keycap.
     function rowsFor(keys) {
       var out = []
       for (var i = 0; i < keys.length; ++i) {
@@ -165,15 +123,12 @@ Item {
       return out
     }
 
-    // One entry per drawn glyph, carrying the grid rows it has to span. Derived from rowsFor so
-    // the two models can never disagree about which row a control sits on.
+    // One glyph per control, spanning that control's rows.
     function badgesFor(keys) {
       return spanRuns(rowsFor(keys), function (row) { return row.key })
     }
 
-    // One entry per keycap, spanning the consecutive rows that share it. A control whose actions
-    // are all reached by the same key shows the cap once; a stick bound as two axes shows each
-    // axis' own keys beside its own row.
+    // One keycap per run of consecutive rows that share it.
     function capsFor(keys) {
       return spanRuns(rowsFor(keys), function (row) { return row.cap })
         .filter(function (run) { return run.value !== "" })
@@ -202,7 +157,7 @@ Item {
       return out
     }
 
-    // Keep a band fully on-screen, giving up its preferred position before it clips.
+    // Keep a band on-screen.
     function clampX(v, w) { return Math.max(margin, Math.min(v, control.width - w - margin)) }
     function clampY(v, h) { return Math.max(margin, Math.min(v, control.height - h - margin)) }
   }
@@ -222,7 +177,7 @@ Item {
 
   ColumnLayout {
     id: topLeftBand
-    spacing: control.pt(12)
+    spacing: control.unit(12)
     x: d.clampX(d.imgX - d.leaderGap - width, width)
     y: d.clampY(d.topBandY - height / 2, height)
     Repeater { id: topLeftRep; model: d.groupsInBand("topLeft"); delegate: groupComponent }
@@ -230,7 +185,7 @@ Item {
 
   ColumnLayout {
     id: topCenterBand
-    spacing: control.pt(12)
+    spacing: control.unit(12)
     x: d.clampX(d.imgX + d.imgW / 2 - width / 2, width)
     y: d.clampY(d.topBandY - height / 2, height)
     Repeater { id: topCenterRep; model: d.groupsInBand("topCenter"); delegate: groupComponent }
@@ -238,7 +193,7 @@ Item {
 
   ColumnLayout {
     id: topRightBand
-    spacing: control.pt(12)
+    spacing: control.unit(12)
     x: d.clampX(d.imgX + d.imgW + d.leaderGap, width)
     y: d.clampY(d.topBandY - height / 2, height)
     Repeater { id: topRightRep; model: d.groupsInBand("topRight"); delegate: groupComponent }
@@ -246,7 +201,7 @@ Item {
 
   ColumnLayout {
     id: leftBand
-    spacing: control.pt(12)
+    spacing: control.unit(12)
     x: d.clampX(d.imgX - d.leaderGap - width, width)
     y: d.clampY(control.height / 2 - height / 2, height)
     Repeater { id: leftRep; model: d.groupsInBand("left"); delegate: groupComponent }
@@ -254,7 +209,7 @@ Item {
 
   ColumnLayout {
     id: rightBand
-    spacing: control.pt(12)
+    spacing: control.unit(12)
     x: d.clampX(d.imgX + d.imgW + d.leaderGap, width)
     y: d.clampY(control.height / 2 - height / 2, height)
     Repeater { id: rightRep; model: d.groupsInBand("right"); delegate: groupComponent }
@@ -262,14 +217,14 @@ Item {
 
   ColumnLayout {
     id: bottomBand
-    spacing: control.pt(12)
+    spacing: control.unit(12)
     x: d.clampX(d.imgX + d.imgW / 2 - width / 2, width)
     y: d.clampY(d.imgY + 0.8 * d.imgH + d.leaderGap, height)
     Repeater { id: bottomRep; model: d.groupsInBand("bottom"); delegate: groupComponent }
   }
 
-  // Connectors from every group's dot to its anchor. Drawn over the bands so a connector stays
-  // joined to the dot it leaves rather than disappearing under its own group's plate.
+  // Connectors from each group to its anchor. Drawn above the bands, or a group's plate would hide
+  // the start of its connector.
   Canvas {
     id: connectorCanvas
     anchors.fill: parent
@@ -294,7 +249,7 @@ Item {
     readonly property var repeaters: [topLeftRep, topCenterRep, topRightRep,
                                       leftRep, rightRep, bottomRep]
 
-    // The spine runs the length of the group's plate, just off the edge facing the artwork.
+    // Line along the group's edge facing the artwork.
     function strokeSpine(ctx, group) {
       var from = group.verticalSpine ? group.mapToItem(connectorCanvas, group.dotX, 0)
                                      : group.mapToItem(connectorCanvas, 0, group.dotY)
@@ -313,11 +268,8 @@ Item {
       ctx.fill()
     }
 
-    // Right-angled route from the dot to the anchor, turning at turnX. Off a vertical spine it
-    // leaves sideways, turns to the anchor's height and runs in. Off a horizontal spine it leaves
-    // squarely away from the group, crosses halfway between group and anchor, and drops in.
-    // Degenerate segments collapse on their own, so a turnX left at the anchor's own x costs the
-    // last leg and yields a plain elbow.
+    // Right-angled route from the dot to the anchor, turning at turnX. Zero-length segments are
+    // harmless, so an unset turnX gives a plain elbow.
     function strokeConnector(ctx, group) {
       var dot = group.mapToItem(connectorCanvas, group.dotX, group.dotY)
       var def = group.groupDef
@@ -338,8 +290,7 @@ Item {
       ctx.stroke()
     }
 
-    // `grow` widens every stroke so the same pass can lay down a halo under the real lines. Spine,
-    // dot and connector all go through it, so the whole run reads as one line on any background.
+    // Strokes every group. A positive `grow` widens the lines, which is how the halo is drawn.
     function pass(ctx, color, grow) {
       ctx.strokeStyle = color
       ctx.fillStyle = color
@@ -367,8 +318,7 @@ Item {
     }
   }
 
-  // One callout group: a plate holding a grid of glyphs and action rows, with a spine along the
-  // edge facing the artwork and the connector's dot at that spine's midpoint.
+  // One callout group: glyph, keycap and action columns, with a spine facing the artwork.
   Component {
     id: groupComponent
     Item {
@@ -378,7 +328,7 @@ Item {
       readonly property string side: groupDef.side
       // A vertical spine sits left or right of the rows, a horizontal one above or below them.
       readonly property bool verticalSpine: side === "left" || side === "right"
-      // Glyphs hug the spine where it runs alongside the rows, and otherwise lead them.
+      // Glyphs sit next to a spine on the right, otherwise at the start of the row.
       readonly property bool glyphsRight: side === "right"
 
       readonly property real spineSpace: d.spineGap + d.spineWidth
@@ -391,9 +341,7 @@ Item {
       Layout.alignment: verticalSpine ? (glyphsRight ? Qt.AlignRight : Qt.AlignLeft)
                                       : Qt.AlignHCenter
 
-      // Spine center, and with it the connector's origin, in group coordinates. The spine sits in
-      // the strip outside the plate so that it, the dot and the connector all share the canvas'
-      // halo - on the plate it would be the only part of the run without one.
+      // Connector origin: the spine's center, just outside the plate.
       readonly property real dotX: !verticalSpine ? width / 2
                                  : (side === "right" ? width - d.spineWidth / 2 : d.spineWidth / 2)
       readonly property real dotY: verticalSpine ? height / 2
@@ -410,18 +358,16 @@ Item {
 
       GridLayout {
         id: grid
-        // Glyph, keycap and action rows. The keycap column collapses to nothing when the caller
-        // supplies no controlKeys, leaving the original two-column layout.
+        // Glyph, keycap and action columns. The keycap column is empty without controlKeys.
         columns: 3
-        rowSpacing: control.pt(4)
-        columnSpacing: control.pt(6)
+        rowSpacing: control.unit(4)
+        columnSpacing: control.unit(6)
         x: group.side === "left" ? d.groupPadding + group.spineSpace : d.groupPadding
         y: group.side === "top" ? d.groupPadding + group.spineSpace : d.groupPadding
         width: group.width - 2 * d.groupPadding - (group.verticalSpine ? group.spineSpace : 0)
         height: group.height - 2 * d.groupPadding - (group.verticalSpine ? 0 : group.spineSpace)
 
-        // Glyph column. A glyph spans all of its control's action rows so it ends up vertically
-        // centered on them.
+        // Glyph column. A glyph spans its control's rows, which centers it on them.
         Repeater {
           model: d.badgesFor(group.groupDef.keys)
           delegate: GamepadButtonIcon {
@@ -439,9 +385,7 @@ Item {
           }
         }
 
-        // Keycap column: which keyboard key reaches the control. Drawn as an outlined cap so it
-        // reads as a key rather than as another part of the gamepad. Sits between the glyph and
-        // the action rows on both sides, so it stays next to the control it belongs to.
+        // Keycap column: the keyboard key that drives the control.
         Repeater {
           model: d.capsFor(group.groupDef.keys)
           delegate: Rectangle {
@@ -451,19 +395,19 @@ Item {
             Layout.rowSpan: modelData.span
             Layout.column: 1
             Layout.alignment: Qt.AlignVCenter | Qt.AlignHCenter
-            implicitWidth: keyText.implicitWidth + 2 * control.pt(3)
-            implicitHeight: keyText.implicitHeight + control.pt(2)
-            radius: control.pt(2)
+            implicitWidth: keyText.implicitWidth + 2 * control.unit(3)
+            implicitHeight: keyText.implicitHeight + control.unit(2)
+            radius: control.unit(2)
             color: "transparent"
-            border.width: Math.max(1, control.pt(0.75))
+            border.width: Math.max(1, control.unit(0.75))
             border.color: d.isActive(modelData.key) ? control.activeColor : control.contentColor
 
-            Text {
+            Caption {
               id: keyText
               anchors.centerIn: parent
               text: parent.keyLabel
               color: parent.border.color
-              font: d.keycapFont
+              font.bold: true
             }
           }
         }
@@ -479,28 +423,28 @@ Item {
             implicitHeight: rowContent.implicitHeight
 
             // Natural (unwrapped) text width, measured without feeding back into the layout.
-            TextMetrics { id: metrics; font: d.labelFont; text: modelData.text }
+            TextMetrics { id: metrics; font: actionText.font; text: modelData.text }
 
             Row {
               id: rowContent
-              spacing: control.pt(3)
-              // Rows left of the glyphs flow right-to-left so the modifier badge keeps hugging the
-              // glyph even when the description wraps to several lines.
+              spacing: control.unit(3)
+              // Right-to-left when left of the glyphs, so the badge stays next to the glyph when
+              // the text wraps.
               layoutDirection: group.glyphsRight ? Qt.RightToLeft : Qt.LeftToRight
 
-              Text {
+              Caption {
                 visible: modelData.badge.length > 0
                 text: modelData.badge
                 color: control.accentColor
-                font: d.badgeFont
                 anchors.verticalCenter: parent.verticalCenter
               }
 
-              Text {
+              Label {
+                id: actionText
                 text: modelData.text
                 color: control.contentColor
-                font: d.labelFont
-                width: Math.min(metrics.advanceWidth + control.pt(1), d.maxTextWidth)
+                font.bold: true
+                width: Math.min(metrics.advanceWidth + control.unit(1), d.maxTextWidth)
                 wrapMode: Text.WordWrap
                 horizontalAlignment: group.glyphsRight ? Text.AlignRight : Text.AlignLeft
               }

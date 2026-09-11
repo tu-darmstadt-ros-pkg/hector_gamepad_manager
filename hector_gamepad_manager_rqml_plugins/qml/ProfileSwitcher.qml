@@ -1,13 +1,6 @@
 import QtQuick
 
-// Tracks a config-switch request from the press that starts it to the manager's acknowledgement.
-//
-// The manager republishes joy_teleop_profile on every switch, so that message is the only
-// confirmation there is - and the only way to notice a switch someone made on a real gamepad.
-// Assign activeProfile from it and this watches for its own request to land, or gives up.
-//
-// Deliberately free of ROS and of any UI so the state machine can be tested on its own: the
-// caller performs the button press and phrases the messages.
+// Tracks a config-switch request until joy_teleop_profile confirms it or it times out.
 QtObject {
   id: switcher
 
@@ -17,7 +10,7 @@ QtObject {
   //! Canonical button name -> Joy index. Names absent from it cannot be pressed on the wire.
   property var pressableButtons: ({})
 
-  //! Profile the robot currently reports. Assign it; changes drive the confirmation.
+  //! Profile the robot currently reports.
   property string activeProfile: ""
 
   //! Requested but unconfirmed profile, "" when idle.
@@ -35,14 +28,14 @@ QtObject {
     return configSwitch.name
   })
 
-  //! The caller should press this button as if it came from the gamepad.
+  //! The caller should press this button.
   signal pressRequested(string buttonName)
 
   //! The robot confirmed the requested profile.
   signal succeeded(string config)
 
-  //! reason is "unbound" (no switch button maps to it), "unpressable" (it maps to a virtual axis
-  //! button, which is not on the wire) or "timeout". detail carries the button name where useful.
+  //! reason: "unbound" (no switch button), "unpressable" (bound to a virtual axis button) or
+  //! "timeout". detail: the button name, or the still active profile on timeout.
   signal failed(string config, string reason, string detail)
 
   property Timer timeoutTimer: Timer {
@@ -62,9 +55,8 @@ QtObject {
     return ""
   }
 
-  //! Ask for `config`. Returns true if a press was emitted, false if it failed outright - in which
-  //! case failed() has already fired. Requests are ignored while one is in flight or when the
-  //! robot is already in that config.
+  //! Ask for `config`. Returns whether a press was emitted. Ignored while busy or when `config` is
+  //! already active; any other refusal also emits failed().
   function request(config) {
     if (busy || config === "" || config === activeProfile)
       return false
@@ -73,8 +65,7 @@ QtObject {
       failed(config, "unbound", "")
       return false
     }
-    // Config switches are indexed over the virtual axis buttons too, and those are derived by the
-    // manager from the axes rather than read off the wire, so there is no button to press.
+    // Virtual axis buttons can be config switches too, but they are not on the wire.
     if (pressableButtons[name] === undefined) {
       failed(config, "unpressable", name)
       return false
@@ -85,8 +76,7 @@ QtObject {
     return true
   }
 
-  //! Drop an in-flight request without reporting either outcome, e.g. when publishing stops and
-  //! the press can no longer reach the robot.
+  //! Drop an in-flight request without reporting an outcome.
   function abort() {
     timeoutTimer.stop()
     pendingProfile = ""

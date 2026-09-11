@@ -1,27 +1,18 @@
 import QtQuick
 
-// Keyboard-driven gamepad state, and its translation to the sensor_msgs/Joy wire format.
-//
-// Deliberately free of ROS and of any UI so the conversion can be unit-tested on its own: it holds
-// *logical* input values (sticks -1..1, triggers 0..1) and only converts to wire values in
-// joyAxes() / joyButtons().
-//
-// The wire layout is SDL's canonical GameController layout, the same one game_controller_node
-// publishes and hector_gamepad_manager's gamepad_buttons.hpp reads. Being the producer side, this
-// file has to know that layout; consumers of the published mapping key off the names instead.
+// Keyboard-driven gamepad state. joyAxes() and joyButtons() convert it to sensor_msgs/Joy in SDL's
+// GameController layout, the one game_controller_node publishes.
 QtObject {
   id: state
 
   //! Amount an axis moves per key press in sticky mode. Shift/Ctrl scale it, see stepFor().
   property real step: 0.1
 
-  //! Sticky (throttle-like) axes: a key press moves the axis and it stays there. When false the
-  //! axes are momentary: held = fully deflected, released = centered.
+  //! Axes keep their value between key presses. Otherwise a held key deflects fully.
   property bool sticky: true
 
-  // Logical axis values. Sticks are -1..1 with positive meaning left/up (the ROS joy convention
-  // the manager expects); triggers are 0..1 with 0 = released. The d-pad is not here: SDL reports
-  // it as four real buttons.
+  // Sticks are -1..1, positive left/up (ROS joy convention). Triggers are 0..1, 0 is released.
+  // The d-pad is four buttons.
   property real leftStickX: 0
   property real leftStickY: 0
   property real leftTrigger: 0
@@ -29,15 +20,13 @@ QtObject {
   property real rightStickY: 0
   property real rightTrigger: 0
 
-  //! Pressed physical buttons as { canonical name: true }. Replaced wholesale on every change so
-  //! bindings on it re-evaluate.
+  //! Pressed buttons as { name: true }. Reassigned on every change so bindings re-evaluate.
   property var buttonStates: ({})
 
   //! Buttons whose press centers every axis, e.g. the config switches.
   property var axisResetButtons: []
 
-  //! Mirrors HectorGamepadManager::AXIS_DEADZONE, so the UI marks an axis as triggering its
-  //! virtual button at the same point the manager does.
+  //! Mirrors HectorGamepadManager::AXIS_DEADZONE.
   readonly property real axisDeadzone: 0.5
 
   //! Physical button name -> Joy button index, in SDL GameController order.
@@ -50,29 +39,19 @@ QtObject {
     "share": 15
   })
 
-  //! Number of buttons published. The manager reads ids 0-31 straight off the wire; sending the
-  //! full range covers the paddles and touchpad some pads report.
+  //! Buttons published; the manager reads ids 0-31.
   readonly property int buttonCount: 32
 
-  // Two-hand layout that mirrors the pad's own geometry:
+  // Keyboard layout, mirroring the pad:
   //
   //   Q W E        shoulders           U I O        shoulders        ↑          face buttons
-  //    A S D       left stick           J K L       right stick    ← ↓ →       (same diamond
-  //                                                                             as the pad)
+  //    A S D       left stick           J K L       right stick    ← ↓ →
+  //
   //   T F G H      d-pad                C / V       stick clicks
   //
-  //   F1 F2 F3 F4  guide, back, start, share - the four system buttons, in the order the
-  //                controller diagram stacks them
+  //   F1 F2 F3 F4  guide, back, start, share
   //
-  // Two diamonds do the heavy lifting. The right stick is IJKL, and the face buttons are the
-  // arrow keys - whose diamond has exactly the pad's own arrangement, Y on top, A at the bottom,
-  // X left and B right - so neither needs memorising. That frees the left hand for WASD.
-  //
-  // What you can hold at once: left stick + right stick, and left stick + face buttons. Right
-  // stick and face buttons share the right hand, which is the combination you rarely need.
-  //
-  // Every key is in the same physical place on QWERTZ as on QWERTY: no punctuation keys, no
-  // numpad, and nothing that depends on where Y and Z sit.
+  // Every key sits in the same place on QWERTY and QWERTZ.
 
   // Key code -> axis descriptor. `dir` is the sign a press applies.
   readonly property var axisKeys: {
@@ -85,10 +64,7 @@ QtObject {
     m[Qt.Key_L] = ({ axis: "right_stick_x", dir: -1 })
     m[Qt.Key_I] = ({ axis: "right_stick_y", dir: 1 })
     m[Qt.Key_K] = ({ axis: "right_stick_y", dir: -1 })
-    // Triggers sit outboard of each stick's top row, bumpers inboard, mirrored on both hands.
-    // A trigger only travels one way, but in sticky mode it still needs a way back: the key
-    // directly above each one eases it off, so a trigger can be trimmed without Space zeroing
-    // the sticks along with it. (1 sits above Q and 9 above O on QWERTY and QWERTZ alike.)
+    // 1 and 9 step the triggers back down, so they can be eased off without Space.
     m[Qt.Key_Q] = ({ axis: "left_trigger", dir: 1 })
     m[Qt.Key_1] = ({ axis: "left_trigger", dir: -1 })
     m[Qt.Key_O] = ({ axis: "right_trigger", dir: 1 })
@@ -96,12 +72,8 @@ QtObject {
     return m
   }
 
-  // Key code -> physical button name. The arrow keys carry the face buttons in the pad's own
-  // arrangement, so their positions match what is printed on the controller.
-  //
-  // The four system buttons sit on F1-F4, in the order the diagram stacks them. They are rarely
-  // pressed, so being away from the hands costs nothing, and unlike Enter, Backspace, Home and End
-  // they mean nothing to a text field, which the panel has one of.
+  // Key code -> physical button name. The arrow keys form the face-button diamond. The system
+  // buttons use F1-F4, since the text fields need Enter, Backspace, Home and End.
   readonly property var buttonKeys: {
     var m = ({})
     m[Qt.Key_Up] = "y"
@@ -123,8 +95,7 @@ QtObject {
     return m
   }
 
-  //! Canonical input name -> the key(s) that drive it, for the bindings table. Axis-derived
-  //! virtual buttons list the single key that pushes the axis that way.
+  //! Canonical input name -> the key(s) that drive it, for the bindings table.
   readonly property var keyLabels: ({
     "left_stick_x": "A / D", "left_stick_y": "W / S",
     "left_stick_left": "A", "left_stick_right": "D",
@@ -140,8 +111,7 @@ QtObject {
     "left_stick_click": "C", "right_stick_click": "V"
   })
 
-  // Virtual axis button name -> the axis it reads and the sign that activates it. Mirrors the
-  // assignment order of convertJoyToGamepadInputs().
+  // Virtual axis button -> source axis and activating sign, as in convertJoyToGamepadInputs().
   readonly property var virtualButtonSources: ({
     "left_stick_left": ({ axis: "left_stick_x", dir: 1 }),
     "left_stick_right": ({ axis: "left_stick_x", dir: -1 }),
@@ -167,14 +137,14 @@ QtObject {
     return 0
   }
 
-  //! Triggers only travel in one direction, so they clamp to [0, 1] rather than [-1, 1].
+  //! Lower bound: 0 for triggers, -1 for sticks.
   function axisMinimum(name) {
     return (name === "left_trigger" || name === "right_trigger") ? 0 : -1
   }
 
   function setAxis(name, value) {
     var clamped = Math.max(axisMinimum(name), Math.min(1, value))
-    // Snap to zero so repeated 0.1 steps land exactly on center instead of 5.55e-17.
+    // Snap float residue from repeated 0.1 steps (e.g. 5.55e-17) to exactly 0.
     if (Math.abs(clamped) < 1e-6)
       clamped = 0
     switch (name) {
@@ -201,8 +171,7 @@ QtObject {
 
   function isButtonPressed(name) { return buttonStates[name] === true }
 
-  //! True if the input is currently deflected/pressed far enough for the manager to act on it.
-  //! Covers physical buttons, virtual axis buttons and raw axes alike.
+  //! The input is pressed or deflected far enough for the manager to act on it.
   function isActive(name) {
     if (buttonIndices[name] !== undefined)
       return isButtonPressed(name)
@@ -230,13 +199,13 @@ QtObject {
     rightTrigger = 0
   }
 
-  //! Full stop: everything back to rest.
+  //! Release everything.
   function reset() {
     resetAxes()
     buttonStates = ({})
   }
 
-  //! Handle a key press. Returns true if the key belongs to the gamepad and was consumed.
+  //! Handle a key press. Returns true if the key belongs to the gamepad.
   function pressKey(key, modifiers, autoRepeat) {
     if (key === Qt.Key_Escape) {
       reset()
@@ -249,7 +218,7 @@ QtObject {
     var axis = axisKeys[key]
     if (axis) {
       if (sticky) {
-        // Auto-repeat is what makes a held key ramp the axis, so it is not filtered here.
+        // Auto-repeat is what ramps the axis while a key is held.
         setAxis(axis.axis, axisValue(axis.axis) + axis.dir * stepFor(modifiers))
       } else if (!autoRepeat) {
         setAxis(axis.axis, axis.dir)
@@ -283,15 +252,13 @@ QtObject {
     return false
   }
 
-  //! Axis values in Joy wire format, in SDL GameController order. Triggers are held logically as
-  //! 0 (released) to 1 (pressed) but go out negated, the way game_controller_node publishes them;
-  //! the manager flips them back. See isTriggerAxis() in gamepad_buttons.hpp.
+  //! Axes in Joy wire order. Triggers go out negated like game_controller_node publishes them, see
+  //! isTriggerAxis() in gamepad_buttons.hpp.
   function joyAxes() {
     return [leftStickX, leftStickY, rightStickX, rightStickY, -leftTrigger, -rightTrigger]
   }
 
-  //! Button values in Joy wire format. Only physical buttons go on the wire; the manager derives
-  //! the virtual axis buttons from the axes itself.
+  //! Physical buttons in Joy wire order. The manager derives virtual axis buttons from the axes.
   function joyButtons() {
     var buttons = new Array(buttonCount).fill(0)
     for (var name in buttonStates) {
