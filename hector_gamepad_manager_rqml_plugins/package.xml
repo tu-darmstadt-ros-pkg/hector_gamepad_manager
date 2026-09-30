@@ -1,0 +1,30 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>hector_gamepad_manager_rqml_plugins</name>
+  <version>0.0.0</version>
+  <description>RQml plugins for the hector gamepad manager, including a keyboard-driven virtual gamepad</description>
+  <maintainer email="fabian@sim.tu-darmstadt.de">Stefan Fabian</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>rqml_core</depend>
+
+  <exec_depend>hector_gamepad_manager_msgs</exec_depend>
+  <!-- Qt image format plugin for the bundled controller and button SVGs. -->
+  <exec_depend>libqt6svg6</exec_depend>
+  <!-- ColorOverlay, used to tint the monochrome button glyphs. -->
+  <exec_depend>qml6-module-qt5compat-graphicaleffects</exec_depend>
+  <exec_depend>qml6-module-qtquick-controls</exec_depend>
+  <exec_depend>qml6-module-qtquick-layouts</exec_depend>
+  <exec_depend>qml6_ros2_plugin</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>qt6-declarative-dev</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

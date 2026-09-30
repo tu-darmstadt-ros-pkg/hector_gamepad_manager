@@ -1,14 +1,14 @@
 # Test-only config that exercises malformed-entry handling. The manager should log warnings
 # and skip the bad entries rather than throwing or registering a broken mapping.
 axes:
-  # An axis whose plugin and function are written but empty — skipped like an absent entry, and
+  # An axis whose plugin and function are written but empty - skipped like an absent entry, and
   # skipped before any args of it reach the blackboard.
   left_stick_x: {plugin: '', function: ''}
 buttons:
-  # Button A: legacy-format entry with plugin: but no function: — must be skipped, not crash.
+  # Button A: legacy-format entry with plugin: but no function: - must be skipped, not crash.
   a:
     plugin: hector_gamepad_manager_plugins::TestProbePlugin
-  # Button B: new-format entry with no on_press and only on_hold/on_release — must be skipped.
+  # Button B: new-format entry with no on_press and only on_hold/on_release - must be skipped.
   b:
     plugin: hector_gamepad_manager_plugins::TestProbePlugin
     on_hold: {function: probe_hold}
@@ -17,14 +17,14 @@ buttons:
   x:
     plugin: hector_gamepad_manager_plugins::TestProbePlugin
     function: probe
-  # Button Y: new-format entry with on_double_press but no on_press — must be skipped because
+  # Button Y: new-format entry with on_double_press but no on_press - must be skipped because
   # the timeout-flush path would otherwise dispatch handlePress("") on a single tap.
   y:
     plugin: hector_gamepad_manager_plugins::TestProbePlugin
     on_double_press: {function: probe_double}
   # An empty plugin name is skipped as well.
   left_bumper: {plugin: '', function: ''}
-  # Button RB: legacy entry with a description: but no function: — description must not make it
+  # Button RB: legacy entry with a description: but no function: - description must not make it
   # valid; still skipped.
   right_bumper:
     plugin: hector_gamepad_manager_plugins::TestProbePlugin

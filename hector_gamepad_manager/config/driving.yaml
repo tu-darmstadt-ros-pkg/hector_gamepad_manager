@@ -112,6 +112,7 @@ buttons:
   share: # Button Share (only on newer Xbox controllers)
     plugin: hector_gamepad_manager_plugins::BlackboardPlugin
     function: toggle
+    description: Toggle inverted steering
     args:
       name: invert_steering
       ocs_topic: joy_teleop_direction
