@@ -10,12 +10,14 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
   <buildtool_depend>ros2_control_cmake</buildtool_depend>
 
+  <depend>action_msgs</depend>
   <depend>ament_cmake_gen_version_h</depend>
   <depend>backward_ros</depend>
   <depend>controller_manager_msgs</depend>
   <depend>controller_orchestrator</depend>
   <depend>geometry_msgs</depend>
   <depend>hector_gamepad_plugin_interface</depend>
+  <depend>hector_robot_pose_preview_msgs</depend>
   <depend>hector_ros2_utils</depend>
   <depend>hector_ros_controllers_msgs</depend>
   <depend>moveit_msgs</depend>

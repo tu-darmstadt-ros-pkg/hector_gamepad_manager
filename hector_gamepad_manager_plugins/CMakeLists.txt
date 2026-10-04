@@ -13,11 +13,13 @@ find_package(ament_cmake_gen_version_h REQUIRED)
 
 # Define a list of dependencies in alphabetical order
 set(DEPENDENCIES
+    action_msgs
     controller_manager_msgs
     controller_orchestrator
     geometry_msgs
     hector_gamepad_plugin_interface
     hector_ros_controllers_msgs
+    hector_robot_pose_preview_msgs
     hector_ros2_utils
     moveit_msgs
     pluginlib

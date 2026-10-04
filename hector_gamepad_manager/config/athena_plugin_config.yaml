@@ -29,8 +29,17 @@
       gripper_controller_name: gripper_position_controller
     moveit_plugin:
       start_controllers: [arm_trajectory_controller, flipper_trajectory_controller]
+      group_start_controllers:
+        arm_group: [arm_trajectory_controller]
+        flipper_group: [flipper_trajectory_controller]
+      planning_time: 1.0
       max_velocity_scaling_factor: 0.3
       max_acceleration_scaling_factor: 0.2
+      # Flippers should be able to move as fast as teleop. The reduced speed above is for the arm
+      group_max_velocity_scaling_factor:
+        flipper_group: 0.5
+      group_max_acceleration_scaling_factor:
+        flipper_group: 1.0
       action_topic: fold_manager_action
     battery_monitor_plugin:
       cell_voltage_fields:

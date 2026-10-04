@@ -38,6 +38,9 @@ public:
 
   bool isZeroCmd() const;
 
+  // Whether the MoveitPlugin is operating the movement. In that case operator arm movement is ignored.
+  bool isMovedByMoveit() const;
+
   /**
    * Reset all motion commands to zero.
    */
@@ -100,6 +103,8 @@ private:
 
   std::string twist_controller_name_;
   std::string gripper_controller_name_;
+  // MoveIt group of the arm, see isMovedByMoveit()
+  std::string moveit_group_;
   geometry_msgs::msg::TwistStamped eef_cmd_;
   geometry_msgs::msg::TwistStamped drive_cmd_;
   std_msgs::msg::Float64 gripper_cmd_;

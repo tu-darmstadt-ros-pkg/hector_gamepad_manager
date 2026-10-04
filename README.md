@@ -306,6 +306,7 @@ Running drive-to-upright and sync actions are **automatically pre-empted on the 
 - `command_topic` (string): Topic to publish velocity commands. Default: `flipper_velocity_controller/commands`
 - `drive_flipper_action` (string): Action server for drive-to-target. Default: `/<robot_ns>/flipper_velocity_to_position_controller/drive_flipper_group`
 - `sync_flipper_action` (string): Action server for sync. Default: `/<robot_ns>/flipper_velocity_to_position_controller/sync_flipper_group`
+- `moveit_group` (string): MoveIt group of the flippers. While the MoveItPlugin moves this group, flipper input (velocity, upright and sync) is ignored. Default: `flipper_group`
 
 ## Manipulation Plugin
 
@@ -346,6 +347,7 @@ world frame.
 - `num_arm_joints` (int): Number of arm joints; must match the twist controller. Default: `7`.
 - `twist_controller_name` / `gripper_controller_name` (string): Controller names to command.
 - `enable_drive_cmd` (bool): Whether to publish base `cmd_vel`. Default: `true`.
+- `moveit_group` (string): MoveIt group of the arm. While the MoveItPlugin moves this group, arm and gripper input is ignored; driving in hold mode still works. Default: `arm_group`
 
 ## BlackboardPlugin
 
@@ -398,6 +400,27 @@ Executes MoveIt! commands to position the robot in predefined SRDF poses.
         - `pose`: The name of the pose to move to (e.g., "folded").
         - `inverted_pose`: Optional, if set the robot will move to the inverted pose if `inverted_steering` from the
           blackboard is `true`.
+
+The pose is planned and executed only while the button is held; releasing it cancels the motion. While a pose button
+is held, the moved group is written to the blackboard (`moveit_active_group`), and the FlipperPlugin /
+ManipulationPlugin ignore input for that group, since their controller switch would abort the MoveIt trajectory.
+Other pose buttons are ignored until the active one is released.
+
+### Parameters
+
+- `start_controllers` (string[]): Controllers activated before a pose is executed.
+- `group_start_controllers.<group>` (string[]): Optional per-group override of `start_controllers`, so that moving one
+  group does not switch away the teleop controller of another.
+- `action_topic` (string): MoveGroup action to send goals to (may be a relay). Default: `move_action`
+- `moveit_status_topic` (string): Status topic of MoveIt's own move action. A new goal is held back while MoveIt still
+  has an active goal, which crashes move_group otherwise. Default: `move_action/_action/status`
+- `planning_time` (double): Allowed planning time in seconds. Default: `1.0`
+- `max_velocity_scaling_factor` / `max_acceleration_scaling_factor` (double): Scaling of the planned trajectory.
+- `group_max_velocity_scaling_factor.<group>` / `group_max_acceleration_scaling_factor.<group>` (double): Optional
+  per-group override of the scaling factors, e.g. to move the flippers as fast as in teleoperation.
+- `joint_tolerance` (double): Goal joint tolerance.
+- `preview_node` (string): Name of the `hector_robot_pose_preview` node whose (private) services show the target pose.
+  Default: `robot_pose_preview`
 
 ## BatteryMonitorPlugin
 
