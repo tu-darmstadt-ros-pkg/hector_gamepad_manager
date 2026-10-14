@@ -16,7 +16,7 @@ using controller_manager_msgs::srv::ListControllers;
 using namespace std::chrono_literals;
 
 // A flipper command activates teleop_controller through the controller orchestrator, whose
-// first step is to list the controllers; switch_controllers: false leaves the controllers alone.
+// first step is to list the controllers. With switch_controllers false nothing is listed.
 class FlipperControllerSwitchTest : public ::testing::TestWithParam<bool>
 {
 protected:
@@ -59,7 +59,7 @@ protected:
 
 TEST_P( FlipperControllerSwitchTest, FlipperCommandSwitchesOnlyWhenAllowed )
 {
-  // Each command after a pause is a switch request; the orchestrator sends it once its
+  // Each command after a pause is a switch request, which the orchestrator sends once its
   // client has discovered the service.
   const auto deadline = std::chrono::steady_clock::now() + 5s;
   while ( list_requests_ == 0 && std::chrono::steady_clock::now() < deadline ) {
