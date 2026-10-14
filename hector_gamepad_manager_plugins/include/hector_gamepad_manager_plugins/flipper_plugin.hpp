@@ -49,6 +49,7 @@ private:
 
   std::string standard_controller_;
   std::vector<std::string> teleop_controller_;
+  bool switch_controllers_ = true;
 
   std_msgs::msg::Float64MultiArray flipper_speed_commands_;
 

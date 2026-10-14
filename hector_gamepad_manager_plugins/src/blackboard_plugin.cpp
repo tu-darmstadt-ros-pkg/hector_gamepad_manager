@@ -40,7 +40,8 @@ void BlackboardPlugin::handlePress( const std::string &function, const std::stri
     return;
   } else if ( function == "hold" ) {
     const std::string &name = getConfigValueOr<std::string>( id, "name" );
-    onHoldPress( name );
+    const std::string &topic = getConfigValueOr<std::string>( id, "topic", "" );
+    onHold( name, topic, true );
     return;
   } else if ( function == "set" ) {
     const std::string &to = getConfigValueOr<std::string>( id, "set" );
@@ -61,7 +62,8 @@ void BlackboardPlugin::handleRelease( const std::string &function, const std::st
   // Only "hold/<var>" reacts on release → set false
   if ( function == "hold" ) {
     const auto name = getConfigValueOr<std::string>( id, "name" );
-    onHoldRelease( name );
+    const auto topic = getConfigValueOr<std::string>( id, "topic", "" );
+    onHold( name, topic, false );
     return;
   }
   // toggle/* and set/* are no-ops on release
@@ -101,18 +103,14 @@ void BlackboardPlugin::onToggle( const std::string &var, const std::string &topi
                 ref ? "true" : "false" );
 }
 
-void BlackboardPlugin::onHoldPress( const std::string &var ) const
+void BlackboardPlugin::onHold( const std::string &var, const std::string &topic, bool value )
 {
-  bool &ref = blackboard_->get_or_emplace<bool>( var, false );
-  ref = true;
-  RCLCPP_DEBUG( node_->get_logger(), "[blackboard_plugin] hold %s -> true", var.c_str() );
-}
-
-void BlackboardPlugin::onHoldRelease( const std::string &var ) const
-{
-  bool &ref = blackboard_->get_or_emplace<bool>( var, false );
-  ref = false;
-  RCLCPP_DEBUG( node_->get_logger(), "[blackboard_plugin] hold %s -> false", var.c_str() );
+  blackboard_->get_or_emplace<bool>( var, false ) = value;
+  if ( !topic.empty() ) {
+    getOrCreatePublisher( topic )->publish( std_msgs::msg::Bool().set__data( value ) );
+  }
+  RCLCPP_DEBUG( node_->get_logger(), "[blackboard_plugin] hold %s -> %s", var.c_str(),
+                value ? "true" : "false" );
 }
 
 void BlackboardPlugin::onSetString( const std::string &var, const std::string &value ) const

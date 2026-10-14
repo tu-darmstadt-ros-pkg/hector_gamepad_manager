@@ -106,6 +106,16 @@ if(BUILD_TESTING)
     rtest::action_client_mock
     rtest::rtest_common)
 
+  # FlipperPlugin's controller switching, against an in-process fake controller
+  # manager, so without rtest's mocks.
+  ament_add_gmock(
+    test_flipper_controller_switch test/test_flipper_controller_switch.cpp
+    src/flipper_plugin.cpp)
+  target_include_directories(
+    test_flipper_controller_switch
+    PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
+  ament_target_dependencies(test_flipper_controller_switch ${DEPENDENCIES})
+
   file(MAKE_DIRECTORY
        "${CMAKE_CURRENT_BINARY_DIR}/share/hector_gamepad_manager_plugins")
   file(MAKE_DIRECTORY
