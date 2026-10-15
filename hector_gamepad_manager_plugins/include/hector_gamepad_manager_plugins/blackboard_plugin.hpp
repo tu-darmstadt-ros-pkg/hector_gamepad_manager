@@ -13,7 +13,7 @@ namespace hector_gamepad_manager_plugins
  *
  * Button mappings support the following function strings:
  *  - "toggle" with args: name, [topic], [ocs_topic], [initial]
- *  - "hold" with args: name
+ *  - "hold" with args: name, [topic]
  *  - "set" with args: name, set
  *
  * Behavior:
@@ -22,7 +22,7 @@ namespace hector_gamepad_manager_plugins
  *  - set:    write <value> (string) on press
  *
  * Topic options (both are relative to the robot namespace the node runs in):
- *  - topic: publishes the new value to this topic
+ *  - topic: publishes the new value of toggle or hold to this topic
  *  - ocs_topic: optional second topic the new value is also published to (e.g. for UI feedback);
  *               ignored if empty or equal to topic
  */
@@ -48,8 +48,7 @@ public:
 private:
   void onToggle( const std::string &var, const std::string &topic, const std::string &ocs_topic,
                  bool initial_value );
-  void onHoldPress( const std::string &var ) const;
-  void onHoldRelease( const std::string &var ) const;
+  void onHold( const std::string &var, const std::string &topic, bool value );
   void onSetString( const std::string &var, const std::string &value ) const;
 
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr getOrCreatePublisher( const std::string &topic );

@@ -87,8 +87,11 @@ buttons:
       pose: front
 
   dpad_up:
-    plugin: ''
-    function: ''
+    plugin: hector_gamepad_manager_plugins::BlackboardPlugin
+    function: hold
+    args:
+      name: precise_mode
+      topic: precise_mode
 
   dpad_down:
     plugin: hector_gamepad_manager_plugins::MoveitPlugin

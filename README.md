@@ -304,6 +304,8 @@ Running drive-to-upright and sync actions are **automatically pre-empted on the 
 ### Parameters
 
 - `command_topic` (string): Topic to publish velocity commands. Default: `flipper_velocity_controller/commands`
+- `teleop_controller` (string array): Controllers activated when a flipper command starts. Default: `[self_collision_avoidance_controller, flipper_velocity_controller]`
+- `switch_controllers` (bool): Whether to activate `teleop_controller`. Off where something else owns the controller states. Default: `true`
 - `drive_flipper_action` (string): Action server for drive-to-target. Default: `/<robot_ns>/flipper_velocity_to_position_controller/drive_flipper_group`
 - `sync_flipper_action` (string): Action server for sync. Default: `/<robot_ns>/flipper_velocity_to_position_controller/sync_flipper_group`
 
@@ -368,6 +370,8 @@ It supports toggling and holding boolean values as well as setting string values
   when released.
     - `args`:
         - `name`: The name of the variable to hold.
+        - `topic`: Optional, if set the plugin will publish the value to the specified topic on press and release (
+          transient_local, std_msgs/Bool).
     - Example: `hold` with name safety_mode → sets `safety_mode = true` when held, and resets it to `false` when
       released.
 * `set`: Sets a string variable in the blackboard to a specific value when the button is pressed.
