@@ -106,8 +106,7 @@ if(BUILD_TESTING)
     rtest::action_client_mock
     rtest::rtest_common)
 
-  # FlipperPlugin's controller switching, against an in-process fake controller
-  # manager, so without rtest's mocks.
+  # FlipperPlugin's controller switching against a fake controller manager.
   ament_add_gmock(
     test_flipper_controller_switch test/test_flipper_controller_switch.cpp
     src/flipper_plugin.cpp)
