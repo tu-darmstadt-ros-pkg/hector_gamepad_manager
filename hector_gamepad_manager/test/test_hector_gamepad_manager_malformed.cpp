@@ -97,32 +97,32 @@ TEST_F( HectorGamepadManagerMalformedConfigTest, MalformedMappingsAreSkipped )
   EXPECT_CALL( *pub_probe_hold_, publish( _ ) ).Times( 0 );
   EXPECT_CALL( *pub_probe_release_, publish( _ ) ).Times( 0 );
 
-  // Button 0: legacy format with plugin: but no function: — must be skipped.
+  // Button 0: legacy format with plugin: but no function: - must be skipped.
   setButton( 0, 1 );
   sendJoy();
   setButton( 0, 0 );
   sendJoy();
 
-  // Button 1: new format with on_hold/on_release but no on_press — must be skipped.
+  // Button 1: new format with on_hold/on_release but no on_press - must be skipped.
   setButton( 1, 1 );
   sendJoy();
   setButton( 1, 0 );
   sendJoy();
 
-  // Button 3: new format with on_double_press but no on_press — must be skipped.
+  // Button 3: new format with on_double_press but no on_press - must be skipped.
   setButton( 3, 1 );
   sendJoy();
   setButton( 3, 0 );
   sendJoy();
 
-  // Button 5: legacy format with a description: but no function: — must be skipped.
+  // Button 5: legacy format with a description: but no function: - must be skipped.
   setButton( 5, 1 );
   sendJoy();
   setButton( 5, 0 );
   sendJoy();
 }
 
-// Test F — A valid entry coexisting with malformed entries in the same config still works.
+// Test F - A valid entry coexisting with malformed entries in the same config still works.
 TEST_F( HectorGamepadManagerMalformedConfigTest, ValidMappingsStillWorkAlongsideMalformedOnes )
 {
   EXPECT_CALL( *pub_probe_press_,

@@ -6,7 +6,7 @@ the `FeedbackManager` (rumble), and access to the `controller_orchestrator`.
 
 Plugins are loaded by the manager via `pluginlib` and react to gamepad input by implementing the
 handler methods below. The manager runs on the robot, in the robot namespace, so any ROS endpoints a
-plugin creates on `node_` should use **relative** names — they resolve under the robot namespace.
+plugin creates on `node_` should use **relative** names - they resolve under the robot namespace.
 
 ## Writing a plugin
 
@@ -57,8 +57,8 @@ Available as protected members after initialization:
 
 ## Helper methods
 
-- `getConfigValueOr<T>(id, param, default)` — read an `args` value for this plugin/config from the
+- `getConfigValueOr<T>(id, param, default)` - read an `args` value for this plugin/config from the
   blackboard, namespaced by plugin id and config id.
-- `activateControllers(names, callback = nullptr)` — switch ros2_control controllers asynchronously.
-- `areControllersActive(names)` — check whether the given controllers are active.
-- `isActive()`, `getPluginId()`, `getPluginName()`, `getPluginNamespace()` — accessors.
+- `activateControllers(names, callback = nullptr)` - switch ros2_control controllers asynchronously.
+- `areControllersActive(names)` - check whether the given controllers are active.
+- `isActive()`, `getPluginId()`, `getPluginName()`, `getPluginNamespace()` - accessors.

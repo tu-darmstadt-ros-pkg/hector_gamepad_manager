@@ -211,7 +211,8 @@ void ManipulationPlugin::update()
   double cmd_vel_linear = 0.0, cmd_vel_angular = 0.0;
   if ( hold_mode_active_ ) {
     // left joystick moves base, ignore all other axis and buttons
-    cmd_vel_linear = move_up_down_ * max_drive_linear_speed_;
+    const double steering_inv = blackboard_->value_or<bool>( "invert_steering", false ) ? -1.0 : 1.0;
+    cmd_vel_linear = steering_inv * move_up_down_ * max_drive_linear_speed_;
     cmd_vel_angular = move_left_right_ * max_drive_angular_speed_;
   } else {
     eef_cmd_.twist.linear.x = ( move_forward_ + move_backward_ ) * max_eef_linear_speed_;

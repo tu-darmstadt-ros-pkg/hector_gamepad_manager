@@ -113,7 +113,7 @@ TEST( VibrationPattern, ReactivatingResetsTiming )
 }
 
 // setActive(true) on a finished one-shot pattern must restart it even without an intermediate
-// setActive(false) — this is how plugins retrigger notification buzzes.
+// setActive(false) - this is how plugins retrigger notification buzzes.
 TEST( VibrationPattern, ReactivatingFinishedPatternRestartsIt )
 {
   auto node = makeNode( "vibration_retrigger" );

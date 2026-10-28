@@ -43,6 +43,9 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   //     node_->get_parameter( plugin_namespace + ".standard_controller" ).as_string();
   teleop_controller_ =
       node_->get_parameter( plugin_namespace + ".teleop_controller" ).as_string_array();
+  // Off where something else owns the controller states, such as a benchmark.
+  switch_controllers_ =
+      node_->declare_parameter<bool>( plugin_namespace + ".switch_controllers", true );
 
   // Setup Flipper Command Publisher
   const std::string command_topic =
@@ -154,7 +157,7 @@ void FlipperPlugin::update()
 
   const bool current_cmd_zero = checkCurrentCmdIsZero();
 
-  if ( last_cmd_zero_ && !current_cmd_zero )
+  if ( switch_controllers_ && last_cmd_zero_ && !current_cmd_zero )
     activateControllers( teleop_controller_ );
 
   if ( !( last_cmd_zero_ && current_cmd_zero ) )

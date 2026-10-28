@@ -109,7 +109,7 @@ TEST_F( HectorGamepadManagerDoublePressTest, QuickTapWithDoublePressDispatchesPr
   ::testing::Mock::VerifyAndClearExpectations( pub_probe_release_.get() );
   ::testing::Mock::VerifyAndClearExpectations( pub_probe_hold_.get() );
 
-  // Advance past the window — the buffered press should flush, paired with an immediate release.
+  // Advance past the window - the buffered press should flush, paired with an immediate release.
   EXPECT_CALL( *pub_probe_press_,
                publish( Field( &std_msgs::msg::String::data, HasSubstr( "press:probe:" ) ) ) )
       .Times( 1 );
@@ -122,7 +122,7 @@ TEST_F( HectorGamepadManagerDoublePressTest, QuickTapWithDoublePressDispatchesPr
   sendJoy();
 }
 
-// Test B — Two quick presses inside the window dispatch on_double_press only.
+// Test B - Two quick presses inside the window dispatch on_double_press only.
 TEST_F( HectorGamepadManagerDoublePressTest, DoublePressDispatchesDoublePressFunction )
 {
   EXPECT_CALL( *pub_probe_press_, publish( _ ) ).Times( 0 );
@@ -134,7 +134,7 @@ TEST_F( HectorGamepadManagerDoublePressTest, DoublePressDispatchesDoublePressFun
 
   advanceMs( 100 ); // still inside window
 
-  // Second press within the window — on_double_press fires, on_press does NOT.
+  // Second press within the window - on_double_press fires, on_press does NOT.
   EXPECT_CALL( *pub_probe_press_, publish( Field( &std_msgs::msg::String::data,
                                                   HasSubstr( "press:probe_double:" ) ) ) )
       .Times( 1 );
@@ -155,7 +155,7 @@ TEST_F( HectorGamepadManagerDoublePressTest, TwoPressesSeparatedByTimeoutAreBoth
                                                   HasSubstr( "press:probe_double:" ) ) ) )
       .Times( 0 );
 
-  // First press, release, wait past window — flushes as single press.
+  // First press, release, wait past window - flushes as single press.
   setButton( 0, 1 );
   sendJoy();
   setButton( 0, 0 );
@@ -163,7 +163,7 @@ TEST_F( HectorGamepadManagerDoublePressTest, TwoPressesSeparatedByTimeoutAreBoth
   advanceMs( 300 );
   sendJoy();
 
-  // Second press, release, wait past window — also flushes as single press.
+  // Second press, release, wait past window - also flushes as single press.
   setButton( 0, 1 );
   sendJoy();
   setButton( 0, 0 );
@@ -180,7 +180,7 @@ TEST_F( HectorGamepadManagerDoublePressTest, HeldButtonAfterTimeoutGeneratesHold
   sendJoy();
   ::testing::Mock::VerifyAndClearExpectations( pub_probe_press_.get() );
 
-  // Window expires while still held — press flushes, no release yet.
+  // Window expires while still held - press flushes, no release yet.
   EXPECT_CALL( *pub_probe_press_,
                publish( Field( &std_msgs::msg::String::data, HasSubstr( "press:probe:" ) ) ) )
       .Times( 1 );

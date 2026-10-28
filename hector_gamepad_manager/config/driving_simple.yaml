@@ -63,8 +63,12 @@ buttons:
     function: ''
 
   guide: # Button Guide (Manufacturer Button)
-    plugin: ''
-    function: ''
+    plugin: hector_gamepad_manager_plugins::BlackboardPlugin
+    function: toggle
+    description: Toggle inverted steering
+    args:
+      name: invert_steering
+      ocs_topic: joy_teleop_direction
 
   left_stick_click:
     plugin: hector_gamepad_manager_plugins::BatteryMonitorPlugin
@@ -76,8 +80,11 @@ buttons:
     function: ''
 
   share: # Button Share (only on newer Xbox controllers)
-    plugin: ''
-    function: ''
+    plugin: hector_gamepad_manager_plugins::BlackboardPlugin
+    function: toggle
+    args:
+      name: invert_steering
+      ocs_topic: joy_teleop_direction
 
   dpad_left:
     plugin: ''

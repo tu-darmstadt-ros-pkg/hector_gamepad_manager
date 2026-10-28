@@ -13,7 +13,7 @@ publishes. That node drives SDL's GameController API, which maps every pad in SD
 database onto one layout, so an Xbox pad and a DualSense produce identical indices and no
 per-controller configuration is needed.
 
-**Do not use `joy_node`.** It publishes raw device indices, and those differ per pad — even
+**Do not use `joy_node`.** It publishes raw device indices, and those differ per pad - even
 between Xbox models. A DualSense reports its right stick on `axes[2]`, where the Xbox layout has
 the left trigger, so on `joy_node` a sideways nudge of the right stick would pull a trigger.
 
@@ -120,7 +120,7 @@ full mapping of every loaded config) so a user interface can show the current co
 top-level `description` describes the config itself. Descriptions never affect behavior.
 
 Every button and axis in that message is identified by its canonical `name` (`"a"`,
-`"left_bumper"`, `"dpad_up"`, `"left_stick_up"`, `"left_stick_x"`, …) — the same identifier the
+`"left_bumper"`, `"dpad_up"`, `"left_stick_up"`, `"left_stick_x"`, …) - the same identifier the
 config files use. Wire indices are an internal detail of the Joy adapter and are not published.
 The catalog lives in `gamepad_buttons.hpp`.
 
@@ -299,11 +299,13 @@ Running drive-to-upright and sync actions are **automatically pre-empted on the 
 - `individual_front_flipper_control_mode`: Hold to enable individual front flipper steering; release to return to paired control. Default button: (B, single-press)
 - `individual_back_flipper_control_mode`: Hold to enable individual back flipper steering; release to return to paired control. Default button: (X, single-press)
 
-> **Note on B/X and LB/RB:** these buttons each serve two functions via the per-event format. Holding B/X enables individual front/back control mode until released; pressing and holding LB/RB drives a velocity command. A double press triggers the corresponding sync or drive-to-upright action. Because `on_double_press` is configured on these buttons, single-press dispatch is delayed by `double_press_window_sec` (default 0.25s) — a quick tap therefore enables the mode (or velocity command) only briefly before its paired release fires.
+> **Note on B/X and LB/RB:** these buttons each serve two functions via the per-event format. Holding B/X enables individual front/back control mode until released; pressing and holding LB/RB drives a velocity command. A double press triggers the corresponding sync or drive-to-upright action. Because `on_double_press` is configured on these buttons, single-press dispatch is delayed by `double_press_window_sec` (default 0.25s) - a quick tap therefore enables the mode (or velocity command) only briefly before its paired release fires.
 
 ### Parameters
 
 - `command_topic` (string): Topic to publish velocity commands. Default: `flipper_velocity_controller/commands`
+- `teleop_controller` (string array): Controllers activated when a flipper command starts. Default: `[self_collision_avoidance_controller, flipper_velocity_controller]`
+- `switch_controllers` (bool): Whether to activate `teleop_controller`. Off where something else owns the controller states. Default: `true`
 - `drive_flipper_action` (string): Action server for drive-to-target. Default: `/<robot_ns>/flipper_velocity_to_position_controller/drive_flipper_group`
 - `sync_flipper_action` (string): Action server for sync. Default: `/<robot_ns>/flipper_velocity_to_position_controller/sync_flipper_group`
 
@@ -368,6 +370,8 @@ It supports toggling and holding boolean values as well as setting string values
   when released.
     - `args`:
         - `name`: The name of the variable to hold.
+        - `topic`: Optional, if set the plugin will publish the value to the specified topic on press and release (
+          transient_local, std_msgs/Bool).
     - Example: `hold` with name safety_mode → sets `safety_mode = true` when held, and resets it to `false` when
       released.
 * `set`: Sets a string variable in the blackboard to a specific value when the button is pressed.

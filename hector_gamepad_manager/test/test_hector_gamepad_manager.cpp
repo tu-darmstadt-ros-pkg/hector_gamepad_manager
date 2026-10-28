@@ -837,3 +837,29 @@ TEST_F( HectorGamepadManagerTest, BlackboardEstopTogglePublishes )
   setButton( "right_joy", 1, true );
   sendJoy();
 }
+
+// Verifies a hold with a topic publishes true on press and false on release.
+TEST_F( HectorGamepadManagerTest, BlackboardHoldPublishes )
+{
+  switchToConfig( "manipulation" );
+  // The publisher is created on first use, so press once to create it
+  setButton( "dpad_up", 1, true );
+  sendJoy();
+  setButton( "dpad_up", 0, true );
+  sendJoy();
+
+  auto pub_hold = rtest::findPublisher<std_msgs::msg::Bool>( node_, "/athena/precise_mode" );
+  ASSERT_TRUE( pub_hold );
+
+  ::testing::Sequence seq;
+  EXPECT_CALL( *pub_hold, publish( ::testing::Field( &std_msgs::msg::Bool::data, true ) ) )
+      .Times( 1 )
+      .InSequence( seq );
+  EXPECT_CALL( *pub_hold, publish( ::testing::Field( &std_msgs::msg::Bool::data, false ) ) )
+      .Times( 1 )
+      .InSequence( seq );
+  setButton( "dpad_up", 1, true );
+  sendJoy();
+  setButton( "dpad_up", 0, true );
+  sendJoy();
+}
