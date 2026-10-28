@@ -131,7 +131,7 @@ if(BUILD_TESTING)
   target_include_directories(
     test_flipper_controller_switch
     PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
-  ament_target_dependencies(test_flipper_controller_switch ${DEPENDENCIES})
+  target_link_libraries(test_flipper_controller_switch ${DEPENDENCIES_TARGETS})
 
   file(MAKE_DIRECTORY
        "${CMAKE_CURRENT_BINARY_DIR}/share/hector_gamepad_manager_plugins")
