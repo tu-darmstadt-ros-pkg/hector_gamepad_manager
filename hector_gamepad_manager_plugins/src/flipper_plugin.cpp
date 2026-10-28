@@ -69,11 +69,16 @@ void FlipperPlugin::handlePress( const std::string &function, const std::string 
   // Activate respective individual mode only if other is inactive
   if ( function == "individual_front_flipper_control_mode" ) {
     individual_front_flipper_mode_ = !individual_back_flipper_mode_;
+    // Switching modes changes which array index a held trigger writes to;
+    // clear stale commands left over from the previous mode so a trigger
+    // that was already held doesn't leave a stuck residual command.
+    resetFrontFlipperCommands();
     return;
   }
 
   if ( function == "individual_back_flipper_control_mode" ) {
     individual_back_flipper_mode_ = !individual_front_flipper_mode_;
+    resetBackFlipperCommands();
     return;
   }
 
@@ -100,17 +105,16 @@ void FlipperPlugin::handleRelease( const std::string &function, const std::strin
 {
   // Activate respective individual mode only if other is inactive
   if ( function == "individual_front_flipper_control_mode" ) {
-    // Stop flipper before disable of mode
-    handleIndividualFlipperControlInput( 0, true, "flipper_front_up" );
-    handleIndividualFlipperControlInput( 0, true, "flipper_back_up" );
+    // Stop flipper before disable of mode (both button- and axis-driven
+    // commands, so a trigger held during the mode switch doesn't stay stuck)
+    resetFrontFlipperCommands();
     individual_front_flipper_mode_ = false;
     return;
   }
 
   if ( function == "individual_back_flipper_control_mode" ) {
     // Stop flipper before disable
-    handleIndividualFlipperControlInput( 0, true, "flipper_front_up" );
-    handleIndividualFlipperControlInput( 0, true, "flipper_back_up" );
+    resetBackFlipperCommands();
     individual_back_flipper_mode_ = false;
     return;
   }
@@ -373,6 +377,22 @@ void FlipperPlugin::resetCommands()
   vel_commands_[1] = 0.0;
   vel_commands_[2] = 0.0;
   vel_commands_[3] = 0.0;
+}
+
+void FlipperPlugin::resetFrontFlipperCommands()
+{
+  button_vel_commands_[0] = 0.0;
+  button_vel_commands_[1] = 0.0;
+  axis_vel_commands_[0] = 0.0;
+  axis_vel_commands_[1] = 0.0;
+}
+
+void FlipperPlugin::resetBackFlipperCommands()
+{
+  button_vel_commands_[2] = 0.0;
+  button_vel_commands_[3] = 0.0;
+  axis_vel_commands_[2] = 0.0;
+  axis_vel_commands_[3] = 0.0;
 }
 
 void FlipperPlugin::publishCommands() const

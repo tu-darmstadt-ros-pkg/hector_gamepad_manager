@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.16)
 project(hector_gamepad_plugin_interface)
 
 # Default to C++17
@@ -25,8 +25,11 @@ target_include_directories(
   INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
             "$<INSTALL_INTERFACE:include>")
 target_link_libraries(${PROJECT_NAME} INTERFACE yaml-cpp)
-ament_target_dependencies(${PROJECT_NAME} INTERFACE rclcpp rcl_interfaces
-                          sensor_msgs controller_orchestrator)
+target_link_libraries(${PROJECT_NAME} INTERFACE
+                      rclcpp::rclcpp
+                      rcl_interfaces::rcl_interfaces
+                      sensor_msgs::sensor_msgs
+                      controller_orchestrator::controller_orchestrator)
 
 install(
   TARGETS ${PROJECT_NAME}

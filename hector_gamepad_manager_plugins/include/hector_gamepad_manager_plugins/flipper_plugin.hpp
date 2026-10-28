@@ -69,6 +69,8 @@ private:
   void handleFlipperSync( const std::string &function );
 
   void resetCommands();
+  void resetFrontFlipperCommands();
+  void resetBackFlipperCommands();
 
   void publishCommands() const;
 
