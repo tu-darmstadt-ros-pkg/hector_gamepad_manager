@@ -8,6 +8,8 @@
 #include <std_msgs/msg/string.hpp>
 #include <urdf_parser/urdf_parser.h>
 
+#include <algorithm>
+
 namespace hector_gamepad_manager_plugins
 {
 void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node )
@@ -43,6 +45,30 @@ void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   const auto action_topic = node_->get_parameter( plugin_name + ".action_topic" ).as_string();
   action_client_ =
       rclcpp_action::create_client<moveit_msgs::action::MoveGroup>( node_, action_topic );
+
+  // Status of MoveIt's own move action (not the one of action_topic, which may be a relay).
+  node_->declare_parameter<std::string>( plugin_name + ".moveit_status_topic",
+                                         "move_action/_action/status" );
+  rclcpp::SubscriptionOptions status_options;
+  // A crashed move_group never reports its goals as finished.
+  status_options.event_callbacks.liveliness_callback =
+      [this]( rclcpp::QOSLivelinessChangedInfo &info ) {
+        if ( info.alive_count == 0 )
+          moveit_busy_ = false;
+      };
+  moveit_status_subscriber_ = node_->create_subscription<action_msgs::msg::GoalStatusArray>(
+      node_->get_parameter( plugin_name + ".moveit_status_topic" ).as_string(),
+      rclcpp::QoS( 1 ).reliable().transient_local(),
+      [this]( const action_msgs::msg::GoalStatusArray::SharedPtr msg ) {
+        moveit_busy_ =
+            std::any_of( msg->status_list.begin(), msg->status_list.end(),
+                         []( const action_msgs::msg::GoalStatus &status ) {
+                           return status.status == action_msgs::msg::GoalStatus::STATUS_ACCEPTED ||
+                                  status.status == action_msgs::msg::GoalStatus::STATUS_EXECUTING ||
+                                  status.status == action_msgs::msg::GoalStatus::STATUS_CANCELING;
+                         } );
+      },
+      status_options );
 
   // setup vibration feedback patterns
   const std::string success_pattern_ns = plugin_name + ".vibration_success";
@@ -123,6 +149,11 @@ void MoveitPlugin::handleHold( const std::string &function, const std::string &i
 {
   // wait until controller switch is done
   if ( state_ != State::CONTROLLER_SWITCH || id != active_id_ ) {
+    return;
+  }
+  if ( isMoveitBusy() ) {
+    RCLCPP_INFO_THROTTLE( node_->get_logger(), *node_->get_clock(), 1000,
+                          "[MoveitPlugin] Waiting for the previous MoveIt goal to finish." );
     return;
   }
   auto [group, pose] = functionIdToGroupGroupAndPose( function, id );
@@ -307,6 +338,14 @@ double MoveitPlugin::groupScalingFactor( const std::string &name, const std::str
     node_->declare_parameter<double>( param, -1.0 );
   const double value = node_->get_parameter( param ).as_double();
   return value >= 0.0 && value <= 1.0 ? value : default_value;
+}
+
+bool MoveitPlugin::isMoveitBusy()
+{
+  // Nobody reports the goals of a move_group that went away as finished.
+  if ( moveit_status_subscriber_->get_publisher_count() == 0 )
+    moveit_busy_ = false;
+  return moveit_busy_;
 }
 
 void MoveitPlugin::initializeNamedPoses()

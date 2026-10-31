@@ -5,6 +5,7 @@
 #ifndef HECTOR_GAMEPAD_MANAGER_PLUGINS_MOVEIT_PLUGIN_HPP
 #define HECTOR_GAMEPAD_MANAGER_PLUGINS_MOVEIT_PLUGIN_HPP
 
+#include <action_msgs/msg/goal_status_array.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <hector_gamepad_plugin_interface/gamepad_plugin_interface.hpp>
 #include <hector_ros2_utils/parameters/reconfigurable_parameter.hpp>
@@ -45,6 +46,9 @@ private:
       uint64_t request,
       const rclcpp_action::ClientGoalHandle<moveit_msgs::action::MoveGroup>::SharedPtr &goal_handle );
   void initializeNamedPoses();
+  // Whether MoveIt still has an active goal, e.g. one that is still planning after the
+  // relaying fold manager already reported its cancel.
+  bool isMoveitBusy();
   // Controllers to activate for a group: `group_start_controllers.<group>`, else start_controllers.
   std::vector<std::string> startControllers( const std::string &group );
   // Scaling factor for a group: `group_<name>.<group>` if set (0..1), else the global `default_value`.
@@ -66,6 +70,7 @@ private:
   // deactivation). Failures of user-canceled goals are expected and not signaled by vibration.
   uint64_t goal_request_ = 0;
   uint64_t canceled_request_ = 0;
+  bool moveit_busy_ = false;
   bool initializedNamedPoses = false;
   std::string robot_description_;
   std::string robot_description_semantic_;
@@ -79,6 +84,7 @@ private:
   hector::ParameterSubscription acceleration_scaling_factor_subscriber_;
   hector::ParameterSubscription joint_tolerance_subscriber_;
   hector::ParameterSubscription planning_time_subscriber_;
+  rclcpp::Subscription<action_msgs::msg::GoalStatusArray>::SharedPtr moveit_status_subscriber_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr robot_description_subscriber_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr robot_description_semantic_subscriber_;
   rclcpp_action::Client<moveit_msgs::action::MoveGroup>::SharedPtr action_client_;

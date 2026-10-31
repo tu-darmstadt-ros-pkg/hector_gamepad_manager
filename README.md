@@ -416,6 +416,8 @@ Other pose buttons are ignored until the active one is released.
 - `group_start_controllers.<group>` (string[]): Optional per-group override of `start_controllers`, so that moving one
   group does not switch away the teleop controller of another.
 - `action_topic` (string): MoveGroup action to send goals to (may be a relay). Default: `move_action`
+- `moveit_status_topic` (string): Status topic of MoveIt's own move action. A new goal is held back while MoveIt still
+  has an active goal, which crashes move_group otherwise. Default: `move_action/_action/status`
 - `planning_time` (double): Allowed planning time in seconds. Default: `1.0`
 - `max_velocity_scaling_factor` / `max_acceleration_scaling_factor` (double): Scaling of the planned trajectory.
 - `group_max_velocity_scaling_factor.<group>` / `group_max_acceleration_scaling_factor.<group>` (double): Optional
