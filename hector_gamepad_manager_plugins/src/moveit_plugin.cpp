@@ -70,6 +70,15 @@ void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node )
       },
       status_options );
 
+  // optional target pose preview (hector_robot_pose_preview), its services are private to that node
+  node_->declare_parameter<std::string>( plugin_name + ".preview_node", "robot_pose_preview" );
+  const auto preview_node = node_->get_parameter( plugin_name + ".preview_node" ).as_string();
+  preview_show_client_ = node_->create_client<hector_robot_pose_preview_msgs::srv::ShowNamedPose>(
+      preview_node + "/show_named_pose" );
+  preview_clear_client_ = node_->create_client<std_srvs::srv::Trigger>( preview_node + "/clear" );
+  preview_set_valid_client_ =
+      node_->create_client<std_srvs::srv::SetBool>( preview_node + "/set_valid" );
+
   // setup vibration feedback patterns
   const std::string success_pattern_ns = plugin_name + ".vibration_success";
   const std::string failure_pattern_ns = plugin_name + ".vibration_failure";
@@ -122,6 +131,7 @@ void MoveitPlugin::handlePress( const std::string &function, const std::string &
   if ( function == "go_to_pose" ) {
     auto [group, pose] = functionIdToGroupGroupAndPose( function, id );
     if ( named_poses_.count( toGroupPoseName( group, pose ) ) > 0 ) {
+      showPreview( group, pose );
       active_id_ = id;
       blackboard_->set( kMoveitActiveGroupKey, group );
       state_ = State::CONTROLLER_SWITCH;
@@ -178,6 +188,7 @@ void MoveitPlugin::handleRelease( const std::string &function, const std::string
     return;
   auto [group, pose] = functionIdToGroupGroupAndPose( function, id );
   if ( named_poses_.count( toGroupPoseName( group, pose ) ) > 0 ) {
+    clearPreview();
     cancelGoal(); // cancels all current goals
   }
   canceled_request_ = goal_request_;
@@ -193,6 +204,7 @@ void MoveitPlugin::activate() { active_ = true; }
 void MoveitPlugin::deactivate()
 {
   active_ = false;
+  clearPreview();
   cancelGoal(); // cancels all Goals
   canceled_request_ = goal_request_;
   active_id_.clear();
@@ -209,6 +221,7 @@ void MoveitPlugin::sendNamedPoseGoal( const std::string &move_group, const std::
   }
   if ( !action_client_->wait_for_action_server( std::chrono::seconds( 5 ) ) ) {
     RCLCPP_ERROR( node_->get_logger(), "[MoveitPlugin] Action server not available after waiting" );
+    markPreviewInvalid();
     if ( feedback_manager_ ) {
       feedback_manager_->setPatternActive( failure_vibration_id_, true );
     }
@@ -290,6 +303,11 @@ void MoveitPlugin::resultCallback(
   if ( result.code != rclcpp_action::ResultCode::SUCCEEDED ) {
     RCLCPP_ERROR( node_->get_logger(), "[MoveitPlugin] Moveit action failed with result code %d",
                   static_cast<int>( result.code ) );
+    // planning/execution failed: keep showing the target (tinted) until the button is released
+    if ( result.code == rclcpp_action::ResultCode::ABORTED )
+      markPreviewInvalid();
+    else
+      clearPreview(); // canceled, e.g. by releasing the button
   }
   state_ = State::IDLE;
 }
@@ -311,6 +329,7 @@ void MoveitPlugin::goalResponseCallback(
                  "[MoveitPlugin] Goal was rejected by server after user cancel" );
   } else if ( !goal_handle ) {
     RCLCPP_ERROR( node_->get_logger(), "[MoveitPlugin] Goal was rejected by server" );
+    markPreviewInvalid(); // keep showing the target (tinted) until the button is released
     if ( feedback_manager_ ) {
       feedback_manager_->setPatternActive( failure_vibration_id_, true );
     }
@@ -318,6 +337,23 @@ void MoveitPlugin::goalResponseCallback(
   } else {
     RCLCPP_INFO( node_->get_logger(), "Goal accepted by server, waiting for result" );
   }
+}
+
+void MoveitPlugin::showPreview( const std::string &group, const std::string &pose ) const
+{
+  if ( !preview_show_client_ || !preview_show_client_->service_is_ready() )
+    return;
+  auto request = std::make_shared<hector_robot_pose_preview_msgs::srv::ShowNamedPose::Request>();
+  request->group = group;
+  request->pose = pose;
+  preview_show_client_->async_send_request( request );
+}
+
+void MoveitPlugin::clearPreview() const
+{
+  if ( !preview_clear_client_ || !preview_clear_client_->service_is_ready() )
+    return;
+  preview_clear_client_->async_send_request( std::make_shared<std_srvs::srv::Trigger::Request>() );
 }
 
 std::vector<std::string> MoveitPlugin::startControllers( const std::string &group )
@@ -346,6 +382,15 @@ bool MoveitPlugin::isMoveitBusy()
   if ( moveit_status_subscriber_->get_publisher_count() == 0 )
     moveit_busy_ = false;
   return moveit_busy_;
+}
+
+void MoveitPlugin::markPreviewInvalid() const
+{
+  if ( !preview_set_valid_client_ || !preview_set_valid_client_->service_is_ready() )
+    return;
+  auto request = std::make_shared<std_srvs::srv::SetBool::Request>();
+  request->data = false;
+  preview_set_valid_client_->async_send_request( request );
 }
 
 void MoveitPlugin::initializeNamedPoses()

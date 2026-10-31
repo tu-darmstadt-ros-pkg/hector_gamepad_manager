@@ -423,6 +423,8 @@ Other pose buttons are ignored until the active one is released.
 - `group_max_velocity_scaling_factor.<group>` / `group_max_acceleration_scaling_factor.<group>` (double): Optional
   per-group override of the scaling factors, e.g. to move the flippers as fast as in teleoperation.
 - `joint_tolerance` (double): Goal joint tolerance.
+- `preview_node` (string): Name of the `hector_robot_pose_preview` node whose (private) services show the target pose.
+  Default: `robot_pose_preview`
 
 ## BatteryMonitorPlugin
 

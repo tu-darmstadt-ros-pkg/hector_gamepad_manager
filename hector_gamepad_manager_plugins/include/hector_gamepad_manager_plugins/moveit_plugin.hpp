@@ -8,10 +8,13 @@
 #include <action_msgs/msg/goal_status_array.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <hector_gamepad_plugin_interface/gamepad_plugin_interface.hpp>
+#include <hector_robot_pose_preview_msgs/srv/show_named_pose.hpp>
 #include <hector_ros2_utils/parameters/reconfigurable_parameter.hpp>
 #include <moveit_msgs/action/move_group.hpp>
 #include <rclcpp_action/rclcpp_action.hpp>
 #include <std_msgs/msg/string.hpp>
+#include <std_srvs/srv/set_bool.hpp>
+#include <std_srvs/srv/trigger.hpp>
 
 namespace hector_gamepad_manager_plugins
 {
@@ -46,6 +49,11 @@ private:
       uint64_t request,
       const rclcpp_action::ClientGoalHandle<moveit_msgs::action::MoveGroup>::SharedPtr &goal_handle );
   void initializeNamedPoses();
+  // Shows/clears the transparent target pose preview. No-ops if the preview node is not running.
+  void showPreview( const std::string &group, const std::string &pose ) const;
+  void clearPreview() const;
+  // Tints the preview to signal that the target pose can not be reached. Cleared on release.
+  void markPreviewInvalid() const;
   // Whether MoveIt still has an active goal, e.g. one that is still planning after the
   // relaying fold manager already reported its cancel.
   bool isMoveitBusy();
@@ -88,6 +96,9 @@ private:
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr robot_description_subscriber_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr robot_description_semantic_subscriber_;
   rclcpp_action::Client<moveit_msgs::action::MoveGroup>::SharedPtr action_client_;
+  rclcpp::Client<hector_robot_pose_preview_msgs::srv::ShowNamedPose>::SharedPtr preview_show_client_;
+  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr preview_clear_client_;
+  rclcpp::Client<std_srvs::srv::SetBool>::SharedPtr preview_set_valid_client_;
 };
 } // namespace hector_gamepad_manager_plugins
 

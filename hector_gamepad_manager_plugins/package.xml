@@ -17,6 +17,7 @@
   <depend>controller_orchestrator</depend>
   <depend>geometry_msgs</depend>
   <depend>hector_gamepad_plugin_interface</depend>
+  <depend>hector_robot_pose_preview_msgs</depend>
   <depend>hector_ros2_utils</depend>
   <depend>hector_ros_controllers_msgs</depend>
   <depend>moveit_msgs</depend>

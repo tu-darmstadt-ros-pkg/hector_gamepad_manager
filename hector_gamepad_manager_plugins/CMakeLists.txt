@@ -19,6 +19,7 @@ set(DEPENDENCIES
     geometry_msgs
     hector_gamepad_plugin_interface
     hector_ros_controllers_msgs
+    hector_robot_pose_preview_msgs
     hector_ros2_utils
     moveit_msgs
     pluginlib
@@ -38,6 +39,7 @@ set(DEPENDENCIES_TARGETS
     geometry_msgs::geometry_msgs
     hector_gamepad_plugin_interface::hector_gamepad_plugin_interface
     hector_ros_controllers_msgs::hector_ros_controllers_msgs
+    hector_robot_pose_preview_msgs::hector_robot_pose_preview_msgs
     hector_ros2_utils::hector_ros2_utils
     moveit_msgs::moveit_msgs
     pluginlib::pluginlib
