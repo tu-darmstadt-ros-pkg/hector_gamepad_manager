@@ -32,6 +32,11 @@ void MoveitPlugin::initialize( const rclcpp::Node::SharedPtr &node )
       "Joint tolerance for moveit motion planning",
       hector::ParameterOptions<double>().onValidate(
           []( const auto &value ) { return value >= 0.0; } ) );
+  planning_time_subscriber_ = hector::createReconfigurableParameter(
+      node_, plugin_name + ".planning_time", std::ref( planning_time_ ),
+      "Allowed planning time in seconds for moveit motion planning",
+      hector::ParameterOptions<double>().onValidate(
+          []( const auto &value ) { return value > 0.0; } ) );
 
   // setup action client
   node_->declare_parameter<std::string>( plugin_name + ".action_topic", "move_action" );
@@ -189,9 +194,12 @@ void MoveitPlugin::sendNamedPoseGoal( const std::string &move_group, const std::
   move_group_goal_.request.group_name = move_group;
   move_group_goal_.request.goal_constraints.push_back( named_poses_[group_pose_name] );
   move_group_goal_.planning_options.plan_only = false;
-  move_group_goal_.request.max_acceleration_scaling_factor = max_acceleration_scaling_factor_;
-  move_group_goal_.request.max_velocity_scaling_factor = max_velocity_scaling_factor_;
+  move_group_goal_.request.max_acceleration_scaling_factor = groupScalingFactor(
+      "max_acceleration_scaling_factor", move_group, max_acceleration_scaling_factor_ );
+  move_group_goal_.request.max_velocity_scaling_factor =
+      groupScalingFactor( "max_velocity_scaling_factor", move_group, max_velocity_scaling_factor_ );
   move_group_goal_.request.num_planning_attempts = 3;
+  move_group_goal_.request.allowed_planning_time = planning_time_;
 
   // make sure flippers don't flip the robot
   // side effect - flipper motions not possible if start state in [-3/4 pi, -pi]
@@ -272,6 +280,17 @@ std::vector<std::string> MoveitPlugin::startControllers( const std::string &grou
   if ( !node_->has_parameter( param ) )
     node_->declare_parameter<std::vector<std::string>>( param, start_controllers_ );
   return node_->get_parameter( param ).as_string_array();
+}
+
+double MoveitPlugin::groupScalingFactor( const std::string &name, const std::string &group,
+                                         double default_value )
+{
+  // Declared on first use like group_start_controllers; a negative value means "not set".
+  const std::string param = getPluginName() + ".group_" + name + "." + group;
+  if ( !node_->has_parameter( param ) )
+    node_->declare_parameter<double>( param, -1.0 );
+  const double value = node_->get_parameter( param ).as_double();
+  return value >= 0.0 && value <= 1.0 ? value : default_value;
 }
 
 void MoveitPlugin::initializeNamedPoses()

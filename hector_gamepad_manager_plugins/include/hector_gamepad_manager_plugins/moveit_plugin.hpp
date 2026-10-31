@@ -45,6 +45,8 @@ private:
   void initializeNamedPoses();
   // Controllers to activate for a group: `group_start_controllers.<group>`, else start_controllers.
   std::vector<std::string> startControllers( const std::string &group );
+  // Scaling factor for a group: `group_<name>.<group>` if set (0..1), else the global `default_value`.
+  double groupScalingFactor( const std::string &name, const std::string &group, double default_value );
 
   static std::string toGroupPoseName( const std::string &group_name, const std::string &pose_name );
   std::pair<std::string, std::string> functionIdToGroupGroupAndPose( const std::string &function,
@@ -54,6 +56,7 @@ private:
   double joint_tolerance_ = 0.05;
   double max_acceleration_scaling_factor_ = 0.3;
   double max_velocity_scaling_factor_ = 0.3;
+  double planning_time_ = 1.0;
   // binding id of the pose button that started the current request, hold/release of other pose
   // buttons are ignored
   std::string active_id_;
@@ -69,6 +72,7 @@ private:
   hector::ParameterSubscription velocity_scaling_factor_subscriber_;
   hector::ParameterSubscription acceleration_scaling_factor_subscriber_;
   hector::ParameterSubscription joint_tolerance_subscriber_;
+  hector::ParameterSubscription planning_time_subscriber_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr robot_description_subscriber_;
   rclcpp::Subscription<std_msgs::msg::String>::SharedPtr robot_description_semantic_subscriber_;
   rclcpp_action::Client<moveit_msgs::action::MoveGroup>::SharedPtr action_client_;
