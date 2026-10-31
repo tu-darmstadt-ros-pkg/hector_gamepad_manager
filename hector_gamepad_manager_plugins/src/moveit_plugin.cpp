@@ -94,18 +94,19 @@ void MoveitPlugin::handlePress( const std::string &function, const std::string &
       active_id_ = id;
       blackboard_->set( kMoveitActiveGroupKey, group );
       state_ = State::CONTROLLER_SWITCH;
-      activateControllers( start_controllers_, [this]( bool success, const std::string &message ) {
-        if ( success ) {
-          RCLCPP_DEBUG( node_->get_logger(), "[MoveitPlugin] Controller Switch successful!" );
-        } else {
-          // the controller switch failed, go back to IDLE (but if we were in EXECUTING, stay in
-          // EXECUTING) e.g. controller were switched manually while waiting for controller switch
-          if ( state_ == State::CONTROLLER_SWITCH )
-            state_ = State::IDLE;
-          RCLCPP_WARN( node_->get_logger(), "[MoveitPlugin] Controller Switch failed: %s",
-                       message.c_str() );
-        }
-      } );
+      activateControllers(
+          startControllers( group ), [this]( bool success, const std::string &message ) {
+            if ( success ) {
+              RCLCPP_DEBUG( node_->get_logger(), "[MoveitPlugin] Controller Switch successful!" );
+            } else {
+              // the controller switch failed, go back to IDLE (but if we were in EXECUTING, stay in
+              // EXECUTING) e.g. controller were switched manually while waiting for controller switch
+              if ( state_ == State::CONTROLLER_SWITCH )
+                state_ = State::IDLE;
+              RCLCPP_WARN( node_->get_logger(), "[MoveitPlugin] Controller Switch failed: %s",
+                           message.c_str() );
+            }
+          } );
     } else {
       RCLCPP_WARN( node_->get_logger(), "[MoveitPlugin] No pose named %s found in group %s",
                    pose.c_str(), group.c_str() );
@@ -119,8 +120,8 @@ void MoveitPlugin::handleHold( const std::string &function, const std::string &i
   if ( state_ != State::CONTROLLER_SWITCH || id != active_id_ ) {
     return;
   }
-  if ( function == "go_to_pose" && areControllersActive( start_controllers_ ) ) {
-    auto [group, pose] = functionIdToGroupGroupAndPose( function, id );
+  auto [group, pose] = functionIdToGroupGroupAndPose( function, id );
+  if ( function == "go_to_pose" && areControllersActive( startControllers( group ) ) ) {
     if ( named_poses_.count( toGroupPoseName( group, pose ) ) > 0 ) {
       RCLCPP_WARN( node_->get_logger(),
                    "[MoveitPlugin] Start Moveit Planning & Execution of pose [%s] in group [%s]",
@@ -262,6 +263,15 @@ void MoveitPlugin::goalResponseCallback(
   } else {
     RCLCPP_INFO( node_->get_logger(), "Goal accepted by server, waiting for result" );
   }
+}
+
+std::vector<std::string> MoveitPlugin::startControllers( const std::string &group )
+{
+  // Declared on first use, the groups are only known from the button args.
+  const std::string param = getPluginName() + ".group_start_controllers." + group;
+  if ( !node_->has_parameter( param ) )
+    node_->declare_parameter<std::vector<std::string>>( param, start_controllers_ );
+  return node_->get_parameter( param ).as_string_array();
 }
 
 void MoveitPlugin::initializeNamedPoses()

@@ -43,6 +43,8 @@ private:
   void goalResponseCallback(
       const rclcpp_action::ClientGoalHandle<moveit_msgs::action::MoveGroup>::SharedPtr &goal_handle );
   void initializeNamedPoses();
+  // Controllers to activate for a group: `group_start_controllers.<group>`, else start_controllers.
+  std::vector<std::string> startControllers( const std::string &group );
 
   static std::string toGroupPoseName( const std::string &group_name, const std::string &pose_name );
   std::pair<std::string, std::string> functionIdToGroupGroupAndPose( const std::string &function,

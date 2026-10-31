@@ -410,6 +410,13 @@ is held, the moved group is written to the blackboard (`moveit_active_group`), a
 ManipulationPlugin ignore input for that group, since their controller switch would abort the MoveIt trajectory.
 Other pose buttons are ignored until the active one is released.
 
+### Parameters
+
+- `start_controllers` (string[]): Controllers activated before a pose is executed.
+- `group_start_controllers.<group>` (string[]): Optional per-group override of `start_controllers`, so that moving one
+  group does not switch away the teleop controller of another.
+- `action_topic` (string): MoveGroup action to send goals to (may be a relay). Default: `move_action`
+
 ## BatteryMonitorPlugin
 
 Monitors cell voltages (any battery message type via `ros_babel_fish`) and vibrates the gamepad when any cell
