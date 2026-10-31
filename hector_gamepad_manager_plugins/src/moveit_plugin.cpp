@@ -149,6 +149,7 @@ void MoveitPlugin::handleRelease( const std::string &function, const std::string
   if ( named_poses_.count( toGroupPoseName( group, pose ) ) > 0 ) {
     cancelGoal(); // cancels all current goals
   }
+  canceled_request_ = goal_request_;
   active_id_.clear();
   blackboard_->erase( kMoveitActiveGroupKey );
   state_ = State::IDLE;
@@ -162,6 +163,7 @@ void MoveitPlugin::deactivate()
 {
   active_ = false;
   cancelGoal(); // cancels all Goals
+  canceled_request_ = goal_request_;
   active_id_.clear();
   blackboard_->erase( kMoveitActiveGroupKey );
   state_ = State::IDLE;
@@ -218,12 +220,13 @@ void MoveitPlugin::sendNamedPoseGoal( const std::string &move_group, const std::
 
   // Send the goal
   auto send_goal_options = rclcpp_action::Client<moveit_msgs::action::MoveGroup>::SendGoalOptions();
+  const uint64_t request = ++goal_request_;
   send_goal_options.result_callback =
-      std::bind( &MoveitPlugin::resultCallback, this, std::placeholders::_1 );
+      std::bind( &MoveitPlugin::resultCallback, this, request, std::placeholders::_1 );
   send_goal_options.feedback_callback = std::bind( &MoveitPlugin::feedbackCallback, this,
                                                    std::placeholders::_1, std::placeholders::_2 );
   send_goal_options.goal_response_callback =
-      std::bind( &MoveitPlugin::goalResponseCallback, this, std::placeholders::_1 );
+      std::bind( &MoveitPlugin::goalResponseCallback, this, request, std::placeholders::_1 );
   this->action_client_->async_send_goal( move_group_goal_, send_goal_options );
 }
 
@@ -235,8 +238,17 @@ void MoveitPlugin::cancelGoal() const
 }
 
 void MoveitPlugin::resultCallback(
+    uint64_t request,
     const rclcpp_action::ClientGoalHandle<moveit_msgs::action::MoveGroup>::WrappedResult &result )
 {
+  if ( request <= canceled_request_ ) {
+    // canceled by the user releasing the button: no failure feedback. move_group may report this as
+    // aborted, e.g. when canceled during planning. Release already cleared the preview and state.
+    RCLCPP_INFO( node_->get_logger(),
+                 "[MoveitPlugin] Moveit action canceled by user (result code %d)",
+                 static_cast<int>( result.code ) );
+    return;
+  }
   if ( feedback_manager_ ) {
     if ( result.code == rclcpp_action::ResultCode::SUCCEEDED ) {
       feedback_manager_->setPatternActive( success_vibration_id_, true );
@@ -260,9 +272,13 @@ void MoveitPlugin::feedbackCallback(
 }
 
 void MoveitPlugin::goalResponseCallback(
+    uint64_t request,
     const rclcpp_action::ClientGoalHandle<moveit_msgs::action::MoveGroup>::SharedPtr &goal_handle )
 {
-  if ( !goal_handle ) {
+  if ( !goal_handle && request <= canceled_request_ ) {
+    RCLCPP_INFO( node_->get_logger(),
+                 "[MoveitPlugin] Goal was rejected by server after user cancel" );
+  } else if ( !goal_handle ) {
     RCLCPP_ERROR( node_->get_logger(), "[MoveitPlugin] Goal was rejected by server" );
     if ( feedback_manager_ ) {
       feedback_manager_->setPatternActive( failure_vibration_id_, true );

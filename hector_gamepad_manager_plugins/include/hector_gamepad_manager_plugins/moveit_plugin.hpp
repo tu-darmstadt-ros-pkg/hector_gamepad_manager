@@ -36,11 +36,13 @@ private:
   void sendNamedPoseGoal( const std::string &move_group, const std::string &pose_name );
   void cancelGoal() const;
   void resultCallback(
+      uint64_t request,
       const rclcpp_action::ClientGoalHandle<moveit_msgs::action::MoveGroup>::WrappedResult &result );
   void
   feedbackCallback( rclcpp_action::ClientGoalHandle<moveit_msgs::action::MoveGroup>::SharedPtr,
                     const std::shared_ptr<const moveit_msgs::action::MoveGroup::Feedback> feedback );
   void goalResponseCallback(
+      uint64_t request,
       const rclcpp_action::ClientGoalHandle<moveit_msgs::action::MoveGroup>::SharedPtr &goal_handle );
   void initializeNamedPoses();
   // Controllers to activate for a group: `group_start_controllers.<group>`, else start_controllers.
@@ -60,6 +62,10 @@ private:
   // binding id of the pose button that started the current request, hold/release of other pose
   // buttons are ignored
   std::string active_id_;
+  // sequence number of the last goal sent, and of the last one the user canceled (button release or
+  // deactivation). Failures of user-canceled goals are expected and not signaled by vibration.
+  uint64_t goal_request_ = 0;
+  uint64_t canceled_request_ = 0;
   bool initializedNamedPoses = false;
   std::string robot_description_;
   std::string robot_description_semantic_;
