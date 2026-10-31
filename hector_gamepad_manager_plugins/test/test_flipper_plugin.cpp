@@ -1,7 +1,9 @@
 #include <gmock/gmock.h>
 #include <rclcpp/rclcpp.hpp>
 #include <rtest/action_client_mock.hpp>
+#include <rtest/publisher_mock.hpp>
 
+#include <hector_gamepad_manager_plugins/blackboard_keys.hpp>
 #include <hector_gamepad_manager_plugins/flipper_plugin.hpp>
 #include <hector_gamepad_plugin_interface/blackboard.hpp>
 #include <hector_gamepad_plugin_interface/feedback_manager.hpp>
@@ -25,14 +27,15 @@ protected:
   std::shared_ptr<hector_gamepad_manager_plugins::FlipperPlugin> plugin_;
   std::shared_ptr<rtest::experimental::ActionClientMock<DriveAction>> drive_mock_;
   std::shared_ptr<rtest::experimental::ActionClientMock<SyncAction>> sync_mock_;
+  std::shared_ptr<hector_gamepad_plugin_interface::Blackboard> blackboard_;
 
   void SetUp() override
   {
     node_ = std::make_shared<rclcpp::Node>( "flipper_plugin_test", "athena" );
 
     plugin_ = std::make_shared<hector_gamepad_manager_plugins::FlipperPlugin>();
-    plugin_->initializePlugin( node_, "hector_gamepad_manager_plugins::FlipperPlugin",
-                               std::make_shared<hector_gamepad_plugin_interface::Blackboard>(),
+    blackboard_ = std::make_shared<hector_gamepad_plugin_interface::Blackboard>();
+    plugin_->initializePlugin( node_, "hector_gamepad_manager_plugins::FlipperPlugin", blackboard_,
                                std::make_shared<hector_gamepad_plugin_interface::FeedbackManager>(),
                                nullptr );
 
@@ -206,4 +209,38 @@ int main( int argc, char **argv )
   int result = RUN_ALL_TESTS();
   rclcpp::shutdown();
   return result;
+}
+
+// While the MoveitPlugin moves the flipper group, flipper input must not reach the flippers: its
+// controller switch would abort the MoveIt trajectory.
+TEST_F( FlipperPluginTest, InputIgnoredWhileMoveitMovesFlippers )
+{
+  auto commands_pub = rtest::findPublisher<std_msgs::msg::Float64MultiArray>(
+      node_, "/athena/flipper_velocity_controller/commands" );
+  ASSERT_TRUE( commands_pub );
+  // speed and factors default to 0, which would make every command zero anyway
+  const std::string ns = plugin_->getPluginName() + ".";
+  ASSERT_TRUE( node_->set_parameter( rclcpp::Parameter( ns + "speed", 1.0 ) ).successful );
+  ASSERT_TRUE(
+      node_->set_parameter( rclcpp::Parameter( ns + "flipper_front_factor", 1.0 ) ).successful );
+  const auto all_zero = ::testing::Field( &std_msgs::msg::Float64MultiArray::data,
+                                          ::testing::Each( ::testing::DoubleEq( 0.0 ) ) );
+
+  blackboard_->set( hector_gamepad_manager_plugins::kMoveitActiveGroupKey,
+                    std::string( "flipper_group" ) );
+  EXPECT_CALL( *commands_pub, publish( ::testing::Not( all_zero ) ) ).Times( 0 );
+  EXPECT_CALL( *commands_pub, publish( all_zero ) ).Times( ::testing::AnyNumber() );
+  EXPECT_CALL( *drive_mock_, action_server_is_ready() ).WillRepeatedly( Return( true ) );
+  EXPECT_CALL( *drive_mock_, async_send_goal( _, _ ) ).Times( 0 );
+  plugin_->handleAxis( "flipper_front_down", "test_id", -1.0 );
+  plugin_->update();
+  plugin_->update();
+  plugin_->handlePress( "flipper_front_upright", "test_id" );
+  ::testing::Mock::VerifyAndClearExpectations( commands_pub.get() );
+
+  // Another group is moved (or none): flipper input works again.
+  blackboard_->set( hector_gamepad_manager_plugins::kMoveitActiveGroupKey,
+                    std::string( "arm_group" ) );
+  EXPECT_CALL( *commands_pub, publish( ::testing::Not( all_zero ) ) ).Times( 1 );
+  plugin_->update();
 }

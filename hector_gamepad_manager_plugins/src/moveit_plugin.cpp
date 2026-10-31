@@ -2,6 +2,7 @@
 // Created by aljoscha-schmidt on 3/8/25.
 //
 
+#include <hector_gamepad_manager_plugins/blackboard_keys.hpp>
 #include <hector_gamepad_manager_plugins/moveit_plugin.hpp>
 #include <srdfdom/model.h>
 #include <std_msgs/msg/string.hpp>
@@ -90,6 +91,8 @@ void MoveitPlugin::handlePress( const std::string &function, const std::string &
   if ( function == "go_to_pose" ) {
     auto [group, pose] = functionIdToGroupGroupAndPose( function, id );
     if ( named_poses_.count( toGroupPoseName( group, pose ) ) > 0 ) {
+      active_id_ = id;
+      blackboard_->set( kMoveitActiveGroupKey, group );
       state_ = State::CONTROLLER_SWITCH;
       activateControllers( start_controllers_, [this]( bool success, const std::string &message ) {
         if ( success ) {
@@ -113,7 +116,7 @@ void MoveitPlugin::handlePress( const std::string &function, const std::string &
 void MoveitPlugin::handleHold( const std::string &function, const std::string &id )
 {
   // wait until controller switch is done
-  if ( state_ != State::CONTROLLER_SWITCH ) {
+  if ( state_ != State::CONTROLLER_SWITCH || id != active_id_ ) {
     return;
   }
   if ( function == "go_to_pose" && areControllersActive( start_controllers_ ) ) {
@@ -133,12 +136,15 @@ void MoveitPlugin::handleHold( const std::string &function, const std::string &i
 
 void MoveitPlugin::handleRelease( const std::string &function, const std::string &id )
 {
-  if ( !active_ )
+  // only the button that started the motion may stop it
+  if ( !active_ || id != active_id_ )
     return;
   auto [group, pose] = functionIdToGroupGroupAndPose( function, id );
   if ( named_poses_.count( toGroupPoseName( group, pose ) ) > 0 ) {
     cancelGoal(); // cancels all current goals
   }
+  active_id_.clear();
+  blackboard_->erase( kMoveitActiveGroupKey );
   state_ = State::IDLE;
 }
 
@@ -150,6 +156,8 @@ void MoveitPlugin::deactivate()
 {
   active_ = false;
   cancelGoal(); // cancels all Goals
+  active_id_.clear();
+  blackboard_->erase( kMoveitActiveGroupKey );
   state_ = State::IDLE;
 }
 

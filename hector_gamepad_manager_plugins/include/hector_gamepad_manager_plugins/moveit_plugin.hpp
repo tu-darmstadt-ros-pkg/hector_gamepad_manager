@@ -52,6 +52,9 @@ private:
   double joint_tolerance_ = 0.05;
   double max_acceleration_scaling_factor_ = 0.3;
   double max_velocity_scaling_factor_ = 0.3;
+  // binding id of the pose button that started the current request, hold/release of other pose
+  // buttons are ignored
+  std::string active_id_;
   bool initializedNamedPoses = false;
   std::string robot_description_;
   std::string robot_description_semantic_;

@@ -1,4 +1,5 @@
 #include "hector_gamepad_manager_plugins/manipulation_plugin.hpp"
+#include "hector_gamepad_manager_plugins/blackboard_keys.hpp"
 
 namespace hector_gamepad_manager_plugins
 {
@@ -63,6 +64,8 @@ void ManipulationPlugin::initialize( const rclcpp::Node::SharedPtr &node )
                                          "moveit_twist_controller" );
   twist_controller_name_ =
       node_->get_parameter( plugin_namespace + ".twist_controller_name" ).as_string();
+  moveit_group_ =
+      node_->declare_parameter<std::string>( plugin_namespace + ".moveit_group", "arm_group" );
   node_->declare_parameter<std::string>( plugin_namespace + ".gripper_controller_name",
                                          "gripper_position_controller" );
   gripper_controller_name_ =
@@ -157,6 +160,26 @@ void ManipulationPlugin::update()
     hold_mode_client_->async_send_request( request );
     // reset cmds when hold mode is toggled
     reset();
+  }
+
+  // MoveIt moves the arm: stop all arm (and gripper) commands, driving still goes through.
+  if ( isMovedByMoveit() ) {
+    publishZeroJointCmd();
+    publishZeroNullspaceCmd();
+    if ( !last_eef_cmd_zero_ ) {
+      gripper_cmd_.data = 0.0;
+      gripper_cmd_pub_->publish( gripper_cmd_ );
+    }
+    publishZeroEefCmd();
+    double cmd_vel_linear = 0.0, cmd_vel_angular = 0.0;
+    if ( hold_mode_active_ && !single_joint_mode_active_ && !nullspace_mode_active_ ) {
+      const double steering_inv =
+          blackboard_->value_or<bool>( "invert_steering", false ) ? -1.0 : 1.0;
+      cmd_vel_linear = steering_inv * move_up_down_ * max_drive_linear_speed_;
+      cmd_vel_angular = move_left_right_ * max_drive_angular_speed_;
+    }
+    sendDriveCommand( cmd_vel_linear, cmd_vel_angular );
+    return;
   }
   // Single-joint mode: both joysticks drive the first 4 arm joints directly (no IK).
   if ( single_joint_mode_active_ ) {
@@ -329,6 +352,11 @@ void ManipulationPlugin::sendDriveCommand( const double linear_speed, const doub
     drive_cmd_pub_->publish( drive_cmd_ );
   }
   last_drive_cmd_zero_ = current_cmd_zero;
+}
+
+bool ManipulationPlugin::isMovedByMoveit() const
+{
+  return blackboard_->value_or<std::string>( kMoveitActiveGroupKey, "" ) == moveit_group_;
 }
 
 bool ManipulationPlugin::isZeroCmd() const
