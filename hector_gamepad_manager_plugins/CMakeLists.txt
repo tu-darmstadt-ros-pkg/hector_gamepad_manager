@@ -13,11 +13,13 @@ find_package(ament_cmake_gen_version_h REQUIRED)
 
 # Define a list of dependencies in alphabetical order
 set(DEPENDENCIES
+    action_msgs
     controller_manager_msgs
     controller_orchestrator
     geometry_msgs
     hector_gamepad_plugin_interface
     hector_ros_controllers_msgs
+    hector_robot_pose_preview_msgs
     hector_ros2_utils
     moveit_msgs
     pluginlib
@@ -31,23 +33,25 @@ set(DEPENDENCIES
     std_srvs
     tf2_eigen)
 set(DEPENDENCIES_TARGETS
-  controller_manager_msgs::controller_manager_msgs
-  controller_orchestrator::controller_orchestrator
-  geometry_msgs::geometry_msgs
-  hector_gamepad_plugin_interface::hector_gamepad_plugin_interface
-  hector_ros_controllers_msgs::hector_ros_controllers_msgs
-  hector_ros2_utils::hector_ros2_utils
-  moveit_msgs::moveit_msgs
-  pluginlib::pluginlib
-  ros_babel_fish::ros_babel_fish
-  rcl_interfaces::rcl_interfaces
-  rclcpp::rclcpp
-  rclcpp_action::rclcpp_action
-  sensor_msgs::sensor_msgs
-  srdfdom::srdfdom
-  std_msgs::std_msgs
-  std_srvs::std_srvs
-  tf2_eigen::tf2_eigen)
+    action_msgs::action_msgs
+    controller_manager_msgs::controller_manager_msgs
+    controller_orchestrator::controller_orchestrator
+    geometry_msgs::geometry_msgs
+    hector_gamepad_plugin_interface::hector_gamepad_plugin_interface
+    hector_ros_controllers_msgs::hector_ros_controllers_msgs
+    hector_robot_pose_preview_msgs::hector_robot_pose_preview_msgs
+    hector_ros2_utils::hector_ros2_utils
+    moveit_msgs::moveit_msgs
+    pluginlib::pluginlib
+    ros_babel_fish::ros_babel_fish
+    rcl_interfaces::rcl_interfaces
+    rclcpp::rclcpp
+    rclcpp_action::rclcpp_action
+    sensor_msgs::sensor_msgs
+    srdfdom::srdfdom
+    std_msgs::std_msgs
+    std_srvs::std_srvs
+    tf2_eigen::tf2_eigen)
 
 foreach(dependency IN LISTS DEPENDENCIES)
   find_package(${dependency} REQUIRED)
@@ -93,7 +97,8 @@ if(BUILD_TESTING)
     ${PROJECT_NAME}_test_doubles
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
            $<INSTALL_INTERFACE:include>)
-  target_link_libraries(${PROJECT_NAME}_test_doubles PUBLIC ${DEPENDENCIES_TARGETS})
+  target_link_libraries(${PROJECT_NAME}_test_doubles
+                        PUBLIC ${DEPENDENCIES_TARGETS})
   target_link_libraries(
     ${PROJECT_NAME}_test_doubles
     PRIVATE rtest::publisher_mock rtest::subscription_mock rtest::service_mock
@@ -114,7 +119,8 @@ if(BUILD_TESTING)
   target_include_directories(
     test_flipper_plugin
     PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
-  target_link_libraries(test_flipper_plugin ${DEPENDENCIES_TARGETS} ${rtest_TARGETS})
+  target_link_libraries(test_flipper_plugin ${DEPENDENCIES_TARGETS}
+                        ${rtest_TARGETS})
   target_link_libraries(
     test_flipper_plugin
     rtest::publisher_mock

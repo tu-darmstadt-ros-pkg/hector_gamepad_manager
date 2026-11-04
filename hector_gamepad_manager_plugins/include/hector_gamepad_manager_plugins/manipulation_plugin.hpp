@@ -35,6 +35,8 @@ public:
    * @param angular_speed
    */
   void sendDriveCommand( double linear_speed, double angular_speed );
+  // Drive command of hold mode: the left joystick moves the base.
+  void sendHoldModeDriveCommand();
 
   bool isZeroCmd() const;
 
@@ -100,6 +102,8 @@ private:
 
   std::string twist_controller_name_;
   std::string gripper_controller_name_;
+  // MoveIt group of the arm; while the MoveitPlugin moves it, arm input is ignored
+  std::string moveit_group_;
   geometry_msgs::msg::TwistStamped eef_cmd_;
   geometry_msgs::msg::TwistStamped drive_cmd_;
   std_msgs::msg::Float64 gripper_cmd_;

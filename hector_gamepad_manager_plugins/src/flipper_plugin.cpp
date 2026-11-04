@@ -1,4 +1,5 @@
 #include "hector_gamepad_manager_plugins/flipper_plugin.hpp"
+#include "hector_gamepad_manager_plugins/blackboard_keys.hpp"
 
 namespace hector_gamepad_manager_plugins
 {
@@ -46,6 +47,8 @@ void FlipperPlugin::initialize( const rclcpp::Node::SharedPtr &node )
   // Off where something else owns the controller states, such as a benchmark.
   switch_controllers_ =
       node_->declare_parameter<bool>( plugin_namespace + ".switch_controllers", true );
+  moveit_group_ =
+      node_->declare_parameter<std::string>( plugin_namespace + ".moveit_group", "flipper_group" );
 
   // Setup Flipper Command Publisher
   const std::string command_topic =
@@ -155,6 +158,9 @@ void FlipperPlugin::update()
     vel_commands_[3] = axis_vel_commands_[3] + button_vel_commands_[3]; // flipper_br_joint
   }
 
+  if ( isMovedByMoveit( *blackboard_, moveit_group_ ) )
+    vel_commands_.fill( 0.0 );
+
   const bool current_cmd_zero = checkCurrentCmdIsZero();
 
   if ( switch_controllers_ && last_cmd_zero_ && !current_cmd_zero )
@@ -263,7 +269,7 @@ void FlipperPlugin::handleIndividualFlipperControlInput( const double base_speed
 
 void FlipperPlugin::handleFlipperUpright( const std::string &function )
 {
-  if ( !active_ )
+  if ( !active_ || isMovedByMoveit( *blackboard_, moveit_group_ ) )
     return;
 
   if ( !drive_flipper_client_->action_server_is_ready() ) {
@@ -318,7 +324,7 @@ void FlipperPlugin::handleFlipperUpright( const std::string &function )
 
 void FlipperPlugin::handleFlipperSync( const std::string &function )
 {
-  if ( !active_ )
+  if ( !active_ || isMovedByMoveit( *blackboard_, moveit_group_ ) )
     return;
 
   if ( !sync_flipper_client_->action_server_is_ready() ) {
