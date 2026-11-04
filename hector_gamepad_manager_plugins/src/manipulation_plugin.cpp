@@ -163,7 +163,7 @@ void ManipulationPlugin::update()
   }
 
   // MoveIt moves the arm: stop all arm (and gripper) commands, driving still goes through.
-  if ( isMovedByMoveit() ) {
+  if ( isMovedByMoveit( *blackboard_, moveit_group_ ) ) {
     publishZeroJointCmd();
     publishZeroNullspaceCmd();
     if ( !last_eef_cmd_zero_ ) {
@@ -171,14 +171,10 @@ void ManipulationPlugin::update()
       gripper_cmd_pub_->publish( gripper_cmd_ );
     }
     publishZeroEefCmd();
-    double cmd_vel_linear = 0.0, cmd_vel_angular = 0.0;
-    if ( hold_mode_active_ && !single_joint_mode_active_ && !nullspace_mode_active_ ) {
-      const double steering_inv =
-          blackboard_->value_or<bool>( "invert_steering", false ) ? -1.0 : 1.0;
-      cmd_vel_linear = steering_inv * move_up_down_ * max_drive_linear_speed_;
-      cmd_vel_angular = move_left_right_ * max_drive_angular_speed_;
-    }
-    sendDriveCommand( cmd_vel_linear, cmd_vel_angular );
+    if ( hold_mode_active_ && !single_joint_mode_active_ && !nullspace_mode_active_ )
+      sendHoldModeDriveCommand();
+    else
+      sendDriveCommand( 0.0, 0.0 );
     return;
   }
   // Single-joint mode: both joysticks drive the first 4 arm joints directly (no IK).
@@ -231,13 +227,8 @@ void ManipulationPlugin::update()
   }
   publishZeroNullspaceCmd();
 
-  double cmd_vel_linear = 0.0, cmd_vel_angular = 0.0;
-  if ( hold_mode_active_ ) {
-    // left joystick moves base, ignore all other axis and buttons
-    const double steering_inv = blackboard_->value_or<bool>( "invert_steering", false ) ? -1.0 : 1.0;
-    cmd_vel_linear = steering_inv * move_up_down_ * max_drive_linear_speed_;
-    cmd_vel_angular = move_left_right_ * max_drive_angular_speed_;
-  } else {
+  // in hold mode the left joystick moves the base, all other axes and buttons are ignored
+  if ( !hold_mode_active_ ) {
     eef_cmd_.twist.linear.x = ( move_forward_ + move_backward_ ) * max_eef_linear_speed_;
     eef_cmd_.twist.linear.y = move_left_right_ * max_eef_linear_speed_;
     eef_cmd_.twist.linear.z = move_up_down_ * max_eef_linear_speed_;
@@ -260,7 +251,17 @@ void ManipulationPlugin::update()
   }
   last_eef_cmd_zero_ = is_zero_cmd;
 
-  sendDriveCommand( cmd_vel_linear, cmd_vel_angular );
+  if ( hold_mode_active_ )
+    sendHoldModeDriveCommand();
+  else
+    sendDriveCommand( 0.0, 0.0 );
+}
+
+void ManipulationPlugin::sendHoldModeDriveCommand()
+{
+  const double steering_inv = blackboard_->value_or<bool>( "invert_steering", false ) ? -1.0 : 1.0;
+  sendDriveCommand( steering_inv * move_up_down_ * max_drive_linear_speed_,
+                    move_left_right_ * max_drive_angular_speed_ );
 }
 
 void ManipulationPlugin::activate()
@@ -352,11 +353,6 @@ void ManipulationPlugin::sendDriveCommand( const double linear_speed, const doub
     drive_cmd_pub_->publish( drive_cmd_ );
   }
   last_drive_cmd_zero_ = current_cmd_zero;
-}
-
-bool ManipulationPlugin::isMovedByMoveit() const
-{
-  return blackboard_->value_or<std::string>( kMoveitActiveGroupKey, "" ) == moveit_group_;
 }
 
 bool ManipulationPlugin::isZeroCmd() const

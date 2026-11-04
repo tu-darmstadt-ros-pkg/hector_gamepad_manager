@@ -50,6 +50,7 @@ private:
   std::string standard_controller_;
   std::vector<std::string> teleop_controller_;
   bool switch_controllers_ = true;
+  // MoveIt group of the flippers; while the MoveitPlugin moves it, flipper input is ignored
   std::string moveit_group_;
 
   std_msgs::msg::Float64MultiArray flipper_speed_commands_;
@@ -77,9 +78,6 @@ private:
   void publishCommands() const;
 
   bool checkCurrentCmdIsZero() const;
-
-  // Whether the MoveitPlugin is operating the movement. In that case operator flipper movement is ignored.
-  bool isMovedByMoveit() const;
 
   // Action clients for flipper group actions
   using DriveFlipperGroupAction = hector_ros_controllers_msgs::action::DriveFlipperGroup;

@@ -158,7 +158,7 @@ void FlipperPlugin::update()
     vel_commands_[3] = axis_vel_commands_[3] + button_vel_commands_[3]; // flipper_br_joint
   }
 
-  if ( isMovedByMoveit() )
+  if ( isMovedByMoveit( *blackboard_, moveit_group_ ) )
     vel_commands_.fill( 0.0 );
 
   const bool current_cmd_zero = checkCurrentCmdIsZero();
@@ -269,7 +269,7 @@ void FlipperPlugin::handleIndividualFlipperControlInput( const double base_speed
 
 void FlipperPlugin::handleFlipperUpright( const std::string &function )
 {
-  if ( !active_ || isMovedByMoveit() )
+  if ( !active_ || isMovedByMoveit( *blackboard_, moveit_group_ ) )
     return;
 
   if ( !drive_flipper_client_->action_server_is_ready() ) {
@@ -324,7 +324,7 @@ void FlipperPlugin::handleFlipperUpright( const std::string &function )
 
 void FlipperPlugin::handleFlipperSync( const std::string &function )
 {
-  if ( !active_ || isMovedByMoveit() )
+  if ( !active_ || isMovedByMoveit( *blackboard_, moveit_group_ ) )
     return;
 
   if ( !sync_flipper_client_->action_server_is_ready() ) {
@@ -409,11 +409,6 @@ void FlipperPlugin::publishCommands() const
   std_msgs::msg::Float64MultiArray cmd_msg;
   cmd_msg.data.assign( vel_commands_.begin(), vel_commands_.end() );
   flipper_command_publisher_->publish( cmd_msg );
-}
-
-bool FlipperPlugin::isMovedByMoveit() const
-{
-  return blackboard_->value_or<std::string>( kMoveitActiveGroupKey, "" ) == moveit_group_;
 }
 
 bool FlipperPlugin::checkCurrentCmdIsZero() const

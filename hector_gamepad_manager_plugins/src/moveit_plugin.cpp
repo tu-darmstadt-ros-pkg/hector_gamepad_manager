@@ -133,21 +133,21 @@ void MoveitPlugin::handlePress( const std::string &function, const std::string &
     if ( named_poses_.count( toGroupPoseName( group, pose ) ) > 0 ) {
       showPreview( group, pose );
       active_id_ = id;
+      active_controllers_ = startControllers( group );
       blackboard_->set( kMoveitActiveGroupKey, group );
       state_ = State::CONTROLLER_SWITCH;
-      activateControllers(
-          startControllers( group ), [this]( bool success, const std::string &message ) {
-            if ( success ) {
-              RCLCPP_DEBUG( node_->get_logger(), "[MoveitPlugin] Controller Switch successful!" );
-            } else {
-              // the controller switch failed, go back to IDLE (but if we were in EXECUTING, stay in
-              // EXECUTING) e.g. controller were switched manually while waiting for controller switch
-              if ( state_ == State::CONTROLLER_SWITCH )
-                state_ = State::IDLE;
-              RCLCPP_WARN( node_->get_logger(), "[MoveitPlugin] Controller Switch failed: %s",
-                           message.c_str() );
-            }
-          } );
+      activateControllers( active_controllers_, [this]( bool success, const std::string &message ) {
+        if ( success ) {
+          RCLCPP_DEBUG( node_->get_logger(), "[MoveitPlugin] Controller Switch successful!" );
+        } else {
+          // the controller switch failed, go back to IDLE (but if we were in EXECUTING, stay in
+          // EXECUTING) e.g. controller were switched manually while waiting for controller switch
+          if ( state_ == State::CONTROLLER_SWITCH )
+            state_ = State::IDLE;
+          RCLCPP_WARN( node_->get_logger(), "[MoveitPlugin] Controller Switch failed: %s",
+                       message.c_str() );
+        }
+      } );
     } else {
       RCLCPP_WARN( node_->get_logger(), "[MoveitPlugin] No pose named %s found in group %s",
                    pose.c_str(), group.c_str() );
@@ -166,8 +166,8 @@ void MoveitPlugin::handleHold( const std::string &function, const std::string &i
                           "[MoveitPlugin] Waiting for the previous MoveIt goal to finish." );
     return;
   }
-  auto [group, pose] = functionIdToGroupGroupAndPose( function, id );
-  if ( function == "go_to_pose" && areControllersActive( startControllers( group ) ) ) {
+  if ( function == "go_to_pose" && areControllersActive( active_controllers_ ) ) {
+    auto [group, pose] = functionIdToGroupGroupAndPose( function, id );
     if ( named_poses_.count( toGroupPoseName( group, pose ) ) > 0 ) {
       RCLCPP_WARN( node_->get_logger(),
                    "[MoveitPlugin] Start Moveit Planning & Execution of pose [%s] in group [%s]",
@@ -186,15 +186,7 @@ void MoveitPlugin::handleRelease( const std::string &function, const std::string
   // only the button that started the motion may stop it
   if ( !active_ || id != active_id_ )
     return;
-  auto [group, pose] = functionIdToGroupGroupAndPose( function, id );
-  if ( named_poses_.count( toGroupPoseName( group, pose ) ) > 0 ) {
-    clearPreview();
-    cancelGoal(); // cancels all current goals
-  }
-  canceled_request_ = goal_request_;
-  active_id_.clear();
-  blackboard_->erase( kMoveitActiveGroupKey );
-  state_ = State::IDLE;
+  stopActiveRequest();
 }
 
 void MoveitPlugin::update() { }
@@ -204,10 +196,16 @@ void MoveitPlugin::activate() { active_ = true; }
 void MoveitPlugin::deactivate()
 {
   active_ = false;
+  stopActiveRequest();
+}
+
+void MoveitPlugin::stopActiveRequest()
+{
   clearPreview();
-  cancelGoal(); // cancels all Goals
+  cancelGoal(); // cancels all current goals
   canceled_request_ = goal_request_;
   active_id_.clear();
+  active_controllers_.clear();
   blackboard_->erase( kMoveitActiveGroupKey );
   state_ = State::IDLE;
 }
@@ -307,7 +305,7 @@ void MoveitPlugin::resultCallback(
     if ( result.code == rclcpp_action::ResultCode::ABORTED )
       markPreviewInvalid();
     else
-      clearPreview(); // canceled, e.g. by releasing the button
+      clearPreview(); // canceled by someone else than the user (user cancels returned above)
   }
   state_ = State::IDLE;
 }
@@ -324,24 +322,26 @@ void MoveitPlugin::goalResponseCallback(
     uint64_t request,
     const rclcpp_action::ClientGoalHandle<moveit_msgs::action::MoveGroup>::SharedPtr &goal_handle )
 {
-  if ( !goal_handle && request <= canceled_request_ ) {
+  if ( goal_handle ) {
+    RCLCPP_INFO( node_->get_logger(), "Goal accepted by server, waiting for result" );
+    return;
+  }
+  if ( request <= canceled_request_ ) {
     RCLCPP_INFO( node_->get_logger(),
                  "[MoveitPlugin] Goal was rejected by server after user cancel" );
-  } else if ( !goal_handle ) {
-    RCLCPP_ERROR( node_->get_logger(), "[MoveitPlugin] Goal was rejected by server" );
-    markPreviewInvalid(); // keep showing the target (tinted) until the button is released
-    if ( feedback_manager_ ) {
-      feedback_manager_->setPatternActive( failure_vibration_id_, true );
-    }
-    state_ = State::IDLE;
-  } else {
-    RCLCPP_INFO( node_->get_logger(), "Goal accepted by server, waiting for result" );
+    return;
   }
+  RCLCPP_ERROR( node_->get_logger(), "[MoveitPlugin] Goal was rejected by server" );
+  markPreviewInvalid(); // keep showing the target (tinted) until the button is released
+  if ( feedback_manager_ ) {
+    feedback_manager_->setPatternActive( failure_vibration_id_, true );
+  }
+  state_ = State::IDLE;
 }
 
 void MoveitPlugin::showPreview( const std::string &group, const std::string &pose ) const
 {
-  if ( !preview_show_client_ || !preview_show_client_->service_is_ready() )
+  if ( !preview_show_client_->service_is_ready() )
     return;
   auto request = std::make_shared<hector_robot_pose_preview_msgs::srv::ShowNamedPose::Request>();
   request->group = group;
@@ -351,7 +351,7 @@ void MoveitPlugin::showPreview( const std::string &group, const std::string &pos
 
 void MoveitPlugin::clearPreview() const
 {
-  if ( !preview_clear_client_ || !preview_clear_client_->service_is_ready() )
+  if ( !preview_clear_client_->service_is_ready() )
     return;
   preview_clear_client_->async_send_request( std::make_shared<std_srvs::srv::Trigger::Request>() );
 }
@@ -386,7 +386,7 @@ bool MoveitPlugin::isMoveitBusy()
 
 void MoveitPlugin::markPreviewInvalid() const
 {
-  if ( !preview_set_valid_client_ || !preview_set_valid_client_->service_is_ready() )
+  if ( !preview_set_valid_client_->service_is_ready() )
     return;
   auto request = std::make_shared<std_srvs::srv::SetBool::Request>();
   request->data = false;

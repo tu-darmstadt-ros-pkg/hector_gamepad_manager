@@ -39,6 +39,8 @@ public:
 private:
   void sendNamedPoseGoal( const std::string &move_group, const std::string &pose_name );
   void cancelGoal() const;
+  // Cancels the current request (button release or deactivation) and returns to IDLE.
+  void stopActiveRequest();
   void resultCallback(
       uint64_t request,
       const rclcpp_action::ClientGoalHandle<moveit_msgs::action::MoveGroup>::WrappedResult &result );
@@ -74,6 +76,8 @@ private:
   // binding id of the pose button that started the current request, hold/release of other pose
   // buttons are ignored
   std::string active_id_;
+  // controllers activated for the current request, see startControllers()
+  std::vector<std::string> active_controllers_;
   // sequence number of the last goal sent, and of the last one the user canceled (button release or
   // deactivation). Failures of user-canceled goals are expected and not signaled by vibration.
   uint64_t goal_request_ = 0;
