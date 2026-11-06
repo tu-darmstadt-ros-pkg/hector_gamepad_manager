@@ -13,6 +13,8 @@
 
 namespace hector_gamepad_plugin_interface
 {
+// The manager and every plugin share this vtable. Changing a virtual function needs a version bump
+// of this package and a matching version_gte in the manager and plugin packages.
 class GamepadFunctionPlugin
 {
 public:

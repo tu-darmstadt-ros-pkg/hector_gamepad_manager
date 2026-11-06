@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>hector_gamepad_manager_plugins</name>
-  <version>0.0.0</version>
+  <version>0.1.0</version>
   <description>Package with plugins for the hector_gamepad_manager package</description>
   <maintainer email="simon.giegerich@stud.tu-darmstadt.de">Simon Giegerich</maintainer>
   <license>TODO: License declaration</license>
@@ -15,7 +15,7 @@
   <depend>controller_manager_msgs</depend>
   <depend>controller_orchestrator</depend>
   <depend>geometry_msgs</depend>
-  <depend>hector_gamepad_plugin_interface</depend>
+  <depend version_gte="0.1.0">hector_gamepad_plugin_interface</depend>
   <depend>hector_ros2_utils</depend>
   <depend>hector_ros_controllers_msgs</depend>
   <depend>moveit_msgs</depend>
