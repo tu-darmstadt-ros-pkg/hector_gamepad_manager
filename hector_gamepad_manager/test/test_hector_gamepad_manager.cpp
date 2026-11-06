@@ -813,22 +813,15 @@ TEST_F( HectorGamepadManagerTest, FlipperIndividualFrontMode )
   sendJoy();
 }
 
-// Verifies the e-stop toggle starts engaged and publishes nothing before the first press.
+// Verifies the e-stop toggle starts engaged, so the first press releases and every press flips.
+// GamepadEStopTest checks the value published at startup, which an rtest double cannot see.
 TEST_F( HectorGamepadManagerTest, BlackboardEstopTogglePublishes )
 {
   switchToConfig( "driving" );
-  ASSERT_FALSE( rtest::findPublisher<std_msgs::msg::Bool>( node_, "/athena/gamepad_e_stop" ) );
-  // The publisher is created on first use, so the first press (the release) creates it
-  setButton( "right_joy", 1, true );
-  sendJoy();
-
   auto pub_estop = rtest::findPublisher<std_msgs::msg::Bool>( node_, "/athena/gamepad_e_stop" );
   ASSERT_TRUE( pub_estop );
 
-  setButton( "right_joy", 0, true );
-  sendJoy();
-
-  EXPECT_CALL( *pub_estop, publish( ::testing::Field( &std_msgs::msg::Bool::data, true ) ) ).Times( 1 );
+  EXPECT_CALL( *pub_estop, publish( ::testing::Field( &std_msgs::msg::Bool::data, false ) ) ).Times( 1 );
   setButton( "right_joy", 1, true );
   sendJoy();
   ::testing::Mock::VerifyAndClearExpectations( pub_estop.get() );
@@ -836,7 +829,7 @@ TEST_F( HectorGamepadManagerTest, BlackboardEstopTogglePublishes )
   setButton( "right_joy", 0, true );
   sendJoy();
 
-  EXPECT_CALL( *pub_estop, publish( ::testing::Field( &std_msgs::msg::Bool::data, false ) ) ).Times( 1 );
+  EXPECT_CALL( *pub_estop, publish( ::testing::Field( &std_msgs::msg::Bool::data, true ) ) ).Times( 1 );
   setButton( "right_joy", 1, true );
   sendJoy();
 }

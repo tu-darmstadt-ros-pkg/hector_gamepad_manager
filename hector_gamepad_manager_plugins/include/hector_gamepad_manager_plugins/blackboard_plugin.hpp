@@ -17,7 +17,8 @@ namespace hector_gamepad_manager_plugins
  *  - "set" with args: name, set
  *
  * Behavior:
- *  - toggle: invert the boolean value on press
+ *  - toggle: invert the boolean value on press. With a topic it also publishes its value when
+ *            bound, so a start or respawn announces the initial value (e.g. an engaged e-stop)
  *  - hold:   set true on press, set false on release
  *  - set:    write <value> (string) on press
  *
@@ -32,6 +33,7 @@ public:
   void initialize( const rclcpp::Node::SharedPtr &node ) override;
 
   // Button interface
+  void bindButton( const std::string &function, const std::string &id ) override;
   void handlePress( const std::string &function, const std::string &id ) override;
   void handleRelease( const std::string &function, const std::string &id ) override;
 
@@ -50,6 +52,7 @@ private:
                  bool initial_value );
   void onHold( const std::string &var, const std::string &topic, bool value );
   void onSetString( const std::string &var, const std::string &value ) const;
+  void publishToggle( const std::string &topic, const std::string &ocs_topic, bool value );
 
   rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr getOrCreatePublisher( const std::string &topic );
 

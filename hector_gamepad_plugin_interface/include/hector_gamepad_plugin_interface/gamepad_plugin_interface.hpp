@@ -57,6 +57,18 @@ public:
   }
 
   /**
+   * @brief Called once for every button binding of this plugin when the configs are loaded.
+   *
+   * @param function The press function of the binding.
+   * @param id The binding id, as passed to handlePress().
+   */
+  virtual void bindButton( const std::string &function, const std::string &id )
+  {
+    (void)function;
+    (void)id;
+  }
+
+  /**
    * @brief Function for handling input events where the button or axis is held down.
    *
    * @param function The name of the function that is associated with the input event.

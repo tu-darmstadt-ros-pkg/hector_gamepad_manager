@@ -283,6 +283,7 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
     mapping.plugin = loadPlugin( plugin_name );
     if ( !mapping.plugin )
       return false;
+    mapping.plugin->bindButton( mapping.on_press.function, mapping.binding_id );
     mappings[entry.id] = std::move( mapping );
   }
   return true;
