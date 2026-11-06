@@ -100,7 +100,7 @@ buttons:
     description: Toggle software emergency stop
     args:
       name: software_e_stop
-      initial: 'false'
+      initial: 'true'
       topic: gamepad_e_stop
 
 

@@ -20,6 +20,8 @@
 #include <hector_gamepad_manager/gamepad_buttons.hpp>
 #include <hector_gamepad_manager/hector_gamepad_manager.hpp>
 #include <hector_gamepad_manager_msgs/msg/gamepad_mapping.hpp>
+#include <hector_gamepad_plugin_interface/yaml_helper.hpp>
+#include <yaml-cpp/yaml.h>
 
 #include <filesystem>
 #include <functional>
@@ -811,11 +813,12 @@ TEST_F( HectorGamepadManagerTest, FlipperIndividualFrontMode )
   sendJoy();
 }
 
-// Verifies e-stop toggle publishes expected Bool transitions.
+// Verifies the e-stop toggle starts engaged and publishes nothing before the first press.
 TEST_F( HectorGamepadManagerTest, BlackboardEstopTogglePublishes )
 {
   switchToConfig( "driving" );
-  // e-stop publisher is created on first use, so trigger it once to create it
+  ASSERT_FALSE( rtest::findPublisher<std_msgs::msg::Bool>( node_, "/athena/gamepad_e_stop" ) );
+  // The publisher is created on first use, so the first press (the release) creates it
   setButton( "right_joy", 1, true );
   sendJoy();
 
@@ -825,7 +828,7 @@ TEST_F( HectorGamepadManagerTest, BlackboardEstopTogglePublishes )
   setButton( "right_joy", 0, true );
   sendJoy();
 
-  EXPECT_CALL( *pub_estop, publish( ::testing::Field( &std_msgs::msg::Bool::data, false ) ) ).Times( 1 );
+  EXPECT_CALL( *pub_estop, publish( ::testing::Field( &std_msgs::msg::Bool::data, true ) ) ).Times( 1 );
   setButton( "right_joy", 1, true );
   sendJoy();
   ::testing::Mock::VerifyAndClearExpectations( pub_estop.get() );
@@ -833,9 +836,29 @@ TEST_F( HectorGamepadManagerTest, BlackboardEstopTogglePublishes )
   setButton( "right_joy", 0, true );
   sendJoy();
 
-  EXPECT_CALL( *pub_estop, publish( ::testing::Field( &std_msgs::msg::Bool::data, true ) ) ).Times( 1 );
+  EXPECT_CALL( *pub_estop, publish( ::testing::Field( &std_msgs::msg::Bool::data, false ) ) ).Times( 1 );
   setButton( "right_joy", 1, true );
   sendJoy();
+}
+
+// The e_stop_manager counts the gamepad e-stop as engaged until its first message, so the toggle
+// must start engaged too, or the first press would engage it again instead of releasing it.
+TEST( ShippedConfigs, GamepadEStopStartsEngaged )
+{
+  const auto config_dir = std::filesystem::path( __FILE__ ).parent_path().parent_path() / "config";
+  int e_stops = 0;
+  for ( const auto &entry : std::filesystem::directory_iterator( config_dir ) ) {
+    const YAML::Node buttons = YAML::LoadFile( entry.path().string() )["buttons"];
+    for ( const auto &button : buttons ) {
+      const YAML::Node args = button.second["args"];
+      if ( !args || !args["topic"] || args["topic"].as<std::string>() != "gamepad_e_stop" ) {
+        continue;
+      }
+      ++e_stops;
+      EXPECT_EQ( hector_gamepad_plugin_interface::is_bool( args["initial"] ), true ) << entry.path();
+    }
+  }
+  EXPECT_GT( e_stops, 0 );
 }
 
 // Verifies a hold with a topic publishes true on press and false on release.
