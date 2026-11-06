@@ -4,6 +4,8 @@
 #include <filesystem>
 #include <memory>
 #include <mutex>
+#include <random>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -22,12 +24,12 @@ protected:
   {
     client_ = std::make_shared<rclcpp::Node>( "gamepad_e_stop_test_client" );
     e_stop_sub_ = client_->create_subscription<std_msgs::msg::Bool>(
-        "/athena/gamepad_e_stop", rclcpp::QoS( 10 ).reliable().transient_local(),
+        "/" + ns_ + "/gamepad_e_stop", rclcpp::QoS( 10 ).reliable().transient_local(),
         [this]( const std_msgs::msg::Bool &msg ) {
           std::lock_guard<std::mutex> lock( mutex_ );
           received_.push_back( msg.data );
         } );
-    joy_pub_ = client_->create_publisher<sensor_msgs::msg::Joy>( "/athena/joy", 10 );
+    joy_pub_ = client_->create_publisher<sensor_msgs::msg::Joy>( "/" + ns_ + "/joy", 10 );
     executor_.add_node( client_ );
     startManager();
   }
@@ -46,7 +48,7 @@ protected:
         std::filesystem::path( __FILE__ ).parent_path() / "config" / "athena_plugin_config.yaml";
     rclcpp::NodeOptions options;
     options.arguments( { "--ros-args", "--params-file", params.string() } );
-    node_ = std::make_shared<rclcpp::Node>( "hector_gamepad_manager_test", "athena", options );
+    node_ = std::make_shared<rclcpp::Node>( "hector_gamepad_manager_test", ns_, options );
     manager_ = std::make_shared<hector_gamepad_manager::HectorGamepadManager>( node_ );
     executor_.add_node( node_ );
     spin_thread_ = std::thread( [this] { executor_.spin(); } );
@@ -99,6 +101,8 @@ protected:
     return false;
   }
 
+  // A namespace of its own, so parallel runs on one ROS domain cannot press each other's buttons.
+  const std::string ns_ = "gamepad_e_stop_test_" + std::to_string( std::random_device{}() );
   rclcpp::executors::SingleThreadedExecutor executor_;
   rclcpp::Node::SharedPtr client_;
   rclcpp::Node::SharedPtr node_;
