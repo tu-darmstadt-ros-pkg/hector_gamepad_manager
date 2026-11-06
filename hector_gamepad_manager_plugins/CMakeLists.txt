@@ -95,10 +95,15 @@ if(BUILD_TESTING)
            $<INSTALL_INTERFACE:include>)
   target_link_libraries(${PROJECT_NAME}_test_doubles
                         PUBLIC ${DEPENDENCIES_TARGETS})
+  # Compile only: a static gmock linked into this plugin would be a second copy
+  # next to the test executable's (double free at exit). Its gmock and rtest
+  # symbols resolve from the executable.
   target_link_libraries(
     ${PROJECT_NAME}_test_doubles
-    PRIVATE rtest::publisher_mock rtest::subscription_mock rtest::service_mock
-            rtest::service_client_mock rtest::rtest_common)
+    PRIVATE $<COMPILE_ONLY:rtest::publisher_mock>
+            $<COMPILE_ONLY:rtest::subscription_mock>
+            $<COMPILE_ONLY:rtest::service_mock>
+            $<COMPILE_ONLY:rtest::service_client_mock>)
   set_target_properties(
     ${PROJECT_NAME}_test_doubles
     PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib"
