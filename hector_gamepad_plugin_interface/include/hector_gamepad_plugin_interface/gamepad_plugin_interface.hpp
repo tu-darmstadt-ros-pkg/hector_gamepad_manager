@@ -61,6 +61,7 @@ public:
    *
    * @param function The press function of the binding.
    * @param id The binding id, as passed to handlePress().
+   * @throws std::invalid_argument to reject the binding, which fails the config load.
    */
   virtual void bindButton( const std::string &function, const std::string &id )
   {
@@ -102,7 +103,7 @@ public:
   T getConfigValueOr( const std::string &id, const std::string &param,
                       const T &default_value = T() ) const
   {
-    const std::string key = plugin_id_ + "_" + id + "/" + param;
+    const std::string key = configKey( id, param );
     if ( const T *value = blackboard_->try_get<T>( key ) )
       return *value;
     // A missing arg is the normal case for an optional one, so it passes quietly. An arg that IS
@@ -116,6 +117,13 @@ public:
                    param.c_str(), id.c_str() );
     }
     return default_value;
+  }
+
+  /// True if the binding's config sets @p param to a value readable as T.
+  template<typename T>
+  bool hasConfigValue( const std::string &id, const std::string &param ) const
+  {
+    return blackboard_->try_get<T>( configKey( id, param ) ) != nullptr;
   }
 
   /**
@@ -231,6 +239,11 @@ protected:
     }
     return result;
   }
+  std::string configKey( const std::string &id, const std::string &param ) const
+  {
+    return plugin_id_ + "_" + id + "/" + param;
+  }
+
   // The ROS node in the robot namespace
   rclcpp::Node::SharedPtr node_;
 

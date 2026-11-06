@@ -18,7 +18,8 @@ namespace hector_gamepad_manager_plugins
  *
  * Behavior:
  *  - toggle: invert the boolean value on press. With a topic it also publishes its value when
- *            bound, so a start or respawn announces the initial value (e.g. an engaged e-stop)
+ *            bound, so a start or respawn announces the initial value (e.g. an engaged e-stop).
+ *            A toggle with a topic must therefore set initial, or the config fails to load
  *  - hold:   set true on press, set false on release
  *  - set:    write <value> (string) on press
  *

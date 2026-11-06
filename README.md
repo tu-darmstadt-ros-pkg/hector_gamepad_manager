@@ -361,9 +361,11 @@ It supports toggling and holding boolean values as well as setting string values
 * `toggle`: Toggles a boolean variable in the blackboard.
     - `args`:
         - `name`: The name of the variable to toggle.
-        - `initial`: Optional, the initial value of the variable if it does not exist yet (default is `false`).
-        - `topic`: Optional, if set the plugin will publish the new value to the specified topic whenever it changes (
-          transient_local, std_msgs/Bool).
+        - `initial`: The initial value of the variable if it does not exist yet. Optional without a `topic` (default
+          is `false`), required with one, or the config fails to load.
+        - `topic`: Optional, if set the plugin will publish the value to the specified topic when the config is loaded
+          and whenever it changes (transient_local, std_msgs/Bool). For an e-stop use `initial: true`, so every start
+          of the gamepad manager engages it.
     - Example: `toggle` with name inverted_steering → toggles the `inverted_steering` variable between `true` and
       `false`.
 * `hold`: Sets a boolean variable in the blackboard to `true` while the button is pressed, and resets it to `false`

@@ -1,0 +1,8 @@
+# A toggle with a topic but no initial value. Binding it would publish false, which releases an
+# e-stop, so the config must be rejected at load time.
+axes: {}
+buttons:
+  a:
+    plugin: hector_gamepad_manager_plugins::BlackboardPlugin
+    function: toggle
+    args: {name: probe_toggle, topic: probe_toggle}

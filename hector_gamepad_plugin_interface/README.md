@@ -59,6 +59,7 @@ Available as protected members after initialization:
 
 - `getConfigValueOr<T>(id, param, default)` - read an `args` value for this plugin/config from the
   blackboard, namespaced by plugin id and config id.
+- `hasConfigValue<T>(id, param)` - whether that `args` value is set and readable as `T`.
 - `activateControllers(names, callback = nullptr)` - switch ros2_control controllers asynchronously.
 - `areControllersActive(names)` - check whether the given controllers are active.
 - `isActive()`, `getPluginId()`, `getPluginName()`, `getPluginNamespace()` - accessors.

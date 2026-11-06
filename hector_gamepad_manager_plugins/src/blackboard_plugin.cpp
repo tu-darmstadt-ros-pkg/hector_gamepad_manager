@@ -1,6 +1,7 @@
 #include "hector_gamepad_manager_plugins/blackboard_plugin.hpp"
 
 #include <pluginlib/class_list_macros.hpp>
+#include <stdexcept>
 #include <utility>
 
 namespace hector_gamepad_manager_plugins
@@ -30,11 +31,16 @@ void BlackboardPlugin::bindButton( const std::string &function, const std::strin
 {
   if ( function != "toggle" )
     return;
+  const std::string topic = getConfigValueOr<std::string>( id, "topic", "" );
+  // The initial value is published right away, so a forgotten one would release an e-stop.
+  if ( !topic.empty() && !hasConfigValue<bool>( id, "initial" ) ) {
+    throw std::invalid_argument( "Toggle '" + id + "' publishes on '" + topic +
+                                 "' and must set 'initial' to true or false" );
+  }
   const std::string &name = getConfigValueOr<std::string>( id, "name" );
   const bool initial_value = getConfigValueOr<bool>( id, "initial", false );
   const bool value = blackboard_->get_or_emplace<bool>( name, initial_value );
-  publishToggle( getConfigValueOr<std::string>( id, "topic", "" ),
-                 getConfigValueOr<std::string>( id, "ocs_topic", "" ), value );
+  publishToggle( topic, getConfigValueOr<std::string>( id, "ocs_topic", "" ), value );
 }
 
 void BlackboardPlugin::handlePress( const std::string &function, const std::string &id )

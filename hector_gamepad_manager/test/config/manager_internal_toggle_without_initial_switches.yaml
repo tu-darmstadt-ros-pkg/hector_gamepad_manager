@@ -1,0 +1,3 @@
+default_config: manager_internal_toggle_without_initial
+buttons:
+  start: {package: hector_gamepad_manager, config: manager_internal_toggle_without_initial}
