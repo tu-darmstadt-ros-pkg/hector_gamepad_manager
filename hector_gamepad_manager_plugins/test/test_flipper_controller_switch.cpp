@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <rclcpp/rclcpp.hpp>
 
+#include <controller_manager_msgs/srv/list_controllers.hpp>
 #include <controller_manager_msgs/srv/switch_controller.hpp>
 #include <controller_orchestrator/controller_orchestrator.hpp>
 #include <hector_gamepad_manager_plugins/flipper_plugin.hpp>
@@ -13,6 +14,7 @@
 #include <thread>
 #include <vector>
 
+using controller_manager_msgs::srv::ListControllers;
 using controller_manager_msgs::srv::SwitchController;
 using namespace std::chrono_literals;
 
@@ -28,15 +30,21 @@ protected:
                                    { "flipper_plugin.speed", 1.0 },
                                    { "flipper_plugin.flipper_front_factor", 1.0 } } );
     node_ = std::make_shared<rclcpp::Node>( "flipper_controller_switch_test", options );
-    switch_service_ = node_->create_service<SwitchController>(
-        "controller_manager/switch_controller",
-        [this]( const std::shared_ptr<SwitchController::Request> request,
-                const std::shared_ptr<SwitchController::Response> response ) {
+    // force_auto lets the orchestrator send the switch without planning it
+    cm_node_ = std::make_shared<rclcpp::Node>( "controller_manager" );
+    cm_node_->declare_parameter( "capabilities", std::vector<std::string>{ "force_auto" } );
+    list_service_ = cm_node_->create_service<ListControllers>(
+        "~/list_controllers",
+        []( const ListControllers::Request::SharedPtr, ListControllers::Response::SharedPtr ) { } );
+    switch_service_ = cm_node_->create_service<SwitchController>(
+        "~/switch_controller", [this]( const std::shared_ptr<SwitchController::Request> request,
+                                       const std::shared_ptr<SwitchController::Response> response ) {
           const std::lock_guard<std::mutex> lock( mutex_ );
           requests_.push_back( *request );
           response->ok = true;
         } );
     executor_.add_node( node_ );
+    executor_.add_node( cm_node_ );
     spinner_ = std::thread( [this]() { executor_.spin(); } );
 
     plugin_ = std::make_shared<hector_gamepad_manager_plugins::FlipperPlugin>();
@@ -55,6 +63,8 @@ protected:
   }
 
   rclcpp::Node::SharedPtr node_;
+  rclcpp::Node::SharedPtr cm_node_;
+  rclcpp::Service<ListControllers>::SharedPtr list_service_;
   rclcpp::Service<SwitchController>::SharedPtr switch_service_;
   rclcpp::executors::MultiThreadedExecutor executor_;
   std::thread spinner_;
