@@ -1,4 +1,0 @@
-/**:
-  ros__parameters:
-    config_name: manager_internal_toggle_without_initial_switches
-    config_directory: test/config

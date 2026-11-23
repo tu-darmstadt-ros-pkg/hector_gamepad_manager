@@ -283,7 +283,6 @@ bool HectorGamepadManager::initButtonMappings( const YAML::Node &config,
     mapping.plugin = loadPlugin( plugin_name );
     if ( !mapping.plugin )
       return false;
-    mapping.plugin->bindButton( mapping.on_press.function, mapping.binding_id );
     mappings[entry.id] = std::move( mapping );
   }
   return true;
@@ -573,7 +572,7 @@ std::string HectorGamepadManager::getPath( const std::string &pkg_name, const st
   if ( config_dir.is_absolute() ) {
     path = config_dir / file_name;
   } else {
-    const auto package_path = ament_index_cpp::get_package_share_path(pkg_name).string();
+    const auto package_path = ament_index_cpp::get_package_share_path( pkg_name ).string();
     path = std::filesystem::path( package_path ) / config_directory_ / file_name;
   }
   if ( path.extension() != ".yaml" ) {

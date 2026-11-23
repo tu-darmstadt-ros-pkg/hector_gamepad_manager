@@ -1,7 +1,6 @@
 #include "hector_gamepad_manager_plugins/blackboard_plugin.hpp"
 
 #include <pluginlib/class_list_macros.hpp>
-#include <stdexcept>
 #include <utility>
 
 namespace hector_gamepad_manager_plugins
@@ -25,22 +24,6 @@ void BlackboardPlugin::deactivate()
 {
   active_ = false;
   RCLCPP_DEBUG( node_->get_logger(), "[blackboard_plugin] deactivated" );
-}
-
-void BlackboardPlugin::bindButton( const std::string &function, const std::string &id )
-{
-  if ( function != "toggle" )
-    return;
-  const std::string topic = getConfigValueOr<std::string>( id, "topic", "" );
-  // The initial value is published right away, so a forgotten one would release an e-stop.
-  if ( !topic.empty() && !hasConfigValue<bool>( id, "initial" ) ) {
-    throw std::invalid_argument( "Toggle '" + id + "' publishes on '" + topic +
-                                 "' and must set 'initial' to true or false" );
-  }
-  const std::string &name = getConfigValueOr<std::string>( id, "name" );
-  const bool initial_value = getConfigValueOr<bool>( id, "initial", false );
-  const bool value = blackboard_->get_or_emplace<bool>( name, initial_value );
-  publishToggle( topic, getConfigValueOr<std::string>( id, "ocs_topic", "" ), value );
 }
 
 void BlackboardPlugin::handlePress( const std::string &function, const std::string &id )
@@ -102,23 +85,22 @@ void BlackboardPlugin::onToggle( const std::string &var, const std::string &topi
   // Fetch or create bool with default false, then invert
   bool &ref = blackboard_->get_or_emplace<bool>( var, initial_value );
   ref = !ref;
-  publishToggle( topic, ocs_topic, ref );
 
-  RCLCPP_DEBUG( node_->get_logger(), "[blackboard_plugin] toggle %s -> %s", var.c_str(),
-                ref ? "true" : "false" );
-}
+  auto msg = std_msgs::msg::Bool();
+  msg.data = ref;
 
-void BlackboardPlugin::publishToggle( const std::string &topic, const std::string &ocs_topic,
-                                      bool value )
-{
-  const auto msg = std_msgs::msg::Bool().set__data( value );
+  // Publish to robot namespace topic if specified
   if ( !topic.empty() ) {
     getOrCreatePublisher( topic )->publish( msg );
   }
-  // An optional second, OCS-facing topic
+
+  // Publish to an optional separate OCS-facing topic if specified
   if ( !ocs_topic.empty() && ocs_topic != topic ) {
     getOrCreatePublisher( ocs_topic )->publish( msg );
   }
+
+  RCLCPP_DEBUG( node_->get_logger(), "[blackboard_plugin] toggle %s -> %s", var.c_str(),
+                ref ? "true" : "false" );
 }
 
 void BlackboardPlugin::onHold( const std::string &var, const std::string &topic, bool value )

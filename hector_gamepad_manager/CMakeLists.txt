@@ -39,8 +39,6 @@ foreach(dependency IN LISTS DEPENDENCIES)
 endforeach()
 
 find_package(rclcpp_components REQUIRED)
-# Plugins built against an older interface crash the manager when loaded.
-find_package(hector_gamepad_manager_plugins 0.1.0 REQUIRED)
 
 set(HEADERS
     include/hector_gamepad_manager/hector_gamepad_manager.hpp
@@ -139,13 +137,6 @@ if(BUILD_TESTING)
       ENVIRONMENT
       "AMENT_PREFIX_PATH=${PLUGIN_TEST_PREFIX}:${CMAKE_INSTALL_PREFIX}:$ENV{AMENT_PREFIX_PATH}"
   )
-
-  # Real publishers and the installed plugins instead of rtest doubles, to
-  # observe what is published during startup.
-  ament_add_gmock(test_gamepad_e_stop test/main.cpp
-                  test/test_gamepad_e_stop.cpp)
-  target_link_libraries(test_gamepad_e_stop ${PROJECT_NAME}
-                        ${DEPENDENCIES_TARGETS})
 
   # Builder unit test: pure message construction, no node or rtest needed.
   ament_add_gmock(test_gamepad_mapping_builder test/main.cpp

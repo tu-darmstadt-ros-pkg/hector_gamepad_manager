@@ -72,7 +72,7 @@ buttons:
     function: toggle
     args:
       name: software_e_stop
-      initial: 'true'
+      initial: 'false'
       topic: gamepad_e_stop
 
   share: # Button Share (only on newer Xbox controllers)

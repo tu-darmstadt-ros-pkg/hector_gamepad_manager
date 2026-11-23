@@ -17,12 +17,9 @@
 #include <std_msgs/msg/float64_multi_array.hpp>
 #include <std_msgs/msg/string.hpp>
 
-#include <ament_index_cpp/get_package_share_path.hpp>
 #include <hector_gamepad_manager/gamepad_buttons.hpp>
 #include <hector_gamepad_manager/hector_gamepad_manager.hpp>
 #include <hector_gamepad_manager_msgs/msg/gamepad_mapping.hpp>
-#include <hector_gamepad_plugin_interface/yaml_helper.hpp>
-#include <yaml-cpp/yaml.h>
 
 #include <filesystem>
 #include <functional>
@@ -814,13 +811,19 @@ TEST_F( HectorGamepadManagerTest, FlipperIndividualFrontMode )
   sendJoy();
 }
 
-// Verifies the e-stop toggle starts engaged, so the first press releases and every press flips.
-// GamepadEStopTest checks the value published at startup, which an rtest double cannot see.
+// Verifies e-stop toggle publishes expected Bool transitions.
 TEST_F( HectorGamepadManagerTest, BlackboardEstopTogglePublishes )
 {
   switchToConfig( "driving" );
+  // e-stop publisher is created on first use, so trigger it once to create it
+  setButton( "right_joy", 1, true );
+  sendJoy();
+
   auto pub_estop = rtest::findPublisher<std_msgs::msg::Bool>( node_, "/athena/gamepad_e_stop" );
   ASSERT_TRUE( pub_estop );
+
+  setButton( "right_joy", 0, true );
+  sendJoy();
 
   EXPECT_CALL( *pub_estop, publish( ::testing::Field( &std_msgs::msg::Bool::data, false ) ) ).Times( 1 );
   setButton( "right_joy", 1, true );
@@ -833,45 +836,6 @@ TEST_F( HectorGamepadManagerTest, BlackboardEstopTogglePublishes )
   EXPECT_CALL( *pub_estop, publish( ::testing::Field( &std_msgs::msg::Bool::data, true ) ) ).Times( 1 );
   setButton( "right_joy", 1, true );
   sendJoy();
-}
-
-// Binding publishes an e-stop toggle's initial value, so one that starts released would release
-// the e-stop at every gamepad manager start. Checks every config a shipped config switch file loads.
-TEST( ShippedConfigs, GamepadEStopStartsEngaged )
-{
-  const auto config_dir = std::filesystem::path( __FILE__ ).parent_path().parent_path() / "config";
-  int e_stops = 0;
-  const auto check_bindings = [&e_stops]( const YAML::Node &bindings, const std::string &path ) {
-    for ( const auto &binding : bindings ) {
-      const YAML::Node node = binding.second;
-      const YAML::Node press = node["on_press"] ? node["on_press"] : node;
-      const YAML::Node args = node["args"] ? node["args"] : press["args"];
-      if ( !args || args["topic"].as<std::string>( "" ) != "gamepad_e_stop" )
-        continue;
-      ++e_stops;
-      EXPECT_EQ( hector_gamepad_plugin_interface::is_bool( args["initial"] ), true ) << path;
-    }
-  };
-  for ( const auto &entry : std::filesystem::directory_iterator( config_dir ) ) {
-    const YAML::Node switches = YAML::LoadFile( entry.path().string() );
-    if ( !switches["default_config"] )
-      continue;
-    for ( const auto &section : { "buttons", "axis_buttons" } ) {
-      for ( const auto &config_switch : switches[section] ) {
-        const auto package = config_switch.second["package"].as<std::string>( "" );
-        const auto config = config_switch.second["config"].as<std::string>( "" );
-        if ( package.empty() || config.empty() )
-          continue;
-        const auto path =
-            ( ament_index_cpp::get_package_share_path( package ) / "config" / ( config + ".yaml" ) )
-                .string();
-        const YAML::Node loaded = YAML::LoadFile( path );
-        check_bindings( loaded["buttons"], path );
-        check_bindings( loaded["axis_buttons"], path );
-      }
-    }
-  }
-  EXPECT_GT( e_stops, 0 );
 }
 
 // Verifies a hold with a topic publishes true on press and false on release.

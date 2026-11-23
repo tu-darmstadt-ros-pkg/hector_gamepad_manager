@@ -6,7 +6,6 @@
 
 #include <sensor_msgs/msg/joy.hpp>
 #include <sensor_msgs/msg/joy_feedback.hpp>
-#include <std_msgs/msg/bool.hpp>
 #include <std_msgs/msg/string.hpp>
 
 #include <hector_gamepad_manager/hector_gamepad_manager.hpp>
@@ -153,16 +152,6 @@ TEST( HectorGamepadManagerConfigValidation, RejectsUnknownAxisButtonNames )
                                   "manager_internal_bad_axis_name_params.yaml" );
   auto manager = std::make_shared<hector_gamepad_manager::HectorGamepadManager>( node );
   EXPECT_FALSE( rtest::findSubscription<sensor_msgs::msg::Joy>( node, "/athena/joy" ) );
-}
-
-// Binding publishes a toggle's initial value, so one with a topic must state it.
-TEST( HectorGamepadManagerConfigValidation, RejectsToggleWithTopicButNoInitial )
-{
-  auto node = makeNodeWithParams( "gamepad_manager_toggle_without_initial_test",
-                                  "manager_internal_toggle_without_initial_params.yaml" );
-  auto manager = std::make_shared<hector_gamepad_manager::HectorGamepadManager>( node );
-  EXPECT_FALSE( rtest::findSubscription<sensor_msgs::msg::Joy>( node, "/athena/joy" ) );
-  EXPECT_FALSE( rtest::findPublisher<std_msgs::msg::Bool>( node, "/athena/probe_toggle" ) );
 }
 
 TEST_F( HectorGamepadManagerInternalTest, ButtonHoldAndReleaseSequence )
