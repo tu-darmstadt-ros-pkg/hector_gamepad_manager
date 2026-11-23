@@ -25,11 +25,11 @@ target_include_directories(
   INTERFACE "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
             "$<INSTALL_INTERFACE:include>")
 target_link_libraries(${PROJECT_NAME} INTERFACE yaml-cpp)
-target_link_libraries(${PROJECT_NAME} INTERFACE
-                      rclcpp::rclcpp
-                      rcl_interfaces::rcl_interfaces
-                      sensor_msgs::sensor_msgs
-                      controller_orchestrator::controller_orchestrator)
+target_link_libraries(
+  ${PROJECT_NAME}
+  INTERFACE rclcpp::rclcpp rcl_interfaces::rcl_interfaces
+            sensor_msgs::sensor_msgs
+            controller_orchestrator::controller_orchestrator)
 
 install(
   TARGETS ${PROJECT_NAME}
