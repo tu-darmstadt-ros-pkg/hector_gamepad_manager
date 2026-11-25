@@ -26,13 +26,13 @@ set(DEPENDENCIES
     controller_orchestrator
     hector_gamepad_manager_msgs)
 set(DEPENDENCIES_TARGETS
-  pluginlib::pluginlib
-  rclcpp::rclcpp
-  sensor_msgs::sensor_msgs
-  yaml-cpp::yaml-cpp
-  hector_gamepad_plugin_interface::hector_gamepad_plugin_interface
-  controller_orchestrator::controller_orchestrator
-  hector_gamepad_manager_msgs::hector_gamepad_manager_msgs)
+    pluginlib::pluginlib
+    rclcpp::rclcpp
+    sensor_msgs::sensor_msgs
+    yaml-cpp::yaml-cpp
+    hector_gamepad_plugin_interface::hector_gamepad_plugin_interface
+    controller_orchestrator::controller_orchestrator
+    hector_gamepad_manager_msgs::hector_gamepad_manager_msgs)
 
 foreach(dependency IN LISTS DEPENDENCIES)
   find_package(${dependency} REQUIRED)
@@ -65,10 +65,10 @@ add_executable(joy_satellite_node src/joy_satellite_node.cpp)
 target_include_directories(
   joy_satellite_node
   PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
-target_link_libraries(joy_satellite_node PUBLIC
-                      rclcpp::rclcpp
-                      sensor_msgs::sensor_msgs
-                      hector_gamepad_manager_msgs::hector_gamepad_manager_msgs)
+target_link_libraries(
+  joy_satellite_node
+  PUBLIC rclcpp::rclcpp sensor_msgs::sensor_msgs
+         hector_gamepad_manager_msgs::hector_gamepad_manager_msgs)
 
 # Same node exposed as a composable component for loading into a shared
 # container.
@@ -76,11 +76,10 @@ add_library(joy_satellite_component SHARED src/joy_satellite_component.cpp)
 target_include_directories(
   joy_satellite_component
   PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
-target_link_libraries(joy_satellite_component
-                      rclcpp::rclcpp
-                      rclcpp_components::component
-                      sensor_msgs::sensor_msgs
-                      hector_gamepad_manager_msgs::hector_gamepad_manager_msgs)
+target_link_libraries(
+  joy_satellite_component rclcpp::rclcpp rclcpp_components::component
+  sensor_msgs::sensor_msgs
+  hector_gamepad_manager_msgs::hector_gamepad_manager_msgs)
 rclcpp_components_register_nodes(joy_satellite_component
                                  "hector_gamepad_manager::JoySatelliteNode")
 
@@ -107,7 +106,8 @@ if(BUILD_TESTING)
 
   # 1. Generate Test Doubles
   test_tools_add_doubles(${PROJECT_NAME})
-  target_link_libraries(${PROJECT_NAME}_test_doubles PUBLIC ${DEPENDENCIES_TARGETS})
+  target_link_libraries(${PROJECT_NAME}_test_doubles
+                        PUBLIC ${DEPENDENCIES_TARGETS})
 
   # 1. Create the GTest/GMock executable
   ament_add_gmock(
@@ -121,10 +121,9 @@ if(BUILD_TESTING)
   # 1. Link against the Test Doubles
   target_link_libraries(${PROJECT_NAME}_test
                         ${PROJECT_NAME}::${PROJECT_NAME}_test_doubles)
-  target_link_libraries(${PROJECT_NAME}_test
-                        ${DEPENDENCIES_TARGETS}
-                        ${rtest_TARGETS}
-                        controller_manager_msgs::controller_manager_msgs)
+  target_link_libraries(
+    ${PROJECT_NAME}_test ${DEPENDENCIES_TARGETS} ${rtest_TARGETS}
+    controller_manager_msgs::controller_manager_msgs)
 
   # 1. Add includes for tests
   target_include_directories(${PROJECT_NAME}_test
@@ -152,11 +151,9 @@ if(BUILD_TESTING)
   ament_add_gmock(test_joy_satellite test/main.cpp test/test_joy_satellite.cpp)
   target_include_directories(test_joy_satellite
                              PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
-  target_link_libraries(test_joy_satellite
-                        rclcpp::rclcpp
-                        sensor_msgs::sensor_msgs
-                        hector_gamepad_manager_msgs::hector_gamepad_manager_msgs
-                        ${rtest_TARGETS})
+  target_link_libraries(
+    test_joy_satellite rclcpp::rclcpp sensor_msgs::sensor_msgs
+    hector_gamepad_manager_msgs::hector_gamepad_manager_msgs ${rtest_TARGETS})
   target_link_libraries(
     test_joy_satellite rtest::publisher_mock rtest::subscription_mock
     rtest::service_mock rtest::rtest_common)

@@ -2,20 +2,24 @@
 #include <rclcpp/rclcpp.hpp>
 
 #include <controller_manager_msgs/srv/list_controllers.hpp>
+#include <controller_manager_msgs/srv/switch_controller.hpp>
 #include <controller_orchestrator/controller_orchestrator.hpp>
 #include <hector_gamepad_manager_plugins/flipper_plugin.hpp>
 #include <hector_gamepad_plugin_interface/blackboard.hpp>
 #include <hector_gamepad_plugin_interface/feedback_manager.hpp>
 
-#include <atomic>
 #include <chrono>
 #include <memory>
+#include <mutex>
 #include <thread>
+#include <vector>
 
 using controller_manager_msgs::srv::ListControllers;
+using controller_manager_msgs::srv::SwitchController;
 using namespace std::chrono_literals;
 
-// A flipper command lists the controllers to switch them, unless switch_controllers is off.
+// A flipper command sends one FORCE_AUTO switch for its teleop controllers, unless
+// switch_controllers is off.
 class FlipperControllerSwitchTest : public ::testing::TestWithParam<bool>
 {
 protected:
@@ -26,11 +30,21 @@ protected:
                                    { "flipper_plugin.speed", 1.0 },
                                    { "flipper_plugin.flipper_front_factor", 1.0 } } );
     node_ = std::make_shared<rclcpp::Node>( "flipper_controller_switch_test", options );
-    list_service_ = node_->create_service<ListControllers>(
-        "controller_manager/list_controllers",
-        [this]( const std::shared_ptr<ListControllers::Request>,
-                const std::shared_ptr<ListControllers::Response> ) { list_requests_++; } );
+    // force_auto lets the orchestrator send the switch without planning it
+    cm_node_ = std::make_shared<rclcpp::Node>( "controller_manager" );
+    cm_node_->declare_parameter( "capabilities", std::vector<std::string>{ "force_auto" } );
+    list_service_ = cm_node_->create_service<ListControllers>(
+        "~/list_controllers",
+        []( const ListControllers::Request::SharedPtr, ListControllers::Response::SharedPtr ) { } );
+    switch_service_ = cm_node_->create_service<SwitchController>(
+        "~/switch_controller", [this]( const std::shared_ptr<SwitchController::Request> request,
+                                       const std::shared_ptr<SwitchController::Response> response ) {
+          const std::lock_guard<std::mutex> lock( mutex_ );
+          requests_.push_back( *request );
+          response->ok = true;
+        } );
     executor_.add_node( node_ );
+    executor_.add_node( cm_node_ );
     spinner_ = std::thread( [this]() { executor_.spin(); } );
 
     plugin_ = std::make_shared<hector_gamepad_manager_plugins::FlipperPlugin>();
@@ -49,25 +63,41 @@ protected:
   }
 
   rclcpp::Node::SharedPtr node_;
+  rclcpp::Node::SharedPtr cm_node_;
   rclcpp::Service<ListControllers>::SharedPtr list_service_;
+  rclcpp::Service<SwitchController>::SharedPtr switch_service_;
   rclcpp::executors::MultiThreadedExecutor executor_;
   std::thread spinner_;
   std::shared_ptr<hector_gamepad_manager_plugins::FlipperPlugin> plugin_;
-  std::atomic<int> list_requests_{ 0 };
+  std::mutex mutex_;
+  std::vector<SwitchController::Request> requests_;
 };
 
 TEST_P( FlipperControllerSwitchTest, FlipperCommandSwitchesOnlyWhenAllowed )
 {
   // The orchestrator sends a switch request once its client has discovered the service.
+  const auto requested = [this] {
+    const std::lock_guard<std::mutex> lock( mutex_ );
+    return !requests_.empty();
+  };
   const auto deadline = std::chrono::steady_clock::now() + 5s;
-  while ( list_requests_ == 0 && std::chrono::steady_clock::now() < deadline ) {
+  while ( !requested() && std::chrono::steady_clock::now() < deadline ) {
     plugin_->handleAxis( "flipper_front_down", "test_id", 1.0 );
     plugin_->update();
     plugin_->handleAxis( "flipper_front_down", "test_id", 0.0 );
     plugin_->update();
     std::this_thread::sleep_for( 50ms );
   }
-  EXPECT_EQ( list_requests_ > 0, GetParam() );
+  ASSERT_EQ( requested(), GetParam() );
+  if ( !GetParam() )
+    return;
+  const std::lock_guard<std::mutex> lock( mutex_ );
+  const auto &request = requests_.front();
+  EXPECT_EQ( request.strictness, SwitchController::Request::FORCE_AUTO );
+  EXPECT_EQ( request.activate_controllers,
+             ( std::vector<std::string>{ "self_collision_avoidance_controller",
+                                         "flipper_velocity_controller" } ) );
+  EXPECT_TRUE( request.deactivate_controllers.empty() );
 }
 
 INSTANTIATE_TEST_SUITE_P( SwitchControllers, FlipperControllerSwitchTest,

@@ -31,23 +31,23 @@ set(DEPENDENCIES
     std_srvs
     tf2_eigen)
 set(DEPENDENCIES_TARGETS
-  controller_manager_msgs::controller_manager_msgs
-  controller_orchestrator::controller_orchestrator
-  geometry_msgs::geometry_msgs
-  hector_gamepad_plugin_interface::hector_gamepad_plugin_interface
-  hector_ros_controllers_msgs::hector_ros_controllers_msgs
-  hector_ros2_utils::hector_ros2_utils
-  moveit_msgs::moveit_msgs
-  pluginlib::pluginlib
-  ros_babel_fish::ros_babel_fish
-  rcl_interfaces::rcl_interfaces
-  rclcpp::rclcpp
-  rclcpp_action::rclcpp_action
-  sensor_msgs::sensor_msgs
-  srdfdom::srdfdom
-  std_msgs::std_msgs
-  std_srvs::std_srvs
-  tf2_eigen::tf2_eigen)
+    controller_manager_msgs::controller_manager_msgs
+    controller_orchestrator::controller_orchestrator
+    geometry_msgs::geometry_msgs
+    hector_gamepad_plugin_interface::hector_gamepad_plugin_interface
+    hector_ros_controllers_msgs::hector_ros_controllers_msgs
+    hector_ros2_utils::hector_ros2_utils
+    moveit_msgs::moveit_msgs
+    pluginlib::pluginlib
+    ros_babel_fish::ros_babel_fish
+    rcl_interfaces::rcl_interfaces
+    rclcpp::rclcpp
+    rclcpp_action::rclcpp_action
+    sensor_msgs::sensor_msgs
+    srdfdom::srdfdom
+    std_msgs::std_msgs
+    std_srvs::std_srvs
+    tf2_eigen::tf2_eigen)
 
 foreach(dependency IN LISTS DEPENDENCIES)
   find_package(${dependency} REQUIRED)
@@ -93,11 +93,17 @@ if(BUILD_TESTING)
     ${PROJECT_NAME}_test_doubles
     PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
            $<INSTALL_INTERFACE:include>)
-  target_link_libraries(${PROJECT_NAME}_test_doubles PUBLIC ${DEPENDENCIES_TARGETS})
+  target_link_libraries(${PROJECT_NAME}_test_doubles
+                        PUBLIC ${DEPENDENCIES_TARGETS})
+  # Compile only: a static gmock linked into this plugin would be a second copy
+  # next to the test executable's (double free at exit). Its gmock and rtest
+  # symbols resolve from the executable.
   target_link_libraries(
     ${PROJECT_NAME}_test_doubles
-    PRIVATE rtest::publisher_mock rtest::subscription_mock rtest::service_mock
-            rtest::service_client_mock rtest::rtest_common)
+    PRIVATE $<COMPILE_ONLY:rtest::publisher_mock>
+            $<COMPILE_ONLY:rtest::subscription_mock>
+            $<COMPILE_ONLY:rtest::service_mock>
+            $<COMPILE_ONLY:rtest::service_client_mock>)
   set_target_properties(
     ${PROJECT_NAME}_test_doubles
     PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/lib"
@@ -114,7 +120,8 @@ if(BUILD_TESTING)
   target_include_directories(
     test_flipper_plugin
     PRIVATE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
-  target_link_libraries(test_flipper_plugin ${DEPENDENCIES_TARGETS} ${rtest_TARGETS})
+  target_link_libraries(test_flipper_plugin ${DEPENDENCIES_TARGETS}
+                        ${rtest_TARGETS})
   target_link_libraries(
     test_flipper_plugin
     rtest::publisher_mock
